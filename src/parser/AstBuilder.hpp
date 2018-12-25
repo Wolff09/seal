@@ -26,28 +26,22 @@ class AstBuilder : public cola::CoLaVisitor { // TODO: should this be a private 
 		using TypeMap = std::unordered_map<std::string, std::reference_wrapper<const Type>>;
 		using VariableMap = std::unordered_map<std::string, std::unique_ptr<VariableDeclaration>>;
 		using FunctionMap = std::unordered_map<std::string, Function&>;
-		using ArgDeclList = std::vector<std::pair<std::string, std::reference_wrapper<const Type>>>;
+		using ArgDeclList = std::vector<std::pair<std::string, std::string>>;
 		std::shared_ptr<Program> _program = nullptr;
-		std::shared_ptr<Function> _currentFunction = nullptr;
 		std::deque<VariableMap> _scope;
 		TypeMap _types;
 		FunctionMap _functions;
-		ExprForm _exprSplit; // first thing that should be splitted
-		std::size_t _tmpCounter = 0;
-		bool _simplify = true;
-		// TODO: switch to turn simplification on/off
+		bool _inside_loop = false;
 
 		void pushScope();
 		std::vector<std::unique_ptr<VariableDeclaration>> popScope();
 		void addVariable(std::unique_ptr<VariableDeclaration> variable);
 		bool isVariableDeclared(std::string variableName);
 		const VariableDeclaration& lookupVariable(std::string variableName);
-		const VariableDeclaration& makeAuxVar(const Type& type); // resulting variable will be non-shared
 		bool isTypeDeclared(std::string typeName);
 		const Type& lookupType(std::string typeName);
-		std::unique_ptr<Statement> mk_stmt_from_list(std::vector<cola::CoLaParser::StatementContext*> context);
-		std::unique_ptr<Statement> mk_stmt_from_list(std::vector<Statement*> stmts);
-		void transformIfRequired(ExprTrans& trans, ExprForm newform);
+		std::unique_ptr<Statement> mk_stmt_from_list(std::vector<cola::CoLaParser::StatementContext*> stmts);
+		std::unique_ptr<Statement> mk_stmt_from_list(std::vector<Statement*> stmts); // claims ownership of stmts
 
 	public:
 		static std::shared_ptr<Program> buildFrom(cola::CoLaParser::ProgramContext* parseTree);
@@ -67,7 +61,8 @@ class AstBuilder : public cola::CoLaVisitor { // TODO: should this be a private 
 		antlrcpp::Any visitArgDeclList(cola::CoLaParser::ArgDeclListContext *context) override;
 
 		antlrcpp::Any visitBlockStmt(cola::CoLaParser::BlockStmtContext* context) override;
-		antlrcpp::Any visitBlockBlock(cola::CoLaParser::BlockBlockContext* context) override;
+		antlrcpp::Any visitBlockScope(cola::CoLaParser::BlockScopeContext* context) override;
+    	antlrcpp::Any visitScope(cola::CoLaParser::ScopeContext* context) override;
 		antlrcpp::Any visitStmtIf(cola::CoLaParser::StmtIfContext* context) override;
 		antlrcpp::Any visitStmtWhile(cola::CoLaParser::StmtWhileContext* context) override;
 		antlrcpp::Any visitStmtDo(cola::CoLaParser::StmtDoContext* context) override;
@@ -75,13 +70,13 @@ class AstBuilder : public cola::CoLaVisitor { // TODO: should this be a private 
 		antlrcpp::Any visitStmtLoop(cola::CoLaParser::StmtLoopContext* context) override;
 		antlrcpp::Any visitStmtAtomic(cola::CoLaParser::StmtAtomicContext* context) override;
 		antlrcpp::Any visitStmtCom(cola::CoLaParser::StmtComContext* context) override;
+		antlrcpp::Any visitAnnotation(cola::CoLaParser::AnnotationContext* context) override;
 
 		antlrcpp::Any visitCmdSkip(cola::CoLaParser::CmdSkipContext* context) override;
 		antlrcpp::Any visitCmdAssign(cola::CoLaParser::CmdAssignContext* context) override;
 		antlrcpp::Any visitCmdMallo(cola::CoLaParser::CmdMalloContext* context) override;
 		antlrcpp::Any visitCmdAssume(cola::CoLaParser::CmdAssumeContext* context) override;
 		antlrcpp::Any visitCmdAssert(cola::CoLaParser::CmdAssertContext* context) override;
-		antlrcpp::Any visitCmdInvariant(cola::CoLaParser::CmdInvariantContext* context) override;
 		antlrcpp::Any visitCmdCall(cola::CoLaParser::CmdCallContext* context) override;
 		antlrcpp::Any visitCmdContinue(cola::CoLaParser::CmdContinueContext* context) override;
 		antlrcpp::Any visitCmdBreak(cola::CoLaParser::CmdBreakContext* context) override;

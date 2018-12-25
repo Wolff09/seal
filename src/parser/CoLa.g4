@@ -5,7 +5,7 @@ grammar CoLa;
 
 program : struct_decl* var_decl* function* EOF ;
 
-struct_decl : ('struct' || 'class') name=Identifier '{' field_decl* '}' ';' ;
+struct_decl : ('struct' || 'class') name=Identifier '{' field_decl* '}' (';')? ;
 
 typeName : VoidType    #nameVoid
          | BoolType    #nameBool
@@ -18,34 +18,38 @@ type : name=typeName      #typeValue
      | name=typeName '*'  #typePointer
      ;
 
-field_decl : type names+=Identifier (',' names+=Identifier) ';' ;
+field_decl : type names+=Identifier (',' names+=Identifier)* ';' ;
 
-var_decl : type names+=Identifier (',' names+=Identifier) ';' ;
+var_decl : type names+=Identifier (',' names+=Identifier)* ';' ;
 
 /* Type check for inline function calls:
  *   - start function call with empty type environment (maybe retain locals if not passed)
  *   - end of function call takes type of returned pointer(s) from function environment (+ maybe retained locals)
  */
 
-function : (modifier=Inline)? returnType=type name=Identifier '(' args=argDeclList ')' '{' var_decl* statement* '}'
+function : (modifier=Inline)? returnType=type name=Identifier '(' args=argDeclList ')' body=scope //'{' var_decl* statement* '}' // TODO: use scope
          | modifier=Extern returnType=type name=Identifier '(' args=argDeclList ')' ';'
          ;
 
-argDeclList : (argTypes+=type argNames+=Identifier (',' argTypes+=type argNames+=Identifier))? ;
+argDeclList : argTypes+=type argNames+=Identifier (',' argTypes+=type argNames+=Identifier)*
+            ;
 
-block : statement           #blockStmt
-      | '{' statement* '}'  #blockBlock
-//      | '{' var_decl* statement* '}'  #blockBlock
+block : statement  #blockStmt
+      | scope      #blockScope
       ;
 
-statement : 'if' '(' expression ')' block ('else' block)?  #stmtIf
-          | 'while' '(' expression ')' block               #stmtWhile
-          | 'do' block 'while' '(' expression ')' ';'      #stmtDo
-          | 'choose' block block?                          #stmtChoose
-          | 'loop' block                                   #stmtLoop
-          | 'atomic' block                                 #stmtAtomic
-          | command ';'                                    #stmtCom
+scope : '{' var_decl* statement* '}' ;
+
+statement : 'choose' scope+                                                           #stmtChoose
+          | 'loop' scope                                                              #stmtLoop
+          | annotation? 'atomic' body=block                                                       #stmtAtomic
+          | annotation? 'if' '(' expr=expression ')' bif=block ('else' belse=block)?  #stmtIf
+          | annotation? 'while' '(' expr=expression ')' body=block                    #stmtWhile
+          | annotation? 'do' body=block 'while' '(' expr=expression ')' ';'           #stmtDo
+          | annotation? command ';'                                                   #stmtCom
           ;
+
+annotation : '@invariant' invariant ;
 
 /* Simplifying expression may not yield the desired result.
  * It may not correlate temporary variables of @invariant and subsequent assume.
@@ -62,7 +66,6 @@ command : 'skip'                               #cmdSkip
         | lhs=Identifier '=' 'malloc'          #cmdMallo
         | 'assume' '(' expr=expression ')'     #cmdAssume
         | 'assert' '(' expr=invariant ')'      #cmdAssert
-        | '@invariant' '(' expr=invariant ')'  #cmdInvariant
         | name=Identifier '(' argList ')'      #cmdCall
         | 'continue'                           #cmdContinue
         | 'break'                              #cmdBreak
@@ -70,7 +73,7 @@ command : 'skip'                               #cmdSkip
         | cas                                  #cmdCas
         ;
 
-argList : arg+=Identifier (',' arg+=Identifier)*;
+argList : arg+=expression (',' arg+=expression)* ;
 
 cas : 'CAS' '(' dst=expression ',' cmp=expression ',' src=expression ')' ;
 // TODO: dCAS, or general cas with multiple params

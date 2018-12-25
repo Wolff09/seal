@@ -1,4 +1,7 @@
-#pragma once // TODO: add include guards
+#pragma once
+#ifndef COLA_AST
+#define COLA_AST
+
 
 #include <memory>
 #include <vector>
@@ -37,7 +40,7 @@ struct Type {
 	std::string name;
 	Sort sort;
 	std::map<std::string, std::reference_wrapper<const Type>> fields;
-	Type(std::string name, Sort sort) : name(name), sort(sort) {}
+	Type(std::string name_, Sort sort_) : name(name_), sort(sort_) {}
 	const Type* field(std::string name) const {
 		auto it = fields.find(name);
 		if (it == fields.end()) {
@@ -55,7 +58,7 @@ struct Type {
 	static const Type& null_type() { static const Type type = Type("nullptr", Sort::PTR); return type; }
 };
 
-static bool assignable(const Type& to, const Type& from) { // TODO: remove static
+inline bool assignable(const Type& to, const Type& from) { // TODO: remove static
 	if (to.sort != Sort::PTR) {
 		return to.sort == from.sort;
 	} else {
@@ -64,7 +67,7 @@ static bool assignable(const Type& to, const Type& from) { // TODO: remove stati
 	}
 }
 
-static bool comparable(const Type& type, const Type& other) {
+inline bool comparable(const Type& type, const Type& other) {
 	if (type == other) return true;
 	else if (type.sort == Sort::PTR && other == Type::null_type()) return true;
 	else if (other.sort == Sort::PTR && type == Type::null_type()) return true;
@@ -75,7 +78,7 @@ struct VariableDeclaration : public AstNode {
 	std::string name;
 	const Type& type;
 	bool is_shared = false;
-	VariableDeclaration(std::string name, const Type& type, bool shared) : name(name), type(type), is_shared(shared) {}
+	VariableDeclaration(std::string name_, const Type& type_, bool shared_) : name(name_), type(type_), is_shared(shared_) {}
 	ACCEPT_VISITOR
 };
 
@@ -84,13 +87,13 @@ struct VariableDeclaration : public AstNode {
 
 struct Expression : public AstNode {
 	virtual ~Expression() = default;
-	virtual const Type& type() const;
+	virtual const Type& type() const = 0;
 	Sort sort() const { return type().sort; }
 };
 
 struct BooleanValue : public Expression {
 	bool value;
-	BooleanValue(bool value) : value(value) {};
+	BooleanValue(bool value_) : value(value_) {};
 	const Type& type() const override { return Type::bool_type(); }
 	ACCEPT_VISITOR
 };
@@ -112,14 +115,14 @@ struct NDetValue : public Expression {
 
 struct VariableExpression : public Expression {
 	const VariableDeclaration& decl;
-	VariableExpression(const VariableDeclaration& decl) : decl(decl) {}
+	VariableExpression(const VariableDeclaration& decl_) : decl(decl_) {}
 	const Type& type() const override { return decl.type; }
 	ACCEPT_VISITOR
 };
 
 struct NegatedExpresion : public Expression {
 	std::unique_ptr<Expression> expr;
-	NegatedExpresion(std::unique_ptr<Expression> expr) : expr(std::move(expr)) {
+	NegatedExpresion(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 		assert(expr);
 		assert(expr->sort() == Sort::BOOL);
 	}
@@ -134,7 +137,7 @@ struct BinaryExpression : public Expression {
 	Operator op;
 	std::unique_ptr<Expression> lhs;
 	std::unique_ptr<Expression> rhs;
-	BinaryExpression(Operator op, std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs) : op(op), lhs(std::move(lhs)), rhs(std::move(rhs)) {
+	BinaryExpression(Operator op_, std::unique_ptr<Expression> lhs_, std::unique_ptr<Expression> rhs_) : op(op_), lhs(std::move(lhs_)), rhs(std::move(rhs_)) {
 		assert(lhs);
 		assert(rhs);
 		assert(lhs->sort() == Sort::BOOL);
@@ -144,7 +147,7 @@ struct BinaryExpression : public Expression {
 	ACCEPT_VISITOR
 };
 
-static std::string toString(BinaryExpression::Operator op) {
+inline std::string toString(BinaryExpression::Operator op) {
 	switch (op) {
 		case BinaryExpression::Operator::EQ: return "==";
 		case BinaryExpression::Operator::NEQ: return "!=";
@@ -160,7 +163,7 @@ static std::string toString(BinaryExpression::Operator op) {
 struct Dereference : public Expression {
 	std::unique_ptr<Expression> expr;
 	std::string fieldname;
-	Dereference(std::unique_ptr<Expression> expr, std::string fieldname) : expr(std::move(expr)), fieldname(fieldname) {
+	Dereference(std::unique_ptr<Expression> expr_, std::string fieldname_) : expr(std::move(expr_)), fieldname(fieldname_) {
 		assert(expr);
 		assert(expr->type().field(fieldname) != nullptr);
 	}
@@ -172,44 +175,97 @@ struct Dereference : public Expression {
 	ACCEPT_VISITOR
 };
 
+struct Invariant : public AstNode {
+	std::unique_ptr<Expression> expr;
+	Invariant(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
+		assert(expr);
+	}
+};
+
+struct InvariantExpression : public Invariant {
+	InvariantExpression(std::unique_ptr<Expression> expr_) : Invariant(std::move(expr_)) {}
+};
+
+struct InvariantActive : public Invariant {
+	InvariantActive(std::unique_ptr<Expression> expr_) : Invariant(std::move(expr_)) {}
+};
+
 
 /*--------------- statements ---------------*/
 
 struct Statement : public AstNode {
 };
 
+struct AnnotatedStatement : public Statement {
+	std::unique_ptr<Invariant> annotation; // optional
+};
+
 struct Sequence : public Statement {
 	std::unique_ptr<Statement> first;
 	std::unique_ptr<Statement> second;
-	Sequence(std::unique_ptr<Statement> first, std::unique_ptr<Statement> second) : first(std::move(first)), second(std::move(second)) {
+	Sequence(std::unique_ptr<Statement> first_, std::unique_ptr<Statement> second_) : first(std::move(first_)), second(std::move(second_)) {
 		assert(first);
 		assert(second);
 	}
 	ACCEPT_VISITOR
 };
 
-struct Atomic : public Statement {
-	std::unique_ptr<Statement> stmt;
-	Atomic(std::unique_ptr<Statement> stmt) : stmt(std::move(stmt)) {
-		assert(stmt);
+struct Scope : public Statement {
+	std::vector<std::unique_ptr<VariableDeclaration>> variables;
+	std::unique_ptr<Statement> body;
+	Scope(std::unique_ptr<Statement> body_) : body(std::move(body_)) {
+		assert(body);
+	}
+	ACCEPT_VISITOR
+};
+
+struct Atomic : public AnnotatedStatement {
+	std::unique_ptr<Scope> body;
+	Atomic(std::unique_ptr<Scope> body_) : body(std::move(body_)) {
+		assert(body);
 	}
 	ACCEPT_VISITOR
 };
 
 struct Choice : public Statement {
-	std::vector<std::unique_ptr<Statement>> branches;
+	std::vector<std::unique_ptr<Scope>> branches;
+	ACCEPT_VISITOR
+};
+
+struct IfThenElse : public AnnotatedStatement {
+	std::unique_ptr<Expression> expr;
+	std::unique_ptr<Scope> ifBranch;
+	std::unique_ptr<Scope> elseBranch;
+	IfThenElse(std::unique_ptr<Expression> expr_, std::unique_ptr<Scope> ifBranch_, std::unique_ptr<Scope> elseBranch_) : expr(std::move(expr_)), ifBranch(std::move(ifBranch_)), elseBranch(std::move(elseBranch_)) {
+		assert(expr);
+		assert(ifBranch);
+		assert(elseBranch);
+	}
 	ACCEPT_VISITOR
 };
 
 struct Loop : public Statement {
-	std::unique_ptr<Statement> body;
+	std::unique_ptr<Scope> body;
+	Loop(std::unique_ptr<Scope> body_) : body(std::move(body_)) {
+		assert(body);
+	}
+	ACCEPT_VISITOR
+};
+
+struct While : public AnnotatedStatement {
+	std::unique_ptr<Expression> expr;
+	std::unique_ptr<Scope> body;
+	While(std::unique_ptr<Expression> expr_, std::unique_ptr<Scope> body_) : expr(std::move(expr_)), body(std::move(body_)) {
+		assert(expr);
+		assert(body);
+	}
 	ACCEPT_VISITOR
 };
 
 
 /*--------------- commands ---------------*/
 
-struct Command : public Statement {
+struct Command : public AnnotatedStatement {
 };
 
 struct Skip : public Command {
@@ -226,16 +282,16 @@ struct Continue : public Command {
 
 struct Assume : public Command {
 	std::unique_ptr<Expression> expr;
-	Assume(std::unique_ptr<Expression> expr) : expr(std::move(expr)) {
+	Assume(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 		assert(expr);
 	}
 	ACCEPT_VISITOR
 };
 
 struct Assert : public Command {
-	std::unique_ptr<Expression> expr;
-	Assert(std::unique_ptr<Expression> expr) : expr(std::move(expr)) {
-		assert(expr);
+	std::unique_ptr<Invariant> inv;
+	Assert(std::unique_ptr<Invariant> inv_) : inv(std::move(inv_)) {
+		assert(inv);
 	}
 	ACCEPT_VISITOR
 };
@@ -243,15 +299,15 @@ struct Assert : public Command {
 struct Return : public Command {
 	std::unique_ptr<Expression> expr;
 	Return() {};
-	Return(std::unique_ptr<Expression> expr) : expr(std::move(expr)) {
+	Return(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 		assert(expr);
 	}
 };
 
 struct Malloc : public Command {
-	std::unique_ptr<Expression> lhs;
-	Malloc(std::unique_ptr<Expression> lhs) : lhs(std::move(lhs)) {
-		assert(lhs);
+	const VariableDeclaration& lhs;
+	Malloc(const VariableDeclaration& lhs_) : lhs(lhs_) {
+		assert(lhs.type.sort == Sort::PTR);
 	}
 	ACCEPT_VISITOR
 };
@@ -259,7 +315,7 @@ struct Malloc : public Command {
 struct Assignment : public Command {
 	std::unique_ptr<Expression> lhs;
 	std::unique_ptr<Expression> rhs;
-	Assignment(std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs) : lhs(std::move(lhs)), rhs(std::move(rhs)) {
+	Assignment(std::unique_ptr<Expression> lhs_, std::unique_ptr<Expression> rhs_) : lhs(std::move(lhs_)), rhs(std::move(rhs_)) {
 		assert(lhs);
 		assert(rhs);
 		assert(assignable(lhs->type(), rhs->type()));
@@ -270,7 +326,7 @@ struct Assignment : public Command {
 struct Enter : public Command {
 	const Function& decl;
 	std::vector<std::unique_ptr<Expression>> args;
-	Enter(const Function& decl) : decl(decl) {
+	Enter(const Function& decl_) : decl(decl_) {
 		// TODO: assert(decl.kind == Function::SMR);
 	}
 	ACCEPT_VISITOR
@@ -278,7 +334,7 @@ struct Enter : public Command {
 
 struct Exit : public Command {
 	const Function& decl;
-	Exit(const Function& decl) : decl(decl) {
+	Exit(const Function& decl_) : decl(decl_) {
 		// TODO: assert(decl.kind == Function::SMR);
 	}
 	ACCEPT_VISITOR
@@ -286,7 +342,7 @@ struct Exit : public Command {
 
 struct Macro : public Command {
 	const Function& decl;
-	Macro(const Function& decl) : decl(decl) {
+	Macro(const Function& decl_) : decl(decl_) {
 		// TODO: assert(decl.kind == Function::MACRO);
 	}
 	ACCEPT_VISITOR
@@ -301,9 +357,9 @@ struct Function : public AstNode {
 	std::string name;
 	const Type& return_type;
 	Kind kind;
-	std::vector<std::unique_ptr<VariableDeclaration>> variables;
-	std::unique_ptr<Statement> body;
-	Function(std::string name, const Type& returnType, Kind kind) : name(name), return_type(returnType), kind(kind) {}
+	std::vector<std::unique_ptr<VariableDeclaration>> args;
+	std::unique_ptr<Scope> body;
+	Function(std::string name_, const Type& returnType_, Kind kind_) : name(name_), return_type(returnType_), kind(kind_) {}
 	ACCEPT_VISITOR
 };
 
@@ -315,3 +371,6 @@ struct Program : public AstNode {
 	std::vector<std::unique_ptr<Function>> functions;
 	ACCEPT_VISITOR
 };
+
+
+#endif

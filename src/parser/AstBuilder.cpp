@@ -50,14 +50,7 @@ void AstBuilder::addVariable(std::unique_ptr<VariableDeclaration> variable) {
 		throw std::logic_error("CompilationError: variable '" + variable->name + "' already declared.");
 	}
 
-	// _scope.back().insert({{ variable->name, std::move(variable) }});
 	_scope.back()[variable->name] = std::move(variable);
-}
-
-const VariableDeclaration& AstBuilder::makeAuxVar(const Type& type) {
-	std::string name = "_aux" + std::to_string(_tmpCounter++); // should not name clash due to underscore
-	addVariable(std::make_unique<VariableDeclaration>(name, type, false));
-	return lookupVariable(name);
 }
 
 bool AstBuilder::isTypeDeclared(std::string typeName) {
@@ -67,20 +60,34 @@ bool AstBuilder::isTypeDeclared(std::string typeName) {
 const Type& AstBuilder::lookupType(std::string typeName) {
 	auto it = _types.find(typeName);
 	if (it == _types.end()) {
-		throw std::logic_error("Type '" + typeName + "' not declared.");
+		std::string help = _types.count(typeName + "*") ? " Did you mean '" + typeName + "*'?" : "";
+		throw std::logic_error("Type '" + typeName + "' not declared." + help);
 	} else {
 		return it->second;
 	}
 }
 
-std::unique_ptr<Statement> AstBuilder::mk_stmt_from_list(std::vector<cola::CoLaParser::StatementContext*> context) {
-	// TODO: implement (reduce to vector version)
-	throw std::logic_error("Not yet implemented (mk_stmt_from_list).");
+std::unique_ptr<Statement> AstBuilder::mk_stmt_from_list(std::vector<cola::CoLaParser::StatementContext*> stmts) {
+	std::vector<Statement*> list;
+	stmts.reserve(stmts.size());
+	for (auto& stmt : stmts) {
+		list.push_back(stmt->accept(this).as<Statement*>());
+	}
+	return mk_stmt_from_list(list);
 }
 
-std::unique_ptr<Statement> mk_stmt_from_list(std::vector<Statement*> stmts) {
-	// TODO: implement (care for empty vector => skip command)
-	throw std::logic_error("Not yet implemented (mk_stmt_from_list).");
+std::unique_ptr<Statement> AstBuilder::mk_stmt_from_list(std::vector<Statement*> stmts) {
+	if (stmts.size() == 0) {
+		return std::make_unique<Skip>();
+	} else {
+		std::unique_ptr<Statement> current(stmts.at(0));
+		for (std::size_t i = 1; i < stmts.size(); i++) {
+			std::unique_ptr<Statement> next(stmts.at(i));
+			auto seq = std::make_unique<Sequence>(std::move(current), std::move(next));
+			current = std::move(seq);
+		}
+		return current;
+	}
 }
 
 
@@ -96,7 +103,6 @@ std::shared_ptr<Program> AstBuilder::buildFrom(cola::CoLaParser::ProgramContext*
 	AstBuilder builder;
 	parseTree->accept(&builder);
 	return builder._program;
-	// return parseTree->accept(&builder).as<std::shared_ptr<Program>>();
 }
 
 antlrcpp::Any AstBuilder::visitProgram(cola::CoLaParser::ProgramContext* context) {
@@ -136,6 +142,7 @@ antlrcpp::Any AstBuilder::visitProgram(cola::CoLaParser::ProgramContext* context
 antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* context) {
 	std::string name = context->name->getText();
 	const Type& returnType = context->returnType->accept(this).as<const Type&>();
+	
 	Function::Kind kind = Function::INTERFACE;
 	assert(!(context->Inline() && context->Extern()));
 	if (context->Inline()) {
@@ -158,19 +165,21 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	}
 
 	auto function = std::make_unique<Function>(name, returnType, kind);
-	pushScope();
-
-	if (_functions.count(name)) {
-		throw std::logic_error("Duplicate function declaration: function with name '" + name + "' already defined.");
+	if (name != INIT_NAME) {
+		// make function available for calls
+		if (_functions.count(name)) {
+			throw std::logic_error("Duplicate function declaration: function with name '" + name + "' already defined.");
+		}
+		_functions.insert({{ name, *function }});
 	}
-	_functions.insert({{ name, *function }});
 
 	// add arguments
-	auto arglist = context->args->accept(this).as<ArgDeclList>();
-	function->variables.reserve(arglist.size() + context->var_decl().size());
-	for (auto& pair : arglist) {
+	pushScope();
+	auto arglist = context->args->accept(this).as<ArgDeclList*>();
+	function->args.reserve(arglist->size());
+	for (auto& pair : *arglist) {
 		std::string argname = pair.first;
-		const Type& argtype = pair.second;
+		const Type& argtype = _types.at(pair.second);
 		auto decl = std::make_unique<VariableDeclaration>(argname, argtype, false);
 		addVariable(std::move(decl));
 
@@ -182,47 +191,70 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 		}
 	}
 
-	// add local variables
+	// handle body
+	auto body = context->body->accept(this).as<Scope*>();
+	function->body = std::unique_ptr<Scope>(body);
+
+	// get variable decls
+	function->args = popScope();
+
+	// transfer ownershp
+	if (name != INIT_NAME) {
+		_program->initalizer = std::move(function);
+	} else {
+		_program->functions.push_back(std::move(function));
+	}
+
+	return nullptr;
+}
+
+antlrcpp::Any AstBuilder::visitArgDeclList(cola::CoLaParser::ArgDeclListContext* context) {
+	auto dlist = new ArgDeclList(); //std::make_shared<ArgDeclList>();
+	auto size = context->argTypes.size();
+	dlist->reserve(size);
+	assert(size == context->argNames.size());
+	for (std::size_t i = 0; i < size; i++) {
+		std::string name = context->argNames.at(i)->getText();
+		const Type& type = context->argTypes.at(i)->accept(this).as<const Type&>();
+		// TODO: swhat the ****?! why can't I pass the reference wrapper here without them being lost after the loop?
+		dlist->push_back(std::make_pair(name, type.name));
+	}
+	return dlist;
+}
+
+antlrcpp::Any AstBuilder::visitScope(cola::CoLaParser::ScopeContext* context) {
+	pushScope();
+	// handle variables
 	auto vars = context->var_decl();
 	for (auto varDeclContext : vars) {
 		varDeclContext->accept(this);
 	}
 
 	// handle body
-	auto stmts = context->statement();
-	if (kind == Function::SMR) {
-		if (stmts.size() != 0 || vars.size() != 0) {
-			throw std::logic_error("Functions with 'extern' modifier must not have an implementation.");
-		}
-	} else {
-		function->body = mk_stmt_from_list(stmts);
-	}
+	auto body = mk_stmt_from_list(context->statement());
+	assert(body);
 
-	// get variable decls
-	function->variables = popScope();
-	_program->functions.push_back(std::move(function));
-
-	return nullptr;
-}
-
-antlrcpp::Any AstBuilder::visitArgDeclList(cola::CoLaParser::ArgDeclListContext *context) {
-	throw std::logic_error("not yet implemented (visitArgDeclList)");
+	auto scope = new Scope(std::move(body));
+	scope->variables = popScope();
+	return scope;
 }
 
 antlrcpp::Any AstBuilder::visitStruct_decl(cola::CoLaParser::Struct_declContext* /*context*/) {
-	throw std::logic_error("Unsupported operation.");
+	throw std::logic_error("Unsupported operation."); // this is done in TypeBuilder.hpp
 }
 
 antlrcpp::Any AstBuilder::visitField_decl(cola::CoLaParser::Field_declContext* /*context*/) {
-	throw std::logic_error("Unsupported operation.");
+	throw std::logic_error("Unsupported operation."); // this is done in TypeBuilder.hpp
 }
 
 antlrcpp::Any AstBuilder::visitNameVoid(cola::CoLaParser::NameVoidContext* /*context*/) {
-	return "void";
+	std::string name = "void";
+	return name;
 }
 
 antlrcpp::Any AstBuilder::visitNameBool(cola::CoLaParser::NameBoolContext* /*context*/) {
-	return "bool";
+	std::string name = "bool";
+	return name;
 }
 
 antlrcpp::Any AstBuilder::visitNameInt(cola::CoLaParser::NameIntContext* /*context*/) {
@@ -230,11 +262,13 @@ antlrcpp::Any AstBuilder::visitNameInt(cola::CoLaParser::NameIntContext* /*conte
 }
 
 antlrcpp::Any AstBuilder::visitNameData(cola::CoLaParser::NameDataContext* /*context*/) {
-	return "data_t";
+	std::string name = "data_t";
+	return name;
 }
 
 antlrcpp::Any AstBuilder::visitNameIdentifier(cola::CoLaParser::NameIdentifierContext* context) {
-	return context->Identifier()->getText();
+	std::string name = context->Identifier()->getText();
+	return name;
 }
 
 antlrcpp::Any AstBuilder::visitTypeValue(cola::CoLaParser::TypeValueContext* context) {
@@ -295,165 +329,92 @@ antlrcpp::Any AstBuilder::visitOpAnd(cola::CoLaParser::OpAndContext* /*context*/
 }
 
 antlrcpp::Any AstBuilder::visitOpOr(cola::CoLaParser::OpOrContext* /*context*/) {
-	// expr_1 || expr_2 --> block_1;block_2;b=b_1||b_2;assume(b);  with  block_i := if (expr_i) then b_i = true; else b_i = false; end
-	// throw std::logic_error("Unsupported expression: cannot handle disjunctions '||'.");
 	return BinaryExpression::Operator::OR;
 }
 
+static Expression* as_expression(Expression* expr) {
+	return expr;
+}
+
 antlrcpp::Any AstBuilder::visitValueNull(cola::CoLaParser::ValueNullContext* /*context*/) {
-	return ExprTrans(ExprForm::PTR, new NullValue());
+	return as_expression(new NullValue());
 }
 
 antlrcpp::Any AstBuilder::visitValueTrue(cola::CoLaParser::ValueTrueContext* /*context*/) {
-	return ExprTrans(ExprForm::NOPTR, new BooleanValue(true));
+	return as_expression(new BooleanValue(true));
 }
 
 antlrcpp::Any AstBuilder::visitValueFalse(cola::CoLaParser::ValueFalseContext* /*context*/) {
-	return ExprTrans(ExprForm::NOPTR, new BooleanValue(false));
+	return as_expression(new BooleanValue(false));
 }
 
 antlrcpp::Any AstBuilder::visitValueNDet(cola::CoLaParser::ValueNDetContext* /*context*/) {
-	return ExprTrans(ExprForm::NOPTR, new NullValue());
+	return as_expression(new NDetValue());
 }
 
 antlrcpp::Any AstBuilder::visitValueEmpty(cola::CoLaParser::ValueEmptyContext* /*context*/) {
-	return ExprTrans(ExprForm::NOPTR, new EmptyValue());
+	return as_expression(new EmptyValue());
 }
 
 antlrcpp::Any AstBuilder::visitExprValue(cola::CoLaParser::ExprValueContext* context) {
-	return context->value()->accept(this);
+	return as_expression(context->value()->accept(this));
 }
 
 antlrcpp::Any AstBuilder::visitExprParens(cola::CoLaParser::ExprParensContext* context) {
-	return context->expr->accept(this);
+	return as_expression(context->expr->accept(this));
 }
 
 antlrcpp::Any AstBuilder::visitExprIdentifier(cola::CoLaParser::ExprIdentifierContext* context) {
 	std::string name = context->name->getText();
 	const VariableDeclaration& decl = lookupVariable(name);
-	const Type& type = decl.type;
-	ExprForm form = type.sort == Sort::PTR ? ExprForm::PTR : ExprForm::NOPTR;
-	return ExprTrans(form, new VariableExpression(decl), decl.is_shared ? 1 : 0);
+	return as_expression(new VariableExpression(decl));
 }
 
-antlrcpp::Any AstBuilder::visitExprNegation(cola::CoLaParser::ExprNegationContext* /*context*/) {
-	// TODO: !expr --> if (expr) then b = false else b = true end; assume(b)
-	throw std::logic_error("Unsupported expression: cannot handle negations '!'.");
-}
-
-static Expression* mk_negated(Expression* expr) {
-	// copy expr and negate
-	throw std::logic_error("not yet implemented (mk_negated).");
-}
-
-void AstBuilder::transformIfRequired(ExprTrans& trans, ExprForm newform) {
-	if (_simplify && newform == _exprSplit) {
-		// TODO: split differently on trans.form == ExprForm::PTR ==> use assumes
-		if (trans.form == ExprForm::PTR) {
-			// translate trans.expr into: choose { assume(expr); aux = true; }{ assume(!expr); aux = false; }
-			auto decl = makeAuxVar(Type::bool_type());
-			auto exprF = std::unique_ptr<Expression>(mk_negated(trans.expr));
-			auto exprT = std::unique_ptr<Expression>(trans.expr);
-			auto choice = new Choice();
-			choice->branches.reserve(2);
-			choice->branches.push_back(std::make_unique<Sequence>(
-				std::make_unique<Assume>(std::move(exprT)),
-				std::make_unique<Assignment>(std::make_unique<VariableExpression>(decl), std::make_unique<BooleanValue>(true))
-			));
-			choice->branches.push_back(std::make_unique<Sequence>(
-				std::make_unique<Assume>(std::move(exprF)),
-				std::make_unique<Assignment>(std::make_unique<VariableExpression>(decl), std::make_unique<BooleanValue>(false))
-			));
-			trans.helper.push_back(choice);
-			trans.expr = new VariableExpression(decl);
-			trans.form = ExprForm::NOPTR;
-			trans.num_shared = 0;
-
-		} else {
-			// translate trans.expr into: aux = expr
-			auto decl = makeAuxVar(trans.expr->type());
-			auto lhs = std::make_unique<VariableExpression>(decl);
-			auto rhs = std::unique_ptr<Expression>(trans.expr);
-			auto assign = new Assignment(std::move(lhs), std::move(rhs));
-			trans.helper.push_back(assign);
-			trans.expr = new VariableExpression(decl);
-			trans.form = trans.expr->type().sort == Sort::PTR ? ExprForm::PTR : ExprForm::NOPTR;
-			trans.num_shared = 0;
-		}
-	}
+antlrcpp::Any AstBuilder::visitExprNegation(cola::CoLaParser::ExprNegationContext* context) {
+	auto expr = context->expr->accept(this).as<Expression*>();
+	return as_expression(new NegatedExpresion(std::unique_ptr<Expression>(expr)));
 }
 
 antlrcpp::Any AstBuilder::visitExprDeref(cola::CoLaParser::ExprDerefContext* context) {
-	auto trans = context->expr->accept(this).as<ExprTrans>();
+	auto expr = context->expr->accept(this).as<Expression*>();
 	std::string fieldname = context->field->getText();
-	const Type& exprtype = trans.expr->type();
+	const Type& exprtype = expr->type();
 
 	if (exprtype.sort != Sort::PTR) {
 		throw std::logic_error("Cannot dereference expression of non-pointer type.");
 	}
 	if (exprtype == Type::null_type()) {
-		throw std::logic_error("Cannot dereference 'nullptr'.");
+		throw std::logic_error("Cannot dereference 'null'.");
 	}
 	if (!exprtype.has_field(fieldname)) {
 		throw std::logic_error("Expression evaluates to type '" + exprtype.name + "' which does not have a field '" + fieldname + "'.");
 	}
-	if (trans.form == ExprForm::NOPTR) {
-		throw std::logic_error("Compilation error: did not expect non-pointer type here.");
-	}
 
-	auto newform = [](ExprForm form) -> ExprForm {
-		return form == ExprForm::PTR ? ExprForm::DEREF : ExprForm::NESTED;
-	};
-
-	transformIfRequired(trans, newform(trans.form));
-	trans.expr = new Dereference(std::unique_ptr<Expression>(trans.expr), fieldname);
-	trans.form = newform(trans.form);
-	return trans;
+	return as_expression(new Dereference(std::unique_ptr<Expression>(expr), fieldname));
 }
 
 antlrcpp::Any AstBuilder::visitExprBinary(cola::CoLaParser::ExprBinaryContext* context) {
-	// TODO: how to reuse auxiliary variables?
 	auto op = context->binop()->accept(this).as<BinaryExpression::Operator>();
-
 	bool is_logic = op == BinaryExpression::Operator::AND || op == BinaryExpression::Operator::OR;
 	bool is_equality = op == BinaryExpression::Operator::EQ || op == BinaryExpression::Operator::NEQ;
-	ExprForm toSplit = is_logic ? ExprForm::PTR : ExprForm::DEREF;
 
-	_exprSplit = toSplit;
-	auto left = context->lhs->accept(this).as<ExprTrans>();
-	const Type& leftType = left.expr->type();
-	_exprSplit = toSplit;
-	transformIfRequired(left, left.form);
+	auto lhs = context->lhs->accept(this).as<Expression*>();
+	auto lhsType = lhs->type();
 
-	_exprSplit = toSplit;
-	auto right = context->rhs->accept(this).as<ExprTrans>();
-	const Type& rightType = right.expr->type();
-	_exprSplit = toSplit;
-	transformIfRequired(right, right.form);
+	auto rhs = context->rhs->accept(this).as<Expression*>();
+	auto rhsType = rhs->type();
 
-	if (!comparable(leftType, rightType)) {
-		throw std::logic_error("Type error: cannot compare types '" + leftType.name + "' and " + rightType.name + "' using operator '" + toString(op) + "'.");
+	if (!comparable(lhsType, rhsType)) {
+		throw std::logic_error("Type error: cannot compare types '" + lhsType.name + "' and " + rhsType.name + "' using operator '" + toString(op) + "'.");
 	}
-	if (leftType.sort == Sort::PTR && !is_equality) {
+	if (lhsType.sort == Sort::PTR && !is_equality) {
 		throw std::logic_error("Type error: pointer types allow only for (in)equality comparison.");
 	}
-	if (is_logic && leftType.sort != Sort::BOOL) {
+	if (is_logic && lhsType.sort != Sort::BOOL) {
 		throw std::logic_error("Type error: logic operators require bool type.");
 	}
 
-	ExprTrans trans;
-	trans.form = left.form != ExprForm::NOPTR || right.form != ExprForm::NOPTR ? ExprForm::PTR : ExprForm::NOPTR;
-	trans.helper.reserve(left.helper.size() + right.helper.size());
-	for (Statement* stmt : left.helper) {
-		trans.helper.push_back(stmt);
-	}
-	for (Statement* stmt : right.helper) {
-		trans.helper.push_back(stmt);
-	}
-	trans.expr = new BinaryExpression(op, std::unique_ptr<Expression>(left.expr), std::unique_ptr<Expression>(right.expr));
-	trans.num_shared = 0;
-	transformIfRequired(trans, trans.form);
-	return trans;
+	return as_expression(new BinaryExpression(op, std::unique_ptr<Expression>(lhs), std::unique_ptr<Expression>(rhs)));
 }
 
 antlrcpp::Any AstBuilder::visitExprCas(cola::CoLaParser::ExprCasContext* context) {
@@ -461,10 +422,12 @@ antlrcpp::Any AstBuilder::visitExprCas(cola::CoLaParser::ExprCasContext* context
 }
 
 antlrcpp::Any AstBuilder::visitInvExpr(cola::CoLaParser::InvExprContext* context) {
+	// TODO: return as Invariant*
 	throw std::logic_error("not yet implemented (visitInvExpr)");
 }
 
 antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* context) {
+	// TODO: return as Invariant*
 	throw std::logic_error("not yet implemented (visitInvActive)");
 }
 
@@ -477,40 +440,89 @@ antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* con
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-antlrcpp::Any AstBuilder::visitBlockStmt(cola::CoLaParser::BlockStmtContext* context) {
-	throw std::logic_error("not yet implemented (visitBlockStmt)");
+static Statement* as_statement(Statement* stmt) {
+	return stmt;
 }
 
-antlrcpp::Any AstBuilder::visitBlockBlock(cola::CoLaParser::BlockBlockContext* context) {
-	throw std::logic_error("not yet implemented (visitBlockBlock)");
+antlrcpp::Any AstBuilder::visitBlockStmt(cola::CoLaParser::BlockStmtContext* context) {
+	return as_statement(context->statement()->accept(this));
+}
+
+antlrcpp::Any AstBuilder::visitBlockScope(cola::CoLaParser::BlockScopeContext* context) {
+	return as_statement(context->scope()->accept(this).as<Scope*>());
 }
 
 antlrcpp::Any AstBuilder::visitStmtIf(cola::CoLaParser::StmtIfContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtIf)");
+	// TODO: avoid wrapping a scope into a scope
+	auto ifExpr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
+	auto ifBranch = std::unique_ptr<Statement>(context->bif->accept(this).as<Statement*>());
+	auto ifScope = std::make_unique<Scope>(std::move(ifBranch));
+	std::unique_ptr<Scope> elseScope;
+	if (context->belse) {
+		auto elseBranch = std::unique_ptr<Statement>(context->belse->accept(this).as<Statement*>());
+		elseScope = std::make_unique<Scope>(std::move(elseBranch));
+	} else {
+		elseScope = std::make_unique<Scope>(std::make_unique<Skip>());
+	}
+	assert(elseScope);
+	auto result = new IfThenElse(std::move(ifExpr), std::move(ifScope), std::move(elseScope));
+	if (context->annotation()) {
+		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
+	}
+	return as_statement(result);
 }
 
 antlrcpp::Any AstBuilder::visitStmtWhile(cola::CoLaParser::StmtWhileContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtWhile)");
+	// TODO: avoid wrapping a scope into a scope
+	auto expr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
+	auto body = std::unique_ptr<Statement>(context->body->accept(this).as<Statement*>());
+	auto scope = std::make_unique<Scope>(std::move(body));
+	auto result = new While(std::move(expr), std::move(scope));
+	if (context->annotation()) {
+		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
+	}
+	return as_statement(result);
 }
 
-antlrcpp::Any AstBuilder::visitStmtDo(cola::CoLaParser::StmtDoContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtDo)");
+antlrcpp::Any AstBuilder::visitStmtDo(cola::CoLaParser::StmtDoContext* /*context*/) {
+	throw std::logic_error("Unsupported construct: do-while not supported, use regular while loop instead.");
 }
 
 antlrcpp::Any AstBuilder::visitStmtChoose(cola::CoLaParser::StmtChooseContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtChoose)");
+	auto result = new Choice();
+	result->branches.reserve(context->scope().size());
+	for (auto scope : context->scope()) {
+		result->branches.push_back(std::unique_ptr<Scope>(scope->accept(this).as<Scope*>()));
+	}
+	return as_statement(result);
 }
 
 antlrcpp::Any AstBuilder::visitStmtLoop(cola::CoLaParser::StmtLoopContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtLoop)");
+	auto scope = std::unique_ptr<Scope>(context->scope()->accept(this).as<Scope*>());
+	return as_statement(new Loop(std::move(scope)));
 }
 
 antlrcpp::Any AstBuilder::visitStmtAtomic(cola::CoLaParser::StmtAtomicContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtAtomic)");
+	auto body = std::unique_ptr<Statement>(context->body->accept(this).as<Statement*>());
+	auto scope = std::make_unique<Scope>(std::move(body)); // TODO: avoid wrapping a scope into a scope
+	auto result = new Atomic(std::move(scope));
+	if (context->annotation()) {
+		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
+	}
+	return as_statement(result);
 }
 
 antlrcpp::Any AstBuilder::visitStmtCom(cola::CoLaParser::StmtComContext* context) {
-	throw std::logic_error("not yet implemented (visitStmtCom)");
+	auto result = context->command()->accept(this).as<Command*>();
+	if (context->annotation()) {
+		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
+	}
+	return as_statement(result);
+}
+
+antlrcpp::Any AstBuilder::visitAnnotation(cola::CoLaParser::AnnotationContext* context) {
+	// TODO: handle annotation in statements
+	throw std::logic_error("not yet implemented (visitAnnotation)");
 }
 
 
@@ -523,40 +535,64 @@ antlrcpp::Any AstBuilder::visitStmtCom(cola::CoLaParser::StmtComContext* context
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-antlrcpp::Any AstBuilder::visitCmdSkip(cola::CoLaParser::CmdSkipContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdSkip)");
+static Command* as_command(Command* cmd) {
+	return cmd;
+}
+
+antlrcpp::Any AstBuilder::visitCmdSkip(cola::CoLaParser::CmdSkipContext* /*context*/) {
+	return as_command(new Skip());
 }
 
 antlrcpp::Any AstBuilder::visitCmdAssign(cola::CoLaParser::CmdAssignContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdAssign)");
+	auto lhs = std::unique_ptr<Expression>(context->lhs->accept(this).as<Expression*>());
+	auto rhs = std::unique_ptr<Expression>(context->rhs->accept(this).as<Expression*>());
+	if (!assignable(lhs->type(), rhs->type())) {
+		throw std::logic_error("Type error: cannot assign to expression of type '" + lhs->type().name + "' from expression of type '" + rhs->type().name + "'.");
+	}
+	if (lhs->type() == Type::void_type()) {
+		throw std::logic_error("Type error: cannot assign to 'null'.");
+	}
+	return as_command(new Assignment(std::move(lhs), std::move(rhs)));
 }
 
 antlrcpp::Any AstBuilder::visitCmdMallo(cola::CoLaParser::CmdMalloContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdMallo)");
+	auto name = context->lhs->getText();
+	auto lhs = lookupVariable(name);
+	if (lhs.type.sort != Sort::PTR) {
+		throw std::logic_error("Type error: cannot assign to expression of non-pointer type.");
+	}
+	if (lhs.type == Type::void_type()) {
+		throw std::logic_error("Type error: cannot assign to 'null'.");
+	}
+	return as_command(new Malloc(std::move(lhs)));
 }
 
 antlrcpp::Any AstBuilder::visitCmdAssume(cola::CoLaParser::CmdAssumeContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdAssume)");
+	auto expr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
+	return as_command(new Assume(std::move(expr)));
 }
 
 antlrcpp::Any AstBuilder::visitCmdAssert(cola::CoLaParser::CmdAssertContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdAssert)");
-}
-
-antlrcpp::Any AstBuilder::visitCmdInvariant(cola::CoLaParser::CmdInvariantContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdInvariant)");
+	auto inv = std::unique_ptr<Invariant>(context->expr->accept(this).as<Invariant*>());
+	return as_command(new Assert(std::move(inv)));
 }
 
 antlrcpp::Any AstBuilder::visitCmdCall(cola::CoLaParser::CmdCallContext* context) {
 	throw std::logic_error("not yet implemented (visitCmdCall)");
 }
 
-antlrcpp::Any AstBuilder::visitCmdContinue(cola::CoLaParser::CmdContinueContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdContinue)");
+antlrcpp::Any AstBuilder::visitCmdContinue(cola::CoLaParser::CmdContinueContext* /*context*/) {
+	if (!_inside_loop) {
+		throw std::logic_error("Semantic error: 'continue' must only appear inside loops.");
+	}
+	return as_command(new Continue());
 }
 
 antlrcpp::Any AstBuilder::visitCmdBreak(cola::CoLaParser::CmdBreakContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdBreak)");
+	if (!_inside_loop) {
+		throw std::logic_error("Semantic error: 'break' must only appear inside loops.");
+	}
+	return as_command(new Break());
 }
 
 antlrcpp::Any AstBuilder::visitCmdReturn(cola::CoLaParser::CmdReturnContext* context) {

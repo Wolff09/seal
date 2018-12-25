@@ -84,7 +84,7 @@ class TypeBuilder : public cola::CoLaBaseVisitor {
 		antlrcpp::Any visitField_decl(cola::CoLaParser::Field_declContext* context) override {
 			assert(_currentType);
 			Type& currentType = *_currentType;
-			const Type& fieldType = context->type()->accept(this).as<Type&>();
+			const Type& fieldType = context->type()->accept(this).as<const Type&>();
 			for (auto token : context->names) {
 				std::string name = token->getText();
 				if (currentType.fields.count(name) != 0) {
@@ -99,7 +99,8 @@ class TypeBuilder : public cola::CoLaBaseVisitor {
 			if (_all_types.count(name) == 0) {
 				throw std::logic_error("Field declaration of unknown type name '" + name + "'.");
 			}
-			return _all_types.at(name);
+			const Type& type = _all_types.at(name);
+			return type;
 		}
 
 		antlrcpp::Any visitTypeValue(cola::CoLaParser::TypeValueContext* context) override {
@@ -113,11 +114,13 @@ class TypeBuilder : public cola::CoLaBaseVisitor {
 		}
 
 		antlrcpp::Any visitNameVoid(cola::CoLaParser::NameVoidContext* /*context*/) override {
-			return "void";
+			std::string name = "void";
+			return name;
 		}
 
 		antlrcpp::Any visitNameBool(cola::CoLaParser::NameBoolContext* /*context*/) override {
-			return "bool";
+			std::string name = "bool";
+			return name;
 		}
 
 		antlrcpp::Any visitNameInt(cola::CoLaParser::NameIntContext* /*context*/) override {
@@ -125,10 +128,12 @@ class TypeBuilder : public cola::CoLaBaseVisitor {
 		}
 
 		antlrcpp::Any visitNameData(cola::CoLaParser::NameDataContext* /*context*/) override {
-			return "data_t";
+			std::string name = "data_t";
+			return name;
 		}
 
 		antlrcpp::Any visitNameIdentifier(cola::CoLaParser::NameIdentifierContext* context) override {
-			return context->Identifier()->getText();
+			std::string name = context->Identifier()->getText();
+			return name;
 		}
 };
