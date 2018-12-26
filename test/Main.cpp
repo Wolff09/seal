@@ -1,4 +1,5 @@
 #include "parser/parse.hpp"
+#include "simplification/simplify.hpp"
 
 #include <iostream>
 
@@ -11,6 +12,7 @@ int main(int argc, char** argv) {
 
 	auto filename = argv[1];
 	auto prog = parse(filename);
+	cola::simplify(*prog);
 
 	return 0;
 }

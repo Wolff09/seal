@@ -379,7 +379,7 @@ antlrcpp::Any AstBuilder::visitExprIdentifier(cola::CoLaParser::ExprIdentifierCo
 
 antlrcpp::Any AstBuilder::visitExprNegation(cola::CoLaParser::ExprNegationContext* context) {
 	auto expr = context->expr->accept(this).as<Expression*>();
-	return as_expression(new NegatedExpresion(std::unique_ptr<Expression>(expr)));
+	return as_expression(new NegatedExpression(std::unique_ptr<Expression>(expr)));
 }
 
 antlrcpp::Any AstBuilder::visitExprDeref(cola::CoLaParser::ExprDerefContext* context) {

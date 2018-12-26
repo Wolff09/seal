@@ -10,24 +10,130 @@
 
 
 struct AstNode;
+struct VariableDeclaration;
+struct Expression;
+struct BooleanValue;
+struct NullValue;
+struct EmptyValue;
+struct NDetValue;
+struct VariableExpression;
+struct NegatedExpression;
+struct BinaryExpression;
+struct Dereference;
+struct InvariantExpression;
+struct InvariantActive;
+struct Statement;
+struct AnnotatedStatement;
+struct Sequence;
+struct Scope;
+struct Atomic;
+struct Choice;
+struct IfThenElse;
+struct Loop;
+struct While;
+struct Command;
+struct Skip;
+struct Break;
+struct Continue;
+struct Assume;
+struct Assert;
+struct Return;
+struct Malloc;
+struct Assignment;
+struct Enter;
+struct Exit;
+struct Macro;
+struct CompareAndSwap;
 struct Function;
 struct Program;
 
 
+/*--------------- visitor ---------------*/
+
 struct Visitor {
-	virtual void accept(AstNode& node) = 0;
-	virtual void accept(const AstNode& node) = 0;
+	virtual void visit(const VariableDeclaration& node) = 0;
+	virtual void visit(const Expression& node) = 0;
+	virtual void visit(const BooleanValue& node) = 0;
+	virtual void visit(const NullValue& node) = 0;
+	virtual void visit(const EmptyValue& node) = 0;
+	virtual void visit(const NDetValue& node) = 0;
+	virtual void visit(const VariableExpression& node) = 0;
+	virtual void visit(const NegatedExpression& node) = 0;
+	virtual void visit(const BinaryExpression& node) = 0;
+	virtual void visit(const Dereference& node) = 0;
+	virtual void visit(const InvariantExpression& node) = 0;
+	virtual void visit(const InvariantActive& node) = 0;
+	virtual void visit(const Sequence& node) = 0;
+	virtual void visit(const Scope& node) = 0;
+	virtual void visit(const Atomic& node) = 0;
+	virtual void visit(const Choice& node) = 0;
+	virtual void visit(const IfThenElse& node) = 0;
+	virtual void visit(const Loop& node) = 0;
+	virtual void visit(const While& node) = 0;
+	virtual void visit(const Skip& node) = 0;
+	virtual void visit(const Break& node) = 0;
+	virtual void visit(const Continue& node) = 0;
+	virtual void visit(const Assume& node) = 0;
+	virtual void visit(const Assert& node) = 0;
+	virtual void visit(const Return& node) = 0;
+	virtual void visit(const Malloc& node) = 0;
+	virtual void visit(const Assignment& node) = 0;
+	virtual void visit(const Enter& node) = 0;
+	virtual void visit(const Exit& node) = 0;
+	virtual void visit(const Macro& node) = 0;
+	virtual void visit(const CompareAndSwap& node) = 0;
+	virtual void visit(const Function& node) = 0;
+	virtual void visit(const Program& node) = 0;
 };
+
+struct NonConstVisitor {
+	virtual void visit(VariableDeclaration& node) = 0;
+	virtual void visit(Expression& node) = 0;
+	virtual void visit(BooleanValue& node) = 0;
+	virtual void visit(NullValue& node) = 0;
+	virtual void visit(EmptyValue& node) = 0;
+	virtual void visit(NDetValue& node) = 0;
+	virtual void visit(VariableExpression& node) = 0;
+	virtual void visit(NegatedExpression& node) = 0;
+	virtual void visit(BinaryExpression& node) = 0;
+	virtual void visit(Dereference& node) = 0;
+	virtual void visit(InvariantExpression& node) = 0;
+	virtual void visit(InvariantActive& node) = 0;
+	virtual void visit(Sequence& node) = 0;
+	virtual void visit(Scope& node) = 0;
+	virtual void visit(Atomic& node) = 0;
+	virtual void visit(Choice& node) = 0;
+	virtual void visit(IfThenElse& node) = 0;
+	virtual void visit(Loop& node) = 0;
+	virtual void visit(While& node) = 0;
+	virtual void visit(Skip& node) = 0;
+	virtual void visit(Break& node) = 0;
+	virtual void visit(Continue& node) = 0;
+	virtual void visit(Assume& node) = 0;
+	virtual void visit(Assert& node) = 0;
+	virtual void visit(Return& node) = 0;
+	virtual void visit(Malloc& node) = 0;
+	virtual void visit(Assignment& node) = 0;
+	virtual void visit(Enter& node) = 0;
+	virtual void visit(Exit& node) = 0;
+	virtual void visit(Macro& node) = 0;
+	virtual void visit(CompareAndSwap& node) = 0;
+	virtual void visit(Function& node) = 0;
+	virtual void visit(Program& node) = 0;
+};
+
+
+/*--------------- base ---------------*/
 
 struct AstNode {
 	virtual ~AstNode() = default;
-	virtual void accept_visitor(Visitor& visitor) = 0;
-	virtual void accept_visitor(Visitor& visitor) const = 0;
+	virtual void accept(NonConstVisitor& visitor) = 0;
+	virtual void accept(Visitor& visitor) const = 0;
 };
 
 #define ACCEPT_VISITOR \
-        virtual void accept_visitor(Visitor& visitor) override { visitor.accept(*this); } \
-        virtual void accept_visitor(Visitor& visitor) const override { visitor.accept(*this); }
+	virtual void accept(NonConstVisitor& visitor) override { visitor.visit(*this); } \
+	virtual void accept(Visitor& visitor) const override { visitor.visit(*this); }
 
 
 /*--------------- types ---------------*/
@@ -120,9 +226,9 @@ struct VariableExpression : public Expression {
 	ACCEPT_VISITOR
 };
 
-struct NegatedExpresion : public Expression {
+struct NegatedExpression : public Expression {
 	std::unique_ptr<Expression> expr;
-	NegatedExpresion(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
+	NegatedExpression(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 		assert(expr);
 		assert(expr->sort() == Sort::BOOL);
 	}
@@ -395,5 +501,76 @@ struct Program : public AstNode {
 	ACCEPT_VISITOR
 };
 
+
+/*--------------- base visitor ---------------*/
+
+struct BaseVisitor : public Visitor, public NonConstVisitor {
+	virtual void visit(const VariableDeclaration& /*node*/) {}
+	virtual void visit(const Expression& /*node*/) {}
+	virtual void visit(const BooleanValue& /*node*/) {}
+	virtual void visit(const NullValue& /*node*/) {}
+	virtual void visit(const EmptyValue& /*node*/) {}
+	virtual void visit(const NDetValue& /*node*/) {}
+	virtual void visit(const VariableExpression& /*node*/) {}
+	virtual void visit(const NegatedExpression& /*node*/) {}
+	virtual void visit(const BinaryExpression& /*node*/) {}
+	virtual void visit(const Dereference& /*node*/) {}
+	virtual void visit(const InvariantExpression& /*node*/) {}
+	virtual void visit(const InvariantActive& /*node*/) {}
+	virtual void visit(const Sequence& /*node*/) {}
+	virtual void visit(const Scope& /*node*/) {}
+	virtual void visit(const Atomic& /*node*/) {}
+	virtual void visit(const Choice& /*node*/) {}
+	virtual void visit(const IfThenElse& /*node*/) {}
+	virtual void visit(const Loop& /*node*/) {}
+	virtual void visit(const While& /*node*/) {}
+	virtual void visit(const Skip& /*node*/) {}
+	virtual void visit(const Break& /*node*/) {}
+	virtual void visit(const Continue& /*node*/) {}
+	virtual void visit(const Assume& /*node*/) {}
+	virtual void visit(const Assert& /*node*/) {}
+	virtual void visit(const Return& /*node*/) {}
+	virtual void visit(const Malloc& /*node*/) {}
+	virtual void visit(const Assignment& /*node*/) {}
+	virtual void visit(const Enter& /*node*/) {}
+	virtual void visit(const Exit& /*node*/) {}
+	virtual void visit(const Macro& /*node*/) {}
+	virtual void visit(const CompareAndSwap& /*node*/) {}
+	virtual void visit(const Function& /*node*/) {}
+	virtual void visit(const Program& /*node*/) {}
+	virtual void visit(VariableDeclaration& /*node*/) {}
+	virtual void visit(Expression& /*node*/) {}
+	virtual void visit(BooleanValue& /*node*/) {}
+	virtual void visit(NullValue& /*node*/) {}
+	virtual void visit(EmptyValue& /*node*/) {}
+	virtual void visit(NDetValue& /*node*/) {}
+	virtual void visit(VariableExpression& /*node*/) {}
+	virtual void visit(NegatedExpression& /*node*/) {}
+	virtual void visit(BinaryExpression& /*node*/) {}
+	virtual void visit(Dereference& /*node*/) {}
+	virtual void visit(InvariantExpression& /*node*/) {}
+	virtual void visit(InvariantActive& /*node*/) {}
+	virtual void visit(Sequence& /*node*/) {}
+	virtual void visit(Scope& /*node*/) {}
+	virtual void visit(Atomic& /*node*/) {}
+	virtual void visit(Choice& /*node*/) {}
+	virtual void visit(IfThenElse& /*node*/) {}
+	virtual void visit(Loop& /*node*/) {}
+	virtual void visit(While& /*node*/) {}
+	virtual void visit(Skip& /*node*/) {}
+	virtual void visit(Break& /*node*/) {}
+	virtual void visit(Continue& /*node*/) {}
+	virtual void visit(Assume& /*node*/) {}
+	virtual void visit(Assert& /*node*/) {}
+	virtual void visit(Return& /*node*/) {}
+	virtual void visit(Malloc& /*node*/) {}
+	virtual void visit(Assignment& /*node*/) {}
+	virtual void visit(Enter& /*node*/) {}
+	virtual void visit(Exit& /*node*/) {}
+	virtual void visit(Macro& /*node*/) {}
+	virtual void visit(CompareAndSwap& /*node*/) {}
+	virtual void visit(Function& /*node*/) {}
+	virtual void visit(Program& /*node*/) {}
+};
 
 #endif
