@@ -85,7 +85,7 @@ struct VariableDeclaration : public AstNode {
 
 /*--------------- expressions ---------------*/
 
-struct Expression : public AstNode {
+struct Expression : virtual public AstNode {
 	virtual ~Expression() = default;
 	virtual const Type& type() const = 0;
 	Sort sort() const { return type().sort; }
@@ -184,16 +184,18 @@ struct Invariant : public AstNode {
 
 struct InvariantExpression : public Invariant {
 	InvariantExpression(std::unique_ptr<Expression> expr_) : Invariant(std::move(expr_)) {}
+	ACCEPT_VISITOR
 };
 
 struct InvariantActive : public Invariant {
 	InvariantActive(std::unique_ptr<Expression> expr_) : Invariant(std::move(expr_)) {}
+	ACCEPT_VISITOR
 };
 
 
 /*--------------- statements ---------------*/
 
-struct Statement : public AstNode {
+struct Statement : virtual public AstNode {
 };
 
 struct AnnotatedStatement : public Statement {
@@ -297,11 +299,12 @@ struct Assert : public Command {
 };
 
 struct Return : public Command {
-	std::unique_ptr<Expression> expr;
+	std::unique_ptr<Expression> expr; // optional
 	Return() {};
 	Return(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 		assert(expr);
 	}
+	ACCEPT_VISITOR
 };
 
 struct Malloc : public Command {
@@ -342,9 +345,29 @@ struct Exit : public Command {
 
 struct Macro : public Command {
 	const Function& decl;
+	std::vector<std::unique_ptr<Expression>> args;
 	Macro(const Function& decl_) : decl(decl_) {
 		// TODO: assert(decl.kind == Function::MACRO);
 	}
+	ACCEPT_VISITOR
+};
+
+
+/*--------------- CAS ---------------*/
+
+struct CompareAndSwap : public Command, public Expression {
+	struct Triple {
+		std::unique_ptr<Expression> dst;
+		std::unique_ptr<Expression> cmp;
+		std::unique_ptr<Expression> src;
+		Triple(std::unique_ptr<Expression> dst_, std::unique_ptr<Expression> cmp_, std::unique_ptr<Expression> src_) : dst(std::move(dst_)), cmp(std::move(cmp_)), src(std::move(src_)) {
+			assert(dst);
+			assert(cmp);
+			assert(src);
+		}
+	};
+	std::vector<Triple> elems;
+	const Type& type() const override { return Type::bool_type(); }
 	ACCEPT_VISITOR
 };
 

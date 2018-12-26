@@ -1,6 +1,7 @@
 #include "parser/AstBuilder.hpp"
 
 #include "parser/TypeBuilder.hpp"
+#include <sstream>
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,7 +153,10 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	}
 
 	if (kind == Function::SMR && returnType != Type::void_type()) {
-		throw std::logic_error("Return type of SMR function " + name + " not support: must be of type 'void'.");
+		throw std::logic_error("Return type of extern SMR function " + name + " not support: must be of type 'void'.");
+	}
+	if (kind == Function::MACRO && returnType != Type::void_type()) {
+		throw std::logic_error("Return type of inline function " + name + " not support: must be of type 'void'.");
 	}
 
 	if (name == INIT_NAME) {
@@ -165,6 +169,7 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	}
 
 	auto function = std::make_unique<Function>(name, returnType, kind);
+	_currentFunction = function.get();
 	if (name != INIT_NAME) {
 		// make function available for calls
 		if (_functions.count(name)) {
@@ -204,6 +209,8 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	} else {
 		_program->functions.push_back(std::move(function));
 	}
+
+	// TODO: check if every path returns
 
 	return nullptr;
 }
@@ -418,17 +425,17 @@ antlrcpp::Any AstBuilder::visitExprBinary(cola::CoLaParser::ExprBinaryContext* c
 }
 
 antlrcpp::Any AstBuilder::visitExprCas(cola::CoLaParser::ExprCasContext* context) {
-	throw std::logic_error("not yet implemented (visitExprCas)");
+	return as_expression(context->cas()->accept(this).as<CompareAndSwap*>());
 }
 
 antlrcpp::Any AstBuilder::visitInvExpr(cola::CoLaParser::InvExprContext* context) {
-	// TODO: return as Invariant*
-	throw std::logic_error("not yet implemented (visitInvExpr)");
+	Invariant* result = new InvariantExpression(std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>()));
+	return result;
 }
 
 antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* context) {
-	// TODO: return as Invariant*
-	throw std::logic_error("not yet implemented (visitInvActive)");
+	Invariant* result = new InvariantActive(std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>()));
+	return result;
 }
 
 
@@ -503,8 +510,9 @@ antlrcpp::Any AstBuilder::visitStmtLoop(cola::CoLaParser::StmtLoopContext* conte
 }
 
 antlrcpp::Any AstBuilder::visitStmtAtomic(cola::CoLaParser::StmtAtomicContext* context) {
+	// TODO: avoid wrapping a scope into a scope
 	auto body = std::unique_ptr<Statement>(context->body->accept(this).as<Statement*>());
-	auto scope = std::make_unique<Scope>(std::move(body)); // TODO: avoid wrapping a scope into a scope
+	auto scope = std::make_unique<Scope>(std::move(body));
 	auto result = new Atomic(std::move(scope));
 	if (context->annotation()) {
 		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
@@ -513,16 +521,16 @@ antlrcpp::Any AstBuilder::visitStmtAtomic(cola::CoLaParser::StmtAtomicContext* c
 }
 
 antlrcpp::Any AstBuilder::visitStmtCom(cola::CoLaParser::StmtComContext* context) {
-	auto result = context->command()->accept(this).as<Command*>();
+	auto result = context->command()->accept(this).as<Statement*>();
 	if (context->annotation()) {
-		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
+		_cmdInvariant = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
 	}
 	return as_statement(result);
 }
 
 antlrcpp::Any AstBuilder::visitAnnotation(cola::CoLaParser::AnnotationContext* context) {
-	// TODO: handle annotation in statements
-	throw std::logic_error("not yet implemented (visitAnnotation)");
+	Invariant* invariant = context->invariant()->accept(this).as<Invariant*>();
+	return invariant;
 }
 
 
@@ -535,8 +543,11 @@ antlrcpp::Any AstBuilder::visitAnnotation(cola::CoLaParser::AnnotationContext* c
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static Command* as_command(Command* cmd) {
-	return cmd;
+Statement* AstBuilder::as_command(Statement* stmt, AnnotatedStatement* cmd) {
+	cmd->annotation = std::move(_cmdInvariant);
+	_cmdInvariant.reset();
+	assert(!_cmdInvariant);
+	return stmt;
 }
 
 antlrcpp::Any AstBuilder::visitCmdSkip(cola::CoLaParser::CmdSkipContext* /*context*/) {
@@ -578,7 +589,69 @@ antlrcpp::Any AstBuilder::visitCmdAssert(cola::CoLaParser::CmdAssertContext* con
 }
 
 antlrcpp::Any AstBuilder::visitCmdCall(cola::CoLaParser::CmdCallContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdCall)");
+	std::string name = context->name->getText();
+	if (!_functions.count(name)) {
+		throw std::logic_error("Error: call to undeclared function '" + name + "'.");
+	}
+
+	const Function& function = _functions.at(name);
+	if (function.kind == Function::INTERFACE) {
+		throw std::logic_error("Error: call to interface function '" + name + "' from interface function '" + _currentFunction->name + "', can only call 'inline'/'extern' functions.");
+	}
+
+	std::vector<std::unique_ptr<Expression>> args;
+	auto argsraw = context->argList()->accept(this).as<std::vector<Expression*>>();
+	args.reserve(argsraw.size());
+	for (Expression* expr : argsraw) {
+		args.push_back(std::unique_ptr<Expression>(expr));
+	}
+
+	if (function.args.size() != args.size()) {
+		std::stringstream msg;
+		msg << "Candidate function not applicable: '" << function.name << "' requires " << function.args.size() << " arguments, ";
+		msg << args.size() << " arguments provided.";
+		throw std::logic_error(msg.str());
+	}
+	for (std::size_t i = 0; i < args.size(); i++) {
+		auto type_is = function.args.at(i)->type;
+		auto type_required = function.args.at(i)->type;
+		if (!assignable(type_required, type_is)) {
+			std::stringstream msg;
+			msg << "Type error: function '" << function.name << "' requires '" << type_required.name << "' for " << i << "th argument, '";
+			msg << type_is.name << "' given.";
+			throw std::logic_error(msg.str());
+		}
+	}
+
+	if (function.kind == Function::SMR) {
+		auto enter = std::make_unique<Enter>(function);
+		enter->args = std::move(args);
+		auto exit = std::make_unique<Enter>(function);
+		auto seq = new Sequence(std::move(enter), std::move(exit));
+		return as_command(seq, static_cast<Enter*>(seq->first.get()));
+
+	} else if (function.kind == Function::MACRO) {
+		if (function.return_type != Type::void_type()) {
+			// throw std::logic_error("Unsupported inline function: cannot call non-void inline function.");
+			throw std::logic_error("Compilation error: I did not expect that to happen.");
+		}
+
+		auto macro = new Macro(function);
+		macro->args = std::move(args);
+		return as_command(macro);
+
+	} else {
+		throw std::logic_error("Internal compilation errror: I did not expect this to happen.");
+	}
+}
+
+antlrcpp::Any AstBuilder::visitArgList(cola::CoLaParser::ArgListContext* context) {
+	std::vector<Expression*> results;
+	results.reserve(context->arg.size());
+	for (auto context : context->arg) {
+		results.push_back(context->accept(this).as<Expression*>());
+	}
+	return results;
 }
 
 antlrcpp::Any AstBuilder::visitCmdContinue(cola::CoLaParser::CmdContinueContext* /*context*/) {
@@ -588,7 +661,7 @@ antlrcpp::Any AstBuilder::visitCmdContinue(cola::CoLaParser::CmdContinueContext*
 	return as_command(new Continue());
 }
 
-antlrcpp::Any AstBuilder::visitCmdBreak(cola::CoLaParser::CmdBreakContext* context) {
+antlrcpp::Any AstBuilder::visitCmdBreak(cola::CoLaParser::CmdBreakContext* /*context*/) {
 	if (!_inside_loop) {
 		throw std::logic_error("Semantic error: 'break' must only appear inside loops.");
 	}
@@ -596,19 +669,36 @@ antlrcpp::Any AstBuilder::visitCmdBreak(cola::CoLaParser::CmdBreakContext* conte
 }
 
 antlrcpp::Any AstBuilder::visitCmdReturn(cola::CoLaParser::CmdReturnContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdReturn)");
+	if (context->expr) {
+		auto expr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
+		if (expr->type() != _currentFunction->return_type) {
+			throw std::logic_error("Type error: return value has type '" + expr->type().name + "' but function has return type '" + _currentFunction->return_type.name + "'.");
+		}
+		return as_command(new Return(std::move(expr)));
+	} else {
+		return as_command(new Return());
+	}
 }
 
 antlrcpp::Any AstBuilder::visitCmdCas(cola::CoLaParser::CmdCasContext* context) {
-	throw std::logic_error("not yet implemented (visitCmdCas)");
-}
-
-antlrcpp::Any AstBuilder::visitArgList(cola::CoLaParser::ArgListContext* context) {
-	throw std::logic_error("not yet implemented (visitArgList)");
+	return as_command(context->cas()->accept(this).as<CompareAndSwap*>());
 }
 
 antlrcpp::Any AstBuilder::visitCas(cola::CoLaParser::CasContext* context) {
-	throw std::logic_error("not yet implemented (visitCas)");
+	if (context->dst.size() != context->cmp.size() || context->cmp.size() != context->src.size()) {
+		throw std::logic_error("Malformed CAS.");
+	} 
+
+	auto result = new CompareAndSwap();
+	result->elems.reserve(context->dst.size());
+	for (std::size_t i = 0; i < context->dst.size(); i++) {
+		auto dst = std::unique_ptr<Expression>(context->dst.at(i)->accept(this).as<Expression*>());
+		auto cmp = std::unique_ptr<Expression>(context->cmp.at(i)->accept(this).as<Expression*>());
+		auto src = std::unique_ptr<Expression>(context->src.at(i)->accept(this).as<Expression*>());
+		result->elems.push_back(CompareAndSwap::Triple(std::move(dst), std::move(cmp), std::move(src)));
+	}
+
+	return as_command(result);
 }
 
 

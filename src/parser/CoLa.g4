@@ -73,9 +73,13 @@ command : 'skip'                               #cmdSkip
         | cas                                  #cmdCas
         ;
 
-argList : arg+=expression (',' arg+=expression)* ;
+argList : (arg+=expression (',' arg+=expression)*)? ;
 
-cas : 'CAS' '(' dst=expression ',' cmp=expression ',' src=expression ')' ;
+cas : 'CAS' '(' dst+=expression ',' cmp+=expression ',' src+=expression ')'
+    | 'CAS' '(' '<' dst+=expression (',' dst+=expression)* '>' ','
+                '<' cmp+=expression (',' cmp+=expression)* '>' ','
+                '<' src+=expression (',' src+=expression)* '>' ',' ')'
+    ;
 // TODO: dCAS, or general cas with multiple params
 
 binop : Eq   #opEq

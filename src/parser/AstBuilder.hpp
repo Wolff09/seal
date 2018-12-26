@@ -32,6 +32,8 @@ class AstBuilder : public cola::CoLaVisitor { // TODO: should this be a private 
 		TypeMap _types;
 		FunctionMap _functions;
 		bool _inside_loop = false;
+		std::unique_ptr<Invariant> _cmdInvariant;
+		const Function* _currentFunction;
 
 		void pushScope();
 		std::vector<std::unique_ptr<VariableDeclaration>> popScope();
@@ -42,6 +44,9 @@ class AstBuilder : public cola::CoLaVisitor { // TODO: should this be a private 
 		const Type& lookupType(std::string typeName);
 		std::unique_ptr<Statement> mk_stmt_from_list(std::vector<cola::CoLaParser::StatementContext*> stmts);
 		std::unique_ptr<Statement> mk_stmt_from_list(std::vector<Statement*> stmts); // claims ownership of stmts
+		Statement* as_command(Statement* stmt, AnnotatedStatement* cmd);
+		Statement* as_command(AnnotatedStatement* stmt) { return as_command(stmt, stmt); }
+		
 
 	public:
 		static std::shared_ptr<Program> buildFrom(cola::CoLaParser::ProgramContext* parseTree);
