@@ -4,7 +4,7 @@
 #include "util/util.hpp"
 
 
-struct RemoveConditionalsVisitor final : public BaseVisitor {
+struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	std::unique_ptr<Statement> replacement;
 	bool replacementNeeded = false;
 
@@ -88,6 +88,32 @@ struct RemoveConditionalsVisitor final : public BaseVisitor {
 		acceptAndReplaceIfNeeded(sequence.first);
 		acceptAndReplaceIfNeeded(sequence.second);
 	}
+
+	void visit(Skip& /*node*/) { /* do nothing */ }
+	void visit(Break& /*node*/) { /* do nothing */ }
+	void visit(Continue& /*node*/) { /* do nothing */ }
+	void visit(Assume& /*node*/) { /* do nothing */ }
+	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(Return& /*node*/) { /* do nothing */ }
+	void visit(Malloc& /*node*/) { /* do nothing */ }
+	void visit(Assignment& /*node*/) { /* do nothing */ }
+	void visit(Enter& /*node*/) { /* do nothing */ }
+	void visit(Exit& /*node*/) { /* do nothing */ }
+	void visit(Macro& /*node*/) { /* do nothing */ }
+	void visit(CompareAndSwap& /*node*/) { /* do nothing */ }
+
+	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(VariableDeclaration&))"); }
+	void visit(Expression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(Expression&))"); }
+	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(BooleanValue&))"); }
+	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(NullValue&))"); }
+	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(EmptyValue&))"); }
+	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(NDetValue&))"); }
+	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(VariableExpression&))"); }
+	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(NegatedExpression&))"); }
+	void visit(BinaryExpression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(BinaryExpression&))"); }
+	void visit(Dereference& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(Dereference&))"); }
+	void visit(InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(InvariantExpression&))"); }
+	void visit(InvariantActive& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(InvariantActive&))"); }
 };
 
 
