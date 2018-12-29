@@ -21,12 +21,171 @@ struct Indent {
 
 std::ostream& operator<<(std::ostream& stream, const Indent indent) { indent.print(stream); return stream; }
 
+
+struct PrintExpressionVisitor final : public Visitor {
+	std::ostream& stream;
+	std::size_t precedence = 0;
+
+	PrintExpressionVisitor(std::ostream& stream) : stream(stream) {}
+
+	void visit(const CompareAndSwap& com) {
+		std::stringstream dst, cmp, src;
+		PrintExpressionVisitor dstVisitor(dst), cmpVisitor(cmp), srcVisitor(src);
+		assert(!com.elems.empty());
+		com.elems.at(0).dst->accept(dstVisitor);
+		com.elems.at(0).cmp->accept(cmpVisitor);
+		com.elems.at(0).src->accept(srcVisitor);
+		for (std::size_t i = 1; i < com.elems.size(); i++) {
+			dst << ", ";
+			cmp << ", ";
+			src << ", ";
+			com.elems.at(i).dst->accept(dstVisitor);
+			com.elems.at(i).cmp->accept(cmpVisitor);
+			com.elems.at(i).src->accept(srcVisitor);
+		}
+		std::string dstResult = dst.str();
+		std::string cmpResult = cmp.str();
+		std::string srcResult = src.str();
+		if (com.elems.size() > 1) {
+			dstResult = "<" + dstResult + ">";
+			cmpResult = "<" + cmpResult + ">";
+			srcResult = "<" + srcResult + ">";
+		}
+		stream << "CAS(" << dstResult << ", " << cmpResult << ", " << srcResult << ")";
+	}
+
+
+	void set_precedence_op(BinaryExpression::Operator op) {
+		throw std::logic_error("not yet implemented (set_precedence_op)");
+		switch (op) {
+			case BinaryExpression::Operator::EQ: precedence = 1; break;
+			case BinaryExpression::Operator::NEQ: precedence = 1; break;
+			case BinaryExpression::Operator::LEQ: precedence = 1; break;
+			case BinaryExpression::Operator::LT: precedence = 1; break;
+			case BinaryExpression::Operator::GEQ: precedence = 1; break;
+			case BinaryExpression::Operator::GT: precedence = 1; break;
+			case BinaryExpression::Operator::AND: precedence = 0; break;
+			case BinaryExpression::Operator::OR: precedence = 0; break;
+		}
+	}
+
+	void set_precedence_neg() {
+		precedence = 2;
+	}
+
+	void set_precedence_deref() {
+		precedence = 3;
+	}
+
+	void set_precedence_immi() {
+		precedence = 4;
+	}
+
+
+	void visit(const Expression& /*expr*/) {
+		throw std::logic_error("Unexpected invocation (PrintVisitor:::visit(const Expression&))");
+	}
+
+	void visit(const BooleanValue& expr) {
+		stream << (expr.value ? "true" : "false");
+		set_precedence_immi();
+	}
+
+	void visit(const NullValue& /*expr*/) {
+		stream << "NULL";
+		set_precedence_immi();
+	}
+
+	void visit(const EmptyValue& /*expr*/) {
+		stream << "EMPTY";
+		set_precedence_immi();
+	}
+
+	void visit(const NDetValue& /*expr*/) {
+		stream << "*";
+		set_precedence_immi();
+	}
+
+	void visit(const VariableExpression& expr) {
+		stream << expr.decl.name;
+		set_precedence_immi();
+	}
+
+	void print_sub_expression(const Expression& expr) {
+		std::stringstream my_stream;
+		PrintExpressionVisitor subprinter(my_stream);
+		expr.accept(subprinter);
+		std::string expr_string = my_stream.str();
+
+		if (subprinter.precedence <= precedence) {
+			stream << "(" << expr_string << ")";
+		} else {
+			stream << expr_string;
+		}
+	}
+
+	void visit(const NegatedExpression& expr) {
+		// TODO: check when parenthesis are needed
+		set_precedence_neg();
+		stream << "!";
+		print_sub_expression(*expr.expr);
+	}
+
+	void visit(const BinaryExpression& expr) {
+		// TODO: check when parenthesis are needed
+		set_precedence_op(expr.op);
+		print_sub_expression(*expr.lhs);
+		stream << " " << toString(expr.op) << " ";
+		print_sub_expression(*expr.rhs);
+	}
+
+	void visit(const Dereference& expr) {
+		// TODO: check when parenthesis are needed
+		set_precedence_deref();
+		print_sub_expression(*expr.expr);
+		stream << "->" << expr.fieldname;
+	}
+
+	void visit(const InvariantExpression& expr) {
+		expr.expr->accept(*this);
+	}
+
+	void visit(const InvariantActive& expr) {
+		stream << "active(";
+		expr.expr->accept(*this);
+		stream << ")";
+	}
+
+	void visit(const Program& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Program&))"); }
+	void visit(const Function& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Function&))"); }
+	void visit(const VariableDeclaration& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const VariableDeclaration&))"); }
+	void visit(const Scope& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Scope&))"); }
+	void visit(const Sequence& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Sequence&))"); }
+	void visit(const Atomic& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Atomic&))"); }
+	void visit(const Choice& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Choice&))"); }
+	void visit(const IfThenElse& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const IfThenElse&))"); }
+	void visit(const Loop& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Loop&))"); }
+	void visit(const While& /*stmt*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const While&))"); }
+	void visit(const Skip& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Skip&))"); }
+	void visit(const Break& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Break&))"); }
+	void visit(const Continue& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Continue&))"); }
+	void visit(const Assume& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Assume&))"); }
+	void visit(const Assert& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Assert&))"); }
+	void visit(const Return& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Return&))"); }
+	void visit(const Malloc& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Malloc&))"); }
+	void visit(const Assignment& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Assignment&))"); }
+	void visit(const Enter& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Enter&))"); }
+	void visit(const Exit& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Exit&))"); }
+	void visit(const Macro& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Macro&))"); }
+};
+
 struct PrintVisitor final : public Visitor {
 	std::ostream& stream;
 	Indent indent;
 	bool scope_sameline = false;
+	PrintExpressionVisitor exprinter;
 
-	PrintVisitor(std::ostream& stream) : stream(stream), indent(stream) {}
+	PrintVisitor(std::ostream& stream) : stream(stream), indent(stream), exprinter(stream) {}
 
 	std::string typenameof(const Type& type) {
 		std::string name = type.name;
@@ -150,7 +309,7 @@ struct PrintVisitor final : public Visitor {
 	void visit(const IfThenElse& ite) {
 		print_annotation(ite);
 		stream << indent << "if (";
-		ite.expr->accept(*this);
+		ite.expr->accept(exprinter);
 		stream << ") ";
 		print_scope(*ite.ifBranch);
 		if (ite.elseBranch) {
@@ -169,7 +328,7 @@ struct PrintVisitor final : public Visitor {
 	void visit(const While& whl) {
 		print_annotation(whl);
 		stream << indent << "while (";
-		whl.expr->accept(*this);
+		whl.expr->accept(exprinter);
 		stream << ") " << std::endl;
 		print_scope(*whl.body);
 		stream << std::endl;
@@ -193,14 +352,14 @@ struct PrintVisitor final : public Visitor {
 	void visit(const Assume& com) {
 		print_annotation(com);
 		stream << indent << "assume(";
-		com.expr->accept(*this);
+		com.expr->accept(exprinter);
 		stream << ");" << std::endl;
 	}
 
 	void visit(const Assert& com) {
 		print_annotation(com);
 		stream << indent << "assert(";
-		com.inv->accept(*this);
+		com.inv->accept(exprinter);
 		stream << ");" << std::endl;
 	}
 
@@ -209,7 +368,7 @@ struct PrintVisitor final : public Visitor {
 		stream << indent << "return";
 		if (com.expr) {
 			stream << " ";
-			com.expr->accept(*this);
+			com.expr->accept(exprinter);
 		}
 		stream << ";" << std::endl;
 	}
@@ -222,9 +381,9 @@ struct PrintVisitor final : public Visitor {
 	void visit(const Assignment& com) {
 		print_annotation(com);
 		stream << indent;
-		com.lhs->accept(*this);
+		com.lhs->accept(exprinter);
 		stream << " = ";
-		com.rhs->accept(*this);
+		com.rhs->accept(exprinter);
 		stream << ";" << std::endl;
 	}
 
@@ -232,10 +391,10 @@ struct PrintVisitor final : public Visitor {
 		print_annotation(com);
 		stream << indent << "enter " << com.decl.name << "(";
 		if (!com.args.empty()) {
-			com.args.at(0)->accept(*this);
+			com.args.at(0)->accept(exprinter);
 			for (std::size_t i = 1; i < com.args.size(); i++) {
 				stream << ", ";
-				com.args.at(i)->accept(*this);
+				com.args.at(i)->accept(exprinter);
 			}
 		}
 		stream << ");" << std::endl;
@@ -250,100 +409,34 @@ struct PrintVisitor final : public Visitor {
 		print_annotation(com);
 		stream << indent << com.decl.name << "(";
 		if (!com.args.empty()) {
-			com.args.at(0)->accept(*this);
+			com.args.at(0)->accept(exprinter);
 			for (std::size_t i = 1; i < com.args.size(); i++) {
 				stream << ", ";
-				com.args.at(i)->accept(*this);
+				com.args.at(i)->accept(exprinter);
 			}
 		}
 		stream << ");" << std::endl;
 	}
 
 	void visit(const CompareAndSwap& com) {
-		// TODO: CAS as statement will not print correctly
 		print_annotation(com);
-		std::stringstream dst, cmp, src;
-		PrintVisitor dstVisitor(dst), cmpVisitor(cmp), srcVisitor(src);
-		assert(!com.elems.empty());
-		com.elems.at(0).dst->accept(dstVisitor);
-		com.elems.at(0).cmp->accept(cmpVisitor);
-		com.elems.at(0).src->accept(srcVisitor);
-		for (std::size_t i = 1; i < com.elems.size(); i++) {
-			dst << ", ";
-			cmp << ", ";
-			src << ", ";
-			com.elems.at(i).dst->accept(dstVisitor);
-			com.elems.at(i).cmp->accept(cmpVisitor);
-			com.elems.at(i).src->accept(srcVisitor);
-		}
-		std::string dstResult = dst.str();
-		std::string cmpResult = cmp.str();
-		std::string srcResult = src.str();
-		if (com.elems.size() > 1) {
-			dstResult = "<" + dstResult + ">";
-			cmpResult = "<" + cmpResult + ">";
-			srcResult = "<" + srcResult + ">";
-		}
-		stream << "CAS(" << dstResult << ", " << cmpResult << ", " << srcResult << ")";
+		stream << indent;
+		com.accept(exprinter);
+		stream << ";" << std::endl;
 	}
 
 
-	void visit(const Expression& /*expr*/) {
-		throw std::logic_error("Unexpected invocation (PrintVisitor:::visit(const Expression&))");
-	}
-
-	void visit(const BooleanValue& expr) {
-		stream << (expr.value ? "true" : "false");
-	}
-
-	void visit(const NullValue& /*expr*/) {
-		stream << "NULL";
-	}
-
-	void visit(const EmptyValue& /*expr*/) {
-		stream << "EMPTY";
-	}
-
-	void visit(const NDetValue& /*expr*/) {
-		stream << "*";
-	}
-
-	void visit(const VariableExpression& expr) {
-		stream << expr.decl.name;
-	}
-
-	void visit(const NegatedExpression& expr) {
-		// TODO: check when parenthesis are needed
-		stream << "!(";
-		expr.expr->accept(*this);
-		stream << ")";
-	}
-
-	void visit(const BinaryExpression& expr) {
-		// TODO: check when parenthesis are needed
-		stream << "(";
-		expr.lhs->accept(*this);
-		stream << ") " << toString(expr.op) << " (";
-		expr.rhs->accept(*this);
-		stream << ")";
-	}
-
-	void visit(const Dereference& expr) {
-		// TODO: check when parenthesis are needed
-		stream << "(";
-		stream << ")->" << expr.fieldname;
-		throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Dereference&)");
-	}
-
-	void visit(const InvariantExpression& expr) {
-		expr.expr->accept(*this);
-	}
-
-	void visit(const InvariantActive& expr) {
-		stream << "active(";
-		expr.expr->accept(*this);
-		stream << ")";
-	}
+	void visit(const Expression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor:::visit(const Expression&))"); }
+	void visit(const BooleanValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const BooleanValue&))"); }
+	void visit(const NullValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const NullValue&))"); }
+	void visit(const EmptyValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const EmptyValue&))"); }
+	void visit(const NDetValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const NDetValue&))"); }
+	void visit(const VariableExpression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const VariableExpression&))"); }
+	void visit(const NegatedExpression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const NegatedExpression&))"); }
+	void visit(const BinaryExpression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const BinaryExpression&))"); }
+	void visit(const Dereference& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const Dereference&))"); }
+	void visit(const InvariantExpression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const InvariantExpression&))"); }
+	void visit(const InvariantActive& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const InvariantActive&))"); }
 
 };
 

@@ -28,6 +28,7 @@ inline void foo(bool b, data_t x, Bar* s, Foobar* l) {
 	skip;
 	if (b) {
 		bool test;
+		s = s->bbb->bbb;
 		skip;
 	} else {
 		bool test;
