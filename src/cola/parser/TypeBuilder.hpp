@@ -50,10 +50,12 @@ namespace cola {
 				for (auto structContext : context->struct_decl()) {
 					structContext->accept(this);
 				}
+				
 				_created = true;
 				for (auto structContext : context->struct_decl()) {
 					structContext->accept(this);
 				}
+
 				return nullptr;
 			}
 
@@ -65,7 +67,7 @@ namespace cola {
 						throw std::logic_error("Duplicate type declaration: type '" + name + "' already defined.");
 					} else {
 						auto new_type = std::make_unique<Type>(name, Sort::PTR);
-						_all_types.insert({{ name, *new_type }});
+						_all_types.insert({{ name, std::cref(*new_type.get()) }});
 						_declared_types[name] = std::move(new_type);
 					}
 
@@ -83,36 +85,36 @@ namespace cola {
 				return nullptr;
 			}
 
+			const Type& lookup(std::string name) {
+				if (_all_types.count(name) == 0) {
+					throw std::logic_error("Field declaration of unknown type name '" + name + "'.");
+				}
+				const Type& type = _all_types.at(name).get();
+				return type;
+			}
+
 			antlrcpp::Any visitField_decl(cola::CoLaParser::Field_declContext* context) override {
 				assert(_currentType);
-				Type& currentType = *_currentType;
-				const Type& fieldType = context->type()->accept(this).as<const Type&>();
-				for (auto token : context->names) {
+				const Type& fieldType = lookup(context->type()->accept(this).as<std::string>());
+				for (auto& token : context->names) {
 					std::string name = token->getText();
-					if (currentType.fields.count(name) != 0) {
+					if (_currentType->fields.count(name) != 0) {
 						throw std::logic_error("Duplicate field declaration: field with name '" + name + "' already exists.");
 					}
-					currentType.fields.insert({{ name, fieldType }});
+					auto wrapper = std::cref(fieldType);
+					_currentType->fields.insert({{ name, wrapper }});
 				}
 				return nullptr;
 			}
 
-			antlrcpp::Any lookup(std::string name) {
-				if (_all_types.count(name) == 0) {
-					throw std::logic_error("Field declaration of unknown type name '" + name + "'.");
-				}
-				const Type& type = _all_types.at(name);
-				return type;
-			}
-
 			antlrcpp::Any visitTypeValue(cola::CoLaParser::TypeValueContext* context) override {
 				std::string name = context->name->accept(this).as<std::string>();
-				return lookup(name);
+				return name;
 			}
 
 			antlrcpp::Any visitTypePointer(cola::CoLaParser::TypePointerContext* context) override {
 				std::string name = context->name->accept(this).as<std::string>() + "*";
-				return lookup(name);
+				return name;
 			}
 
 			antlrcpp::Any visitNameVoid(cola::CoLaParser::NameVoidContext* /*context*/) override {

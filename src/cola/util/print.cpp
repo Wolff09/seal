@@ -1,6 +1,6 @@
 #include "cola/util.hpp"
 
-#include <iostream> // TODO: remove?
+#include <sstream>
 #include "cola/ast.hpp"
 
 using namespace cola;
@@ -24,6 +24,7 @@ std::ostream& operator<<(std::ostream& stream, const Indent indent) { indent.pri
 struct PrintVisitor final : public Visitor {
 	std::ostream& stream;
 	Indent indent;
+	bool scope_sameline = false;
 
 	PrintVisitor(std::ostream& stream) : stream(stream), indent(stream) {}
 
@@ -35,72 +36,315 @@ struct PrintVisitor final : public Visitor {
 		return name;
 	}
 
-	void print_type(const Type& type) {
-		stream << indent++ << "struct " << typenameof(type) << " {" << std::endl;
+	void print_class(const Type& type) {
+		stream << std::endl << indent++ << "struct " << typenameof(type) << " {" << std::endl;
 		for (const auto& pair : type.fields) {
 			stream << indent << typenameof(pair.second.get())  << " " << pair.first << ";" << std::endl;
 		}
-		stream << --indent << "};" << std::endl << std::endl;
+		stream << --indent << "};" << std::endl;
 	}
 
 
 	void visit(const Program& program) {
-		stream << "/* program name: " << program.name << " */";
-		stream << std::endl;
+		stream << "// BEGIN program " << program.name << std::endl;
 
 		for (const auto& type : program.types) {
-			print_type(*type);
+			print_class(*type);
 		}
 		stream << std::endl;
 
 		for (const auto& decl : program.variables) {
 			decl->accept(*this);
+			stream << ";" << std::endl;
 		}
-		stream << std::endl;
 
 		program.initalizer->accept(*this);
 		for (const auto& function :  program.functions) {
 			function->accept(*this);
 		}
+
+		stream << std::endl << "// END program " << program.name << std::endl;
 	}
 
-	void visit(const Function& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Function&)"); }
+	void print_scope(const Scope& scope) {
+		scope_sameline = true;
+		scope.accept(*this);
+	}
 
-	void visit(const VariableDeclaration& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const VariableDeclaration&)"); }
+	void visit(const Function& function) {
+		std::string modifier;
+		switch (function.kind) {
+			case Function::INTERFACE: modifier = ""; break;
+			case Function::SMR: modifier = "extern "; break;
+			case Function::MACRO: modifier = "inline "; break;
+		}
+
+		stream << std::endl << modifier << function.return_type.name << " " << function.name << "(";
+		if (function.args.size() > 0) {
+			function.args.at(0)->accept(*this);
+			for (std::size_t i = 1; i < function.args.size(); i++) {
+				stream << ", ";
+				function.args.at(i)->accept(*this);
+			}
+		}
+		stream << ") ";
+		print_scope(*function.body);
+		stream << std::endl;
+	}
+
+	void visit(const VariableDeclaration& decl) {
+		// output without indent and delimiter
+		stream << decl.type.name << " " << decl.name;
+	}
 
 
-	void visit(const Sequence& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Sequence&)"); }
-	void visit(const Scope& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Scope&)"); }
-	void visit(const Atomic& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Atomic&)"); }
-	void visit(const Choice& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Choice&)"); }
-	void visit(const IfThenElse& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const IfThenElse&)"); }
-	void visit(const Loop& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Loop&)"); }
-	void visit(const While& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const While&)"); }
+	void visit(const Scope& scope) {
+		bool sameline = scope_sameline;
+		scope_sameline = false;
+		if (!sameline) {
+			stream << indent;
+		}
+		stream << "{" << std::endl;
+		indent++;
+		for (const auto& var : scope.variables) {
+			stream << indent;
+			var->accept(*this);
+			stream << ";" << std::endl;
+		}
+		scope.body->accept(*this);
+		stream << --indent << "}";
+		if (!sameline) {
+			stream << std::endl;
+		}
+
+	}
+
+	void visit(const Sequence& sequence) {
+		sequence.first->accept(*this);
+		sequence.second->accept(*this);
+	}
+
+	void print_annotation(const AnnotatedStatement& stmt) {
+		if (stmt.annotation) {
+			stream << indent << "@invariant(";
+			stmt.annotation->accept(*this);
+			stream << ")";
+		}
+	}
+
+	void visit(const Atomic& atomic) {
+		print_annotation(atomic);
+		stream << indent << "atomic ";
+		print_scope(*atomic.body);
+		stream << std::endl;
+	}
 	
-	void visit(const Skip& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Skip&)"); }
-	void visit(const Break& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Break&)"); }
-	void visit(const Continue& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Continue&)"); }
-	void visit(const Assume& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Assume&)"); }
-	void visit(const Assert& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Assert&)"); }
-	void visit(const Return& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Return&)"); }
-	void visit(const Malloc& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Malloc&)"); }
-	void visit(const Assignment& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Assignment&)"); }
-	void visit(const Enter& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Enter&)"); }
-	void visit(const Exit& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Exit&)"); }
-	void visit(const Macro& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Macro&)"); }
-	void visit(const CompareAndSwap& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const CompareAndSwap&)"); }
+	void visit(const Choice& choice) {
+		stream << indent << "choose ";
+		for (const auto& scope : choice.branches) {
+			print_scope(*scope);
+		}
+		stream << std::endl;
+	}
+	
+	void visit(const IfThenElse& ite) {
+		print_annotation(ite);
+		stream << indent << "if (";
+		ite.expr->accept(*this);
+		stream << ") ";
+		print_scope(*ite.ifBranch);
+		if (ite.elseBranch) {
+			stream << " else ";
+			print_scope(*ite.elseBranch);
+		}
+		stream << std::endl;
+	}
 
-	void visit(const Expression& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Expression&)"); }
-	void visit(const BooleanValue& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const BooleanValue&)"); }
-	void visit(const NullValue& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const NullValue&)"); }
-	void visit(const EmptyValue& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const EmptyValue&)"); }
-	void visit(const NDetValue& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const NDetValue&)"); }
-	void visit(const VariableExpression& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const VariableExpression&)"); }
-	void visit(const NegatedExpression& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const NegatedExpression&)"); }
-	void visit(const BinaryExpression& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const BinaryExpression&)"); }
-	void visit(const Dereference& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Dereference&)"); }
-	void visit(const InvariantExpression& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const InvariantExpression&)"); }
-	void visit(const InvariantActive& node) { throw std::logic_error("not yet implemented: PrintVisitor:::visit(const InvariantActive&)"); }
+	void visit(const Loop& loop) {
+		stream << indent << "loop ";
+		print_scope(*loop.body);
+		stream << std::endl;
+	}
+
+	void visit(const While& whl) {
+		print_annotation(whl);
+		stream << indent << "while (";
+		whl.expr->accept(*this);
+		stream << ") " << std::endl;
+		print_scope(*whl.body);
+		stream << std::endl;
+	}
+
+	void visit(const Skip& com) {
+	print_annotation(com);
+		stream << indent << "skip;" << std::endl;
+	}
+
+	void visit(const Break& com) {
+	print_annotation(com);
+		stream << indent << "break;" << std::endl;
+	}
+
+	void visit(const Continue& com) {
+	print_annotation(com);
+		stream << indent << "continue;" << std::endl;
+	}
+
+	void visit(const Assume& com) {
+		print_annotation(com);
+		stream << indent << "assume(";
+		com.expr->accept(*this);
+		stream << ");" << std::endl;
+	}
+
+	void visit(const Assert& com) {
+		print_annotation(com);
+		stream << indent << "assert(";
+		com.inv->accept(*this);
+		stream << ");" << std::endl;
+	}
+
+	void visit(const Return& com) {
+		print_annotation(com);
+		stream << indent << "return";
+		if (com.expr) {
+			stream << " ";
+			com.expr->accept(*this);
+		}
+		stream << ";" << std::endl;
+	}
+
+	void visit(const Malloc& com) {
+		print_annotation(com);
+		stream << indent << com.lhs.name << " = malloc;" << std::endl;
+	}
+
+	void visit(const Assignment& com) {
+		print_annotation(com);
+		stream << indent;
+		com.lhs->accept(*this);
+		stream << " = ";
+		com.rhs->accept(*this);
+		stream << ";" << std::endl;
+	}
+
+	void visit(const Enter& com) {
+		print_annotation(com);
+		stream << indent << "enter " << com.decl.name << "(";
+		if (!com.args.empty()) {
+			com.args.at(0)->accept(*this);
+			for (std::size_t i = 1; i < com.args.size(); i++) {
+				stream << ", ";
+				com.args.at(i)->accept(*this);
+			}
+		}
+		stream << ");" << std::endl;
+	}
+
+	void visit(const Exit& com) {
+		print_annotation(com);
+		stream << indent << "exit " << com.decl.name << ";" << std::endl;
+	}
+
+	void visit(const Macro& com) {
+		print_annotation(com);
+		stream << indent << com.decl.name << "(";
+		if (!com.args.empty()) {
+			com.args.at(0)->accept(*this);
+			for (std::size_t i = 1; i < com.args.size(); i++) {
+				stream << ", ";
+				com.args.at(i)->accept(*this);
+			}
+		}
+		stream << ");" << std::endl;
+	}
+
+	void visit(const CompareAndSwap& com) {
+		// TODO: CAS as statement will not print correctly
+		print_annotation(com);
+		std::stringstream dst, cmp, src;
+		PrintVisitor dstVisitor(dst), cmpVisitor(cmp), srcVisitor(src);
+		assert(!com.elems.empty());
+		com.elems.at(0).dst->accept(dstVisitor);
+		com.elems.at(0).cmp->accept(cmpVisitor);
+		com.elems.at(0).src->accept(srcVisitor);
+		for (std::size_t i = 1; i < com.elems.size(); i++) {
+			dst << ", ";
+			cmp << ", ";
+			src << ", ";
+			com.elems.at(i).dst->accept(dstVisitor);
+			com.elems.at(i).cmp->accept(cmpVisitor);
+			com.elems.at(i).src->accept(srcVisitor);
+		}
+		std::string dstResult = dst.str();
+		std::string cmpResult = cmp.str();
+		std::string srcResult = src.str();
+		if (com.elems.size() > 1) {
+			dstResult = "<" + dstResult + ">";
+			cmpResult = "<" + cmpResult + ">";
+			srcResult = "<" + srcResult + ">";
+		}
+		stream << "CAS(" << dstResult << ", " << cmpResult << ", " << srcResult << ")";
+	}
+
+
+	void visit(const Expression& /*expr*/) {
+		throw std::logic_error("Unexpected invocation (PrintVisitor:::visit(const Expression&))");
+	}
+
+	void visit(const BooleanValue& expr) {
+		stream << (expr.value ? "true" : "false");
+	}
+
+	void visit(const NullValue& /*expr*/) {
+		stream << "NULL";
+	}
+
+	void visit(const EmptyValue& /*expr*/) {
+		stream << "EMPTY";
+	}
+
+	void visit(const NDetValue& /*expr*/) {
+		stream << "*";
+	}
+
+	void visit(const VariableExpression& expr) {
+		stream << expr.decl.name;
+	}
+
+	void visit(const NegatedExpression& expr) {
+		// TODO: check when parenthesis are needed
+		stream << "!(";
+		expr.expr->accept(*this);
+		stream << ")";
+	}
+
+	void visit(const BinaryExpression& expr) {
+		// TODO: check when parenthesis are needed
+		stream << "(";
+		expr.lhs->accept(*this);
+		stream << ") " << toString(expr.op) << " (";
+		expr.rhs->accept(*this);
+		stream << ")";
+	}
+
+	void visit(const Dereference& expr) {
+		// TODO: check when parenthesis are needed
+		stream << "(";
+		stream << ")->" << expr.fieldname;
+		throw std::logic_error("not yet implemented: PrintVisitor:::visit(const Dereference&)");
+	}
+
+	void visit(const InvariantExpression& expr) {
+		expr.expr->accept(*this);
+	}
+
+	void visit(const InvariantActive& expr) {
+		stream << "active(";
+		expr.expr->accept(*this);
+		stream << ")";
+	}
+
 };
 
 void cola::print(const Program& program, std::ostream& stream) {

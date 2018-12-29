@@ -31,8 +31,7 @@ function : (modifier=Inline)? returnType=type name=Identifier '(' args=argDeclLi
          | modifier=Extern returnType=type name=Identifier '(' args=argDeclList ')' ';'
          ;
 
-argDeclList : argTypes+=type argNames+=Identifier (',' argTypes+=type argNames+=Identifier)*
-            ;
+argDeclList : (argTypes+=type argNames+=Identifier (',' argTypes+=type argNames+=Identifier)*)? ;
 
 block : statement  #blockStmt
       | scope      #blockScope
@@ -42,7 +41,7 @@ scope : '{' var_decl* statement* '}' ;
 
 statement : 'choose' scope+                                                           #stmtChoose
           | 'loop' scope                                                              #stmtLoop
-          | annotation? 'atomic' body=block                                                       #stmtAtomic
+          | annotation? 'atomic' body=block                                           #stmtAtomic
           | annotation? 'if' '(' expr=expression ')' bif=block ('else' belse=block)?  #stmtIf
           | annotation? 'while' '(' expr=expression ')' body=block                    #stmtWhile
           | annotation? 'do' body=block 'while' '(' expr=expression ')' ';'           #stmtDo
@@ -66,7 +65,7 @@ command : 'skip'                               #cmdSkip
         | lhs=Identifier '=' 'malloc'          #cmdMallo
         | 'assume' '(' expr=expression ')'     #cmdAssume
         | 'assert' '(' expr=invariant ')'      #cmdAssert
-        | name=Identifier '(' argList ')'      #cmdCall
+        | name=Identifier '(' argList ')'      #cmdCall // TODO: support enter/exit
         | 'continue'                           #cmdContinue
         | 'break'                              #cmdBreak
         | 'return' expr=expression?            #cmdReturn
@@ -108,7 +107,7 @@ expression : name=Identifier                        #exprIdentifier
            | cas                                    #exprCas
            ;
 
-invariant : expr=expression                   #invExpr
+invariant : '(' expr=expression ')'           #invExpr
           | 'active' '(' expr=expression ')'  #invActive 
           ;
 

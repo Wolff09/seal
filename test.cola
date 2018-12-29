@@ -12,6 +12,16 @@ struct Foobar {
 	Foobar* fff;
 }
 
+bool Test1, Test2, Test3;
+
+void init() {
+	skip;
+}
+
+inline void bar(bool b) {
+	skip;
+}
+
 inline void foo(bool b, data_t x, Bar* s, Foobar* l) {
 	Foobar* fff;
 	Bar* bbb;

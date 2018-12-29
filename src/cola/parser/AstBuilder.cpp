@@ -143,7 +143,7 @@ antlrcpp::Any AstBuilder::visitProgram(cola::CoLaParser::ProgramContext* context
 
 antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* context) {
 	std::string name = context->name->getText();
-	const Type& returnType = context->returnType->accept(this).as<const Type&>();
+	const Type& returnType = lookupType(context->returnType->accept(this).as<std::string>());
 	
 	Function::Kind kind = Function::INTERFACE;
 	assert(!(context->Inline() && context->Extern()));
@@ -167,6 +167,9 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 		if (returnType != Type::void_type()) {
 			throw std::logic_error("Initalizer function '" + name + "' must have 'void' return type.");
 		}
+	}
+	if (name == "active") {
+		throw std::logic_error("Name clash: function name must not be 'active'.");
 	}
 
 	auto function = std::make_unique<Function>(name, returnType, kind);
@@ -205,7 +208,7 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	function->args = popScope();
 
 	// transfer ownershp
-	if (name != INIT_NAME) {
+	if (name == INIT_NAME) {
 		_program->initalizer = std::move(function);
 	} else {
 		_program->functions.push_back(std::move(function));
@@ -223,8 +226,8 @@ antlrcpp::Any AstBuilder::visitArgDeclList(cola::CoLaParser::ArgDeclListContext*
 	assert(size == context->argNames.size());
 	for (std::size_t i = 0; i < size; i++) {
 		std::string name = context->argNames.at(i)->getText();
-		const Type& type = context->argTypes.at(i)->accept(this).as<const Type&>();
-		// TODO: swhat the ****?! why can't I pass the reference wrapper here without them being lost after the loop?
+		const Type& type = lookupType(context->argTypes.at(i)->accept(this).as<std::string>());
+		// TODO: what the ****?! why can't I pass the reference wrapper here without them being lost after the loop?
 		dlist->push_back(std::make_pair(name, type.name));
 	}
 	return dlist;
@@ -281,16 +284,16 @@ antlrcpp::Any AstBuilder::visitNameIdentifier(cola::CoLaParser::NameIdentifierCo
 
 antlrcpp::Any AstBuilder::visitTypeValue(cola::CoLaParser::TypeValueContext* context) {
 	std::string name = context->name->accept(this).as<std::string>();
-	return lookupType(name);
+	return name;
 }
 
 antlrcpp::Any AstBuilder::visitTypePointer(cola::CoLaParser::TypePointerContext* context) {
 	std::string name = context->name->accept(this).as<std::string>() + "*";
-	return lookupType(name);
+	return name;
 }
 
 antlrcpp::Any AstBuilder::visitVar_decl(cola::CoLaParser::Var_declContext* context) {
-	const Type& type = context->type()->accept(this).as<const Type&>();
+	const Type& type = lookupType(context->type()->accept(this).as<std::string>());
 	for (auto token : context->names) {
 		std::string name = token->getText();
 		auto decl = std::make_unique<VariableDeclaration>(name, type, false); // default to non-shared
@@ -448,27 +451,27 @@ antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* con
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+antlrcpp::Any AstBuilder::visitBlockStmt(cola::CoLaParser::BlockStmtContext* context) {
+	Statement* stmt = context->statement()->accept(this);
+	Scope* scope = new Scope(std::unique_ptr<Statement>(stmt));
+	return scope;
+}
+
+antlrcpp::Any AstBuilder::visitBlockScope(cola::CoLaParser::BlockScopeContext* context) {
+	Scope* scope = context->scope()->accept(this).as<Scope*>();
+	return scope;
+}
+
 static Statement* as_statement(Statement* stmt) {
 	return stmt;
 }
 
-antlrcpp::Any AstBuilder::visitBlockStmt(cola::CoLaParser::BlockStmtContext* context) {
-	return as_statement(context->statement()->accept(this));
-}
-
-antlrcpp::Any AstBuilder::visitBlockScope(cola::CoLaParser::BlockScopeContext* context) {
-	return as_statement(context->scope()->accept(this).as<Scope*>());
-}
-
 antlrcpp::Any AstBuilder::visitStmtIf(cola::CoLaParser::StmtIfContext* context) {
-	// TODO: avoid wrapping a scope into a scope
 	auto ifExpr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
-	auto ifBranch = std::unique_ptr<Statement>(context->bif->accept(this).as<Statement*>());
-	auto ifScope = std::make_unique<Scope>(std::move(ifBranch));
+	auto ifScope = std::unique_ptr<Scope>(context->bif->accept(this).as<Scope*>());
 	std::unique_ptr<Scope> elseScope;
 	if (context->belse) {
-		auto elseBranch = std::unique_ptr<Statement>(context->belse->accept(this).as<Statement*>());
-		elseScope = std::make_unique<Scope>(std::move(elseBranch));
+		elseScope = std::unique_ptr<Scope>(context->belse->accept(this).as<Scope*>());
 	} else {
 		elseScope = std::make_unique<Scope>(std::make_unique<Skip>());
 	}
@@ -481,10 +484,8 @@ antlrcpp::Any AstBuilder::visitStmtIf(cola::CoLaParser::StmtIfContext* context) 
 }
 
 antlrcpp::Any AstBuilder::visitStmtWhile(cola::CoLaParser::StmtWhileContext* context) {
-	// TODO: avoid wrapping a scope into a scope
 	auto expr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
-	auto body = std::unique_ptr<Statement>(context->body->accept(this).as<Statement*>());
-	auto scope = std::make_unique<Scope>(std::move(body));
+	auto scope = std::unique_ptr<Scope>(context->body->accept(this).as<Scope*>());
 	auto result = new While(std::move(expr), std::move(scope));
 	if (context->annotation()) {
 		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
@@ -511,9 +512,7 @@ antlrcpp::Any AstBuilder::visitStmtLoop(cola::CoLaParser::StmtLoopContext* conte
 }
 
 antlrcpp::Any AstBuilder::visitStmtAtomic(cola::CoLaParser::StmtAtomicContext* context) {
-	// TODO: avoid wrapping a scope into a scope
-	auto body = std::unique_ptr<Statement>(context->body->accept(this).as<Statement*>());
-	auto scope = std::make_unique<Scope>(std::move(body));
+	auto scope = std::unique_ptr<Scope>(context->body->accept(this).as<Scope*>());
 	auto result = new Atomic(std::move(scope));
 	if (context->annotation()) {
 		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
