@@ -13,10 +13,6 @@ include(ExternalVata2)
 include_directories(${VATA2_INCLUDE_DIRS})
 link_directories(${VATA2_LIBS})
 
-message(STATUS "VATA2_INCLUDE_DIRS: ${VATA2_INCLUDE_DIRS}")
-message(STATUS "VATA2_LIBS: ${VATA2_LIBS}")
-message(STATUS "VATA2_LIB_STATIC: ${VATA2_LIB_STATIC}")
-
 
 ################################
 ####### setting up build #######
