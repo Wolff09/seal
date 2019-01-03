@@ -1,6 +1,8 @@
 #include "cola/parse.hpp"
 #include "cola/transform.hpp"
 #include "cola/util.hpp"
+#include "cola/observer.hpp"
+#include "types/util.hpp"
 
 #include <iostream>
 

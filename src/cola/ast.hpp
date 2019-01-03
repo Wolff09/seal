@@ -133,7 +133,7 @@ namespace cola {
 		virtual void accept(Visitor& visitor) const = 0;
 	};
 
-	#define ACCEPT_VISITOR \
+	#define ACCEPT_COLA_VISITOR \
 		virtual void accept(NonConstVisitor& visitor) override { visitor.visit(*this); } \
 		virtual void accept(Visitor& visitor) const override { visitor.visit(*this); }
 
@@ -187,7 +187,7 @@ namespace cola {
 		const Type& type;
 		bool is_shared = false;
 		VariableDeclaration(std::string name_, const Type& type_, bool shared_) : name(name_), type(type_), is_shared(shared_) {}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 
@@ -203,29 +203,29 @@ namespace cola {
 		bool value;
 		BooleanValue(bool value_) : value(value_) {};
 		const Type& type() const override { return Type::bool_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct NullValue : public Expression {
 		const Type& type() const override { return Type::null_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct EmptyValue : public Expression {
 		const Type& type() const override { return Type::data_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct NDetValue : public Expression {
 		const Type& type() const override { return Type::data_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct VariableExpression : public Expression {
 		const VariableDeclaration& decl;
 		VariableExpression(const VariableDeclaration& decl_) : decl(decl_) {}
 		const Type& type() const override { return decl.type; }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct NegatedExpression : public Expression {
@@ -235,7 +235,7 @@ namespace cola {
 			assert(expr->sort() == Sort::BOOL);
 		}
 		const Type& type() const override { return Type::bool_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct BinaryExpression : public Expression {
@@ -252,7 +252,7 @@ namespace cola {
 			assert(rhs->sort() == Sort::BOOL);
 		}
 		const Type& type() const override { return Type::bool_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	inline std::string toString(BinaryExpression::Operator op) {
@@ -280,7 +280,7 @@ namespace cola {
 			assert(type);
 			return *type;
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Invariant : public AstNode {
@@ -292,12 +292,12 @@ namespace cola {
 
 	struct InvariantExpression : public Invariant {
 		InvariantExpression(std::unique_ptr<Expression> expr_) : Invariant(std::move(expr_)) {}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct InvariantActive : public Invariant {
 		InvariantActive(std::unique_ptr<Expression> expr_) : Invariant(std::move(expr_)) {}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 
@@ -317,7 +317,7 @@ namespace cola {
 			assert(first);
 			assert(second);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Scope : public Statement {
@@ -326,7 +326,7 @@ namespace cola {
 		Scope(std::unique_ptr<Statement> body_) : body(std::move(body_)) {
 			assert(body);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Atomic : public AnnotatedStatement {
@@ -334,12 +334,12 @@ namespace cola {
 		Atomic(std::unique_ptr<Scope> body_) : body(std::move(body_)) {
 			assert(body);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Choice : public Statement {
 		std::vector<std::unique_ptr<Scope>> branches;
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct IfThenElse : public AnnotatedStatement {
@@ -351,7 +351,7 @@ namespace cola {
 			assert(ifBranch);
 			assert(elseBranch);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Loop : public Statement {
@@ -359,7 +359,7 @@ namespace cola {
 		Loop(std::unique_ptr<Scope> body_) : body(std::move(body_)) {
 			assert(body);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct While : public AnnotatedStatement {
@@ -369,7 +369,7 @@ namespace cola {
 			assert(expr);
 			assert(body);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 
@@ -379,15 +379,15 @@ namespace cola {
 	};
 
 	struct Skip : public Command {
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Break : public Command {
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Continue : public Command {
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Assume : public Command {
@@ -395,7 +395,7 @@ namespace cola {
 		Assume(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 			assert(expr);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Assert : public Command {
@@ -403,7 +403,7 @@ namespace cola {
 		Assert(std::unique_ptr<Invariant> inv_) : inv(std::move(inv_)) {
 			assert(inv);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Return : public Command {
@@ -412,7 +412,7 @@ namespace cola {
 		Return(std::unique_ptr<Expression> expr_) : expr(std::move(expr_)) {
 			assert(expr);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Malloc : public Command {
@@ -420,7 +420,7 @@ namespace cola {
 		Malloc(const VariableDeclaration& lhs_) : lhs(lhs_) {
 			assert(lhs.type.sort == Sort::PTR);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Assignment : public Command {
@@ -431,7 +431,7 @@ namespace cola {
 			assert(rhs);
 			assert(assignable(lhs->type(), rhs->type()));
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Enter : public Command {
@@ -440,7 +440,7 @@ namespace cola {
 		Enter(const Function& decl_) : decl(decl_) {
 			// TODO: assert(decl.kind == Function::SMR);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Exit : public Command {
@@ -448,7 +448,7 @@ namespace cola {
 		Exit(const Function& decl_) : decl(decl_) {
 			// TODO: assert(decl.kind == Function::SMR);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Macro : public Command {
@@ -457,7 +457,7 @@ namespace cola {
 		Macro(const Function& decl_) : decl(decl_) {
 			// TODO: assert(decl.kind == Function::MACRO);
 		}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 
@@ -476,7 +476,7 @@ namespace cola {
 		};
 		std::vector<Triple> elems;
 		const Type& type() const override { return Type::bool_type(); }
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 
@@ -491,7 +491,7 @@ namespace cola {
 		std::vector<std::unique_ptr<VariableDeclaration>> args;
 		std::unique_ptr<Scope> body;
 		Function(std::string name_, const Type& returnType_, Kind kind_) : name(name_), return_type(returnType_), kind(kind_) {}
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 	struct Program : public AstNode {
@@ -500,7 +500,7 @@ namespace cola {
 		std::vector<std::unique_ptr<VariableDeclaration>> variables;
 		std::unique_ptr<Function> initalizer;
 		std::vector<std::unique_ptr<Function>> functions;
-		ACCEPT_VISITOR
+		ACCEPT_COLA_VISITOR
 	};
 
 
