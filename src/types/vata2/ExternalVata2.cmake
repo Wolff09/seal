@@ -30,7 +30,7 @@ ExternalProject_ADD(
 ExternalProject_Get_Property(vata2 INSTALL_DIR)
 ExternalProject_Get_Property(vata2 SOURCE_DIR)
 
-list(APPEND VATA2_INCLUDE_DIRS ${INSTALL_DIR}/include/vata2)
+list(APPEND VATA2_INCLUDE_DIRS ${INSTALL_DIR}/include/)
 
 set(VATA2_LIBS "${INSTALL_DIR}/lib")
 set(VATA2_LIB_STATIC "${INSTALL_DIR}/lib/libvata2.a")

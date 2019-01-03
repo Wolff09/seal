@@ -1,4 +1,5 @@
 #include "util.hpp"
+#include "vata2/nfa.hh"
 
 using namespace cola;
 
@@ -58,7 +59,7 @@ void prtypes::observer_to_symbolic_nfa(const cola::Observer& observer) {
 	// ensure that observer observes at most one thread and one pointer (required for correctness of transformation)
 	ObserverCheckVisitor().visit(observer);
 
-	
+
 
 	throw std::logic_error("not yet implemented (observer_to_symbolic_nfa)");
 }
