@@ -13,19 +13,21 @@
 
 namespace prtypes {
 
+	using VataNfa = Vata2::Nfa::Nfa;
+	using VataAlphabet = Vata2::Nfa::EnumAlphabet;
+	using VataSymbol = std::string;
+
 	enum struct SymbolicValue { THREAD, POINTER, OTHER };
 
 	struct Symbol {
 		const cola::Function& func;
+		cola::Transition::Kind kind;
 		std::vector<SymbolicValue> args;
-		std::uintptr_t vata_id = 0; // TODO: how to do this properly?
+		VataSymbol vata_symbol = "";
+		std::uintptr_t vata_id = 0;
 	};
 
 	using Alphabet = std::vector<Symbol>;
-
-	using VataNfa = Vata2::Nfa::Nfa;
-	using VataAlphabet = Vata2::Nfa::EnumAlphabet;
-	using VataSymbol = std::string;
 
 	class Translator {
 		private:
@@ -34,6 +36,7 @@ namespace prtypes {
 			std::unique_ptr<VataAlphabet> vata_alphabet;
 			// TODO?: map<uintptr_t, Symbol> vata2symbol;
 			// TODO?: enter/exit to function map
+			// TODO?: map for nfas of base guarantees
 
 		public:
 			Translator(const cola::Program& program);

@@ -23,6 +23,9 @@ bool are_symbols_equal(const Symbol& symbol, const Symbol& other) {
 	if (&symbol.func != &other.func) {
 		return false;
 	}
+	if (symbol.kind != other.kind) {
+		return false;
+	}
 	assert(symbol.args.size() == other.args.size());
 	for (std::size_t i = 0; i < symbol.args.size(); i++) {
 		if (symbol.args.at(i) != other.args.at(i)) {
@@ -41,52 +44,22 @@ std::string symbolic_value_to_string(SymbolicValue value) {
 }
 
 std::string symbol_to_string(const Symbol& symbol) {
-	return std::to_string(symbol.vata_id);
-	// std::stringstream builder;
-	// builder << symbol.func.name;
-	// builder << "(";
-	// if (!symbol.args.empty()) {
-	// 	auto it = symbol.args.begin();
-	// 	builder << symbolic_value_to_string(*it);
-	// 	it++;
-	// 	for (; it != symbol.args.end(); it++) {
-	// 		builder << ",";
-	// 		builder << symbolic_value_to_string(*it);
-	// 	}
-	// }
-	// builder << ")";
-	// return builder.str();
-}
-
-std::unique_ptr<VataAlphabet> convert_alphabet(const Alphabet& alphabet) {
-	std::set<std::string> keys;
-	for (const auto& symbol : alphabet) {
-		auto res = keys.insert(symbol_to_string(symbol));
-		if (!res.second) {
-			throw std::logic_error("Alphabet conversion failed; vata identifiers are not unique.");
+	// return std::to_string(symbol.vata_id);
+	std::stringstream builder;
+	builder << symbol.func.name;
+	builder << "(";
+	if (!symbol.args.empty()) {
+		auto it = symbol.args.begin();
+		builder << symbolic_value_to_string(*it);
+		it++;
+		for (; it != symbol.args.end(); it++) {
+			builder << ",";
+			builder << symbolic_value_to_string(*it);
 		}
 	}
-	return std::make_unique<VataAlphabet>(keys.begin(), keys.end());
+	builder << ")";
+	return builder.str();
 }
-
-
-//===================== free function hack
-
-class FreeFunction {
-	private:
-		Type ptrtype;
-		Function func;
-		FreeFunction() : ptrtype("$PTR", Sort::PTR), func("free", Type::void_type(), Function::SMR) {
-			func.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
-		}
-	public:
-		static const Function& get();
-};
-
-const Function& FreeFunction::get()  {
-	static const FreeFunction singleton;
-	return singleton.func;
-};
 
 
 //===================== generating alphabet
@@ -148,19 +121,24 @@ struct ValuationPruningVisitor final : ObserverVisitor {
 	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (ThreadValuationVisitor::visit(const Observer&))"); }
 };
 
-SymbolicArgumentList get_all_possible_arguments(const Function& function, const Guard* guard=nullptr) {
+SymbolicArgumentList get_all_possible_arguments(const Function& function, Transition::Kind kind, const Guard* guard=nullptr) {
 	SymbolicArgumentMap arg2val;
 	
 	// implicit thread argument (self)
 	arg2val[nullptr] = { SymbolicValue::THREAD, SymbolicValue::OTHER };
 
-	// explicit arguments from function.args
-	for (const auto& arg : function.args) {
-		if (arg->type.sort == Sort::PTR) {
-			arg2val[arg.get()] = { SymbolicValue::POINTER, SymbolicValue::OTHER };
-		} else {
-			arg2val[arg.get()] = { SymbolicValue::OTHER };
+	if (kind == Transition::INVOCATION) {
+		// explicit arguments from function.args (only for INVOCATION, not for RESPONSE)
+		for (const auto& arg : function.args) {
+			if (arg->type.sort == Sort::PTR) {
+				arg2val[arg.get()] = { SymbolicValue::POINTER, SymbolicValue::OTHER };
+			} else {
+				arg2val[arg.get()] = { SymbolicValue::OTHER };
+			}
 		}
+
+	} else {
+		assert(kind == Transition::RESPONSE);
 	}
 
 	// prune that map, provided guard
@@ -172,8 +150,13 @@ SymbolicArgumentList get_all_possible_arguments(const Function& function, const 
 	// translate map into list
 	SymbolicArgumentList result;
 	result.push_back(arg2val.at(nullptr));
-	for (const auto& arg : function.args) {
-		result.push_back(arg2val.at(arg.get()));
+	if (kind == Transition::INVOCATION) {
+		// again, arguments only for invocations
+		for (const auto& arg : function.args) {
+			result.push_back(arg2val.at(arg.get()));
+		}
+	} else {
+		assert(kind == Transition::RESPONSE);
 	}
 
 	// done
@@ -190,14 +173,17 @@ bool is_enabled(const SymbolicArgumentList& arglist) {
 	return true;
 }
 
-std::vector<Symbol> make_symbols_for_function(const Function& function, const Guard* guard=nullptr) {
+std::vector<Symbol> make_symbols_for_function(const Function& function, Transition::Kind kind, const Guard* guard=nullptr) {
 	std::vector<Symbol> result;
-	SymbolicArgumentList arglist = get_all_possible_arguments(function, guard);
+	SymbolicArgumentList arglist = get_all_possible_arguments(function, kind, guard);
 
 	// return empty list if guard is present and not enabled
 	if (!is_enabled(arglist)) {
 		return result;
 	}
+
+	// add initial to-be-extended symbol
+	result.push_back({ function, kind, {} });
 
 	// flatten the list of sets of values into a list of values
 	for (const auto& set : arglist) {
@@ -223,12 +209,14 @@ Alphabet alphabet_from_program(const Program& program) {
 
 	// add SMR functions defined by program
 	for (const auto& function : program.functions) {
-		auto function_symbols = make_symbols_for_function(*function);
-		copy_vector_contents(result, function_symbols);
+		for (auto kind : { Transition::INVOCATION, Transition::RESPONSE }) {
+			auto function_symbols = make_symbols_for_function(*function, kind);
+			copy_vector_contents(result, function_symbols);
+		}
 	}
 
-	// add special free function
-	auto free_symbols = make_symbols_for_function(FreeFunction::get());
+	// add special free function (only invocation)
+	auto free_symbols = make_symbols_for_function(Observer::free_function(), Transition::INVOCATION);
 	copy_vector_contents(result, free_symbols);
 
 	// set ids
@@ -256,7 +244,7 @@ std::vector<Symbol> get_symbol_for_transition(const Transition& transition, cons
 	std::vector<Symbol> result;
 
 	// get all possible symbols allowed by the function, pruned by transition guard
-	auto symbols = make_symbols_for_function(transition.label, transition.guard.get());
+	auto symbols = make_symbols_for_function(transition.label, transition.kind, transition.guard.get());
 
 	// resulting symbols lack vata_id -> look up in alphabet
 	for (auto symbol : symbols) {
@@ -326,6 +314,32 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 
 //===================== translation
 
+std::unique_ptr<VataAlphabet> convert_alphabet(Alphabet& alphabet) {
+	// computes vata alphabet and updates the given alphabet with vata internal information
+	
+	// get vata encoding (string) for each symbol; also store that info in the symbol
+	std::set<VataSymbol> keys;
+	for (auto& symbol : alphabet) {
+		VataSymbol vata_encoding = symbol_to_string(symbol);
+		symbol.vata_symbol = vata_encoding;
+		auto res = keys.insert(vata_encoding);
+		if (!res.second) {
+			throw std::logic_error("Alphabet conversion failed; vata encodings are not unique.");
+		}
+	}
+
+	// create vata alphabet
+	auto result = std::make_unique<VataAlphabet>(keys.begin(), keys.end());
+
+	// extend alphabet with unique vata identifiers
+	for (auto& symbol : alphabet) {
+		symbol.vata_id = result->translate_symb(symbol.vata_symbol);
+	}
+
+	// done
+	return result;
+}
+
 Translator::Translator(const Program& program_) : program(program_) {
 	alphabet = alphabet_from_program(program);
 	vata_alphabet = convert_alphabet(alphabet);
@@ -349,6 +363,13 @@ VataSymbol Translator::to_vata(Symbol /*symbol*/) {
 
 //===================== inference
 
+GuaranteeSet compute_inference_epsilon(Translator& translator, const GuaranteeSet& guarantees) {
+	throw std::logic_error("not yet implemented(compute_inference_epsilon)");
+}
+
+GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
+	throw std::logic_error("not yet implemented(compute_inference_command)");
+}
 
 InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantees) {
 	key_type result(guarantee_count, false);
@@ -375,8 +396,7 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 	auto key = get_key(guarantees);
 
 	if (inference_map_epsilon.count(key) == 0) {
-		// TODO: compute on the fly // <<<<<===================================================================================== !!!!!!!!!!!!!!!!!!!!!!!!!!
-		throw std::logic_error("not yet implemented (InferenceEngine::infer)");
+		inference_map_epsilon[key] = compute_inference_epsilon(translator, guarantees);
 	}
 
 	return inference_map_epsilon.at(key);
@@ -388,8 +408,7 @@ GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, cons
 
 	auto map = inference_map_command[key];
 	if (map.count(sym) == 0) {
-		// TODO: compute on the fly // <<<<<===================================================================================== !!!!!!!!!!!!!!!!!!!!!!!!!!
-		throw std::logic_error("not yet implemented (InferenceEngine::infer_command)");
+		map[sym] = compute_inference_command(translator, guarantees, command, ptr);
 	}
 
 	return map.at(sym);
@@ -402,13 +421,6 @@ GuaranteeSet InferenceEngine::infer_enter(const GuaranteeSet& guarantees, const 
 GuaranteeSet InferenceEngine::infer_exit(const GuaranteeSet& guarantees, const Exit& command) {
 	return infer_command(guarantees, command, nullptr);
 }
-
-
-
-
-
-// TODO: current severe issues
-//  - observer has not notion of enter/exit in transitions // check if exit is need wrt. to func; was needed for moverness; if not needed: hack exit like free?
 
 
 

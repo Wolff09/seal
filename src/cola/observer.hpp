@@ -112,12 +112,14 @@ namespace cola {
 	};
 
 	struct Transition {
+		enum Kind { INVOCATION, RESPONSE };
 		const State& src;
 		const State& dst;
 		const Function& label;
+		Kind kind;
 		std::unique_ptr<Guard> guard;
 		virtual ~Transition() = default;
-		Transition(const State& src_, const State& dst_, const Function& label_, std::unique_ptr<Guard> guard_) : src(src_), dst(dst_), label(label_), guard(std::move(guard_)) {}
+		Transition(const State& src_, const State& dst_, const Function& label_, Kind kind_, std::unique_ptr<Guard> guard_) : src(src_), dst(dst_), label(label_), kind(kind_), guard(std::move(guard_)) {}
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
 	};
 
@@ -128,8 +130,14 @@ namespace cola {
 		std::vector<std::unique_ptr<Transition>> transitions;
 		virtual ~Observer() = default;
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
+		static const Function& free_function();
 	};
 
+	const Function& Observer::free_function() {
+		static Type ptrtype("$PTR$", Sort::PTR);
+		static Function freefun("free", Type::void_type(), Function::SMR);
+		return freefun;
+	}
 
 } // namespace cola
 
