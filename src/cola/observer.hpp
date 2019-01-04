@@ -38,9 +38,12 @@ namespace cola {
 
 	struct State {
 		std::string name;
+		bool initial = false;
+		bool final = false;
 		virtual ~State() = default;
 		State() {}
 		State(std::string name_) : name(name_) {}
+		State(std::string name_, bool initial_, bool final_) : name(name_), initial(initial_), final(final_) {}
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
 	};
 
@@ -119,6 +122,7 @@ namespace cola {
 	};
 
 	struct Observer {
+		bool negative_specification = true; // negative specification accepts what is *not* in specification (classic notion)
 		std::vector<std::unique_ptr<ObserverVariable>> variables;
 		std::vector<std::unique_ptr<State>> states;
 		std::vector<std::unique_ptr<Transition>> transitions;

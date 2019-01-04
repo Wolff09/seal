@@ -270,11 +270,18 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 	VataNfa nfa;
 
 	// assign vata compatible ids to states of the observer
-	// vata nfa has no explicit notion of states, implicitly added by transitions
+	// vata nfa has no explicit notion of states (except initial/final), implicitly added by transitions
 	std::map<const State*, std::uintptr_t> state2vata;
 	std::uintptr_t counter = 0;
 	for (const auto& state : observer.states) {
-		state2vata[state.get()] = counter++;
+		auto encoding = counter++;
+		state2vata[state.get()] = encoding;
+		if (state->initial) {
+			nfa.add_initial(encoding);
+		}
+		if (state->final) {
+			nfa.add_final(encoding);
+		}
 	}
 
 	// copy transitions from observer to nfa; map transition label+guard to symbols from the alphabet
@@ -288,8 +295,6 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 			outgoing_vata[&transition->src].insert({ sym.vata_id });
 		}
 	}
-
-	throw std::logic_error("not yet implemented --- not initial/final states added"); // <<<<<=========================================== !!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	// make nfa complete by adding self-loops for "missing" transitions
 	auto missing_symbols = [&](const State& state) -> std::set<std::uintptr_t> {
@@ -310,8 +315,12 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 		}
 	}
 
-	// complement nfa (requires vata compatible alphabet)
-	return Vata2::Nfa::complement(nfa, vata_alphabet);
+	// complement nfa if negative specification
+	if (observer.negative_specification) {
+		return Vata2::Nfa::complement(nfa, vata_alphabet);
+	} else {
+		return nfa;
+	}
 }
 
 
@@ -399,7 +408,6 @@ GuaranteeSet InferenceEngine::infer_exit(const GuaranteeSet& guarantees, const E
 
 
 // TODO: current severe issues
-//  - inital/final states in observer translation missing
 //  - observer has not notion of enter/exit in transitions // check if exit is need wrt. to func; was needed for moverness; if not needed: hack exit like free?
 
 
