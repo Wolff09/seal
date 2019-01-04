@@ -2,7 +2,7 @@
 #include "cola/transform.hpp"
 #include "cola/util.hpp"
 #include "cola/observer.hpp"
-#include "types/util.hpp"
+#include "types/check.hpp"
 
 #include <iostream>
 

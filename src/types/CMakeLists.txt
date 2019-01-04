@@ -19,7 +19,8 @@ link_directories(${VATA2_LIBS})
 ################################
 
 set(SOURCES
-	util.cpp
+	inference.cpp
+	check.cpp
 )
 
 add_library(PRTypes ${SOURCES})

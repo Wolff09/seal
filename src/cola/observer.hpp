@@ -15,7 +15,7 @@ namespace cola {
 	struct ProgramObserverVariable;
 	struct SelfGuardVariable;
 	struct ArgumentGuardVariable;
-	struct BoolGuard;
+	struct TrueGuard;
 	struct ConjunctionGuard;
 	struct EqGuard;
 	struct NeqGuard;
@@ -27,7 +27,7 @@ namespace cola {
 		virtual void visit(const ProgramObserverVariable& obj) = 0;
 		virtual void visit(const SelfGuardVariable& obj) = 0;
 		virtual void visit(const ArgumentGuardVariable& obj) = 0;
-		virtual void visit(const BoolGuard& obj) = 0;
+		virtual void visit(const TrueGuard& obj) = 0;
 		virtual void visit(const ConjunctionGuard& obj) = 0;
 		virtual void visit(const EqGuard& obj) = 0;
 		virtual void visit(const NeqGuard& obj) = 0;
@@ -38,6 +38,7 @@ namespace cola {
 
 	struct State {
 		std::string name;
+		virtual ~State() = default;
 		State() {}
 		State(std::string name_) : name(name_) {}
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
@@ -80,9 +81,7 @@ namespace cola {
 		virtual void accept(ObserverVisitor& visitor) const = 0;
 	};
 
-	struct BoolGuard : public Guard {
-		bool value;
-		BoolGuard(bool value_) : value(value_) {}
+	struct TrueGuard : public Guard {
 		virtual void accept(ObserverVisitor& visitor) const override { visitor.visit(*this); }
 	};
 
@@ -114,6 +113,7 @@ namespace cola {
 		const State& dst;
 		const Function& label;
 		std::unique_ptr<Guard> guard;
+		virtual ~Transition() = default;
 		Transition(const State& src_, const State& dst_, const Function& label_, std::unique_ptr<Guard> guard_) : src(src_), dst(dst_), label(label_), guard(std::move(guard_)) {}
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
 	};
@@ -122,6 +122,7 @@ namespace cola {
 		std::vector<std::unique_ptr<ObserverVariable>> variables;
 		std::vector<std::unique_ptr<State>> states;
 		std::vector<std::unique_ptr<Transition>> transitions;
+		virtual ~Observer() = default;
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
 	};
 
