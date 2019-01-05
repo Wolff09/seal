@@ -13,6 +13,8 @@
 
 namespace prtypes {
 
+	// TODO: we assume that observers have exactly 1 thread and 1 pointer observer variable
+
 	using VataNfa = Vata2::Nfa::Nfa;
 	using VataAlphabet = Vata2::Nfa::EnumAlphabet;
 	using VataSymbol = std::string;
@@ -50,9 +52,6 @@ namespace prtypes {
 			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(guarantee); }
 			
 			VataNfa to_nfa(const cola::Observer& observer);
-			Symbol to_symbol(const cola::Command& command, const cola::VariableDeclaration* ptr=nullptr);
-			VataSymbol to_vata(const cola::Command& command, const cola::VariableDeclaration* ptr=nullptr);
-			VataSymbol to_vata(Symbol symbol);
 	};
 
 	class InferenceEngine final {

@@ -97,17 +97,17 @@ namespace cola {
 
 	struct ComparisonGuard : public Guard {
 		const ObserverVariable& lhs;
-		const GuardVariable& rhs;
-		ComparisonGuard(const ObserverVariable& lhs_, const GuardVariable& rhs_) : lhs(lhs_), rhs(rhs_) {}
+		std::unique_ptr<GuardVariable> rhs;
+		ComparisonGuard(const ObserverVariable& lhs_, std::unique_ptr<GuardVariable> rhs_) : lhs(lhs_), rhs(std::move(rhs_)) {}
 	};
 
 	struct EqGuard : public ComparisonGuard {
-		EqGuard(const ObserverVariable& lhs_, const GuardVariable& rhs_) : ComparisonGuard(lhs_, rhs_) {}
+		EqGuard(const ObserverVariable& lhs_, std::unique_ptr<GuardVariable> rhs_) : ComparisonGuard(lhs_, std::move(rhs_)) {}
 		virtual void accept(ObserverVisitor& visitor) const override { visitor.visit(*this); }
 	};
 
 	struct NeqGuard : public ComparisonGuard {
-		NeqGuard(const ObserverVariable& lhs_, const GuardVariable& rhs_) : ComparisonGuard(lhs_, rhs_) {}
+		NeqGuard(const ObserverVariable& lhs_, std::unique_ptr<GuardVariable> rhs_) : ComparisonGuard(lhs_, std::move(rhs_)) {}
 		virtual void accept(ObserverVisitor& visitor) const override { visitor.visit(*this); }
 	};
 
@@ -134,8 +134,13 @@ namespace cola {
 	};
 
 	const Function& Observer::free_function() {
+		static auto mkfreefun = [](const Type& ptrtype) -> Function {
+			Function freefun("free", Type::void_type(), Function::SMR);
+			freefun.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
+			return freefun;
+		};
 		static Type ptrtype("$PTR$", Sort::PTR);
-		static Function freefun("free", Type::void_type(), Function::SMR);
+		static Function freefun = mkfreefun(ptrtype);
 		return freefun;
 	}
 

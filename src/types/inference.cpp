@@ -61,6 +61,91 @@ std::string symbol_to_string(const Symbol& symbol) {
 	return builder.str();
 }
 
+// struct ObserverVariableVisitor final : ObserverVisitor {
+// 	const ThreadObserverVariable* thread_var;
+// 	const ProgramObserverVariable* pointer_var;
+
+// 	void visit(const ThreadObserverVariable& variable) override {
+// 		assert(!thread_var);
+// 		thread_var = &variable;
+// 	}
+
+// 	void visit(const ProgramObserverVariable& variable) override {
+// 		assert(!pointer_var);
+// 		assert(variable.decl->type.sort == Sort::PTR);
+// 		pointer_var = &variable;
+// 	}
+
+// 	void visit(const Observer& observer) override {
+// 		for (const auto& var : observer.variables) {
+// 			var->accept(*this);
+// 		}
+// 	}
+
+// 	void visit(const SelfGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const SelfGuardVariable&))"); }
+// 	void visit(const ArgumentGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const ArgumentGuardVariable&))"); }
+// 	void visit(const TrueGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const TrueGuard&))"); }
+// 	void visit(const ConjunctionGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const ConjunctionGuard&))"); }
+// 	void visit(const EqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const EqGuard&))"); }
+// 	void visit(const NeqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const NeqGuard&))"); }
+// 	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const State&))"); }
+// 	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (ObserverVariableVisitor::visit(const Transition&))"); }
+// };
+
+// const ThreadObserverVariable& get_thread_variable(const Observer& observer) {
+// 	ObserverVariableVisitor visitor;
+// 	observer.accept(visitor);
+// 	if (!visitor.thread_var) {
+// 		throw std::logic_error("Could not fetch thread observer variable.");
+// 	} else {
+// 		return *visitor.thread_var;
+// 	}
+// }
+
+struct IsVariableVisitor final : public Visitor {
+	const VariableDeclaration* result;
+	void visit(const VariableExpression& expr) override { result = &expr.decl; }
+	void visit(const VariableDeclaration& /*node*/) override { result = nullptr; }
+	void visit(const Expression& /*node*/) override { result = nullptr; }
+	void visit(const BooleanValue& /*node*/) override { result = nullptr; }
+	void visit(const NullValue& /*node*/) override { result = nullptr; }
+	void visit(const EmptyValue& /*node*/) override { result = nullptr; }
+	void visit(const NDetValue& /*node*/) override { result = nullptr; }
+	void visit(const NegatedExpression& /*node*/) override { result = nullptr; }
+	void visit(const BinaryExpression& /*node*/) override { result = nullptr; }
+	void visit(const Dereference& /*node*/) override { result = nullptr; }
+	void visit(const InvariantExpression& /*node*/) override { result = nullptr; }
+	void visit(const InvariantActive& /*node*/) override { result = nullptr; }
+	void visit(const Sequence& /*node*/) override { result = nullptr; }
+	void visit(const Scope& /*node*/) override { result = nullptr; }
+	void visit(const Atomic& /*node*/) override { result = nullptr; }
+	void visit(const Choice& /*node*/) override { result = nullptr; }
+	void visit(const IfThenElse& /*node*/) override { result = nullptr; }
+	void visit(const Loop& /*node*/) override { result = nullptr; }
+	void visit(const While& /*node*/) override { result = nullptr; }
+	void visit(const Skip& /*node*/) override { result = nullptr; }
+	void visit(const Break& /*node*/) override { result = nullptr; }
+	void visit(const Continue& /*node*/) override { result = nullptr; }
+	void visit(const Assume& /*node*/) override { result = nullptr; }
+	void visit(const Assert& /*node*/) override { result = nullptr; }
+	void visit(const Return& /*node*/) override { result = nullptr; }
+	void visit(const Malloc& /*node*/) override { result = nullptr; }
+	void visit(const Assignment& /*node*/) override { result = nullptr; }
+	void visit(const Enter& /*node*/) override { result = nullptr; }
+	void visit(const Exit& /*node*/) override { result = nullptr; }
+	void visit(const Macro& /*node*/) override { result = nullptr; }
+	void visit(const CompareAndSwap& /*node*/) override { result = nullptr; }
+	void visit(const Function& /*node*/) override { result = nullptr; }
+	void visit(const Program& /*node*/) override { result = nullptr; }
+};
+
+bool is_expression_variable(const Expression& expr, const VariableDeclaration& variable) {
+	// return true if expr coincides to variable
+	IsVariableVisitor visitor;
+	expr.accept(visitor);
+	return visitor.result != nullptr && visitor.result == &variable;
+}
+
 
 //===================== generating alphabet
 
@@ -99,13 +184,13 @@ struct ValuationPruningVisitor final : ObserverVisitor {
 
 	void visit(const EqGuard& guard) override {
 		guard.lhs.accept(*this);
-		guard.rhs.accept(*this);
+		guard.rhs->accept(*this);
 		remove(rhs, SymbolicValue::OTHER);
 	}
 
 	void visit(const NeqGuard& guard) override {
 		guard.lhs.accept(*this);
-		guard.rhs.accept(*this);
+		guard.rhs->accept(*this);
 		remove(rhs, lhs);
 	}
 
@@ -360,21 +445,24 @@ VataNfa Translator::to_nfa(const Observer& observer) {
 	return translate_observer(observer, alphabet, *vata_alphabet);
 }
 
-// TODO: maybe rewrite the definition of the following functions depending on what we need
-Symbol Translator::to_symbol(const Command& command, const VariableDeclaration* ptr) {
-	// assumption: command is of type enter => ptr != nullptr; command is of type exit => ptr == nullptr; command is either of type enter or exit
-	throw std::logic_error("not yet implemented (to_symbol)");
-}
-
-VataSymbol Translator::to_vata(Symbol symbol) {
-	throw std::logic_error("not yet implemented (to_vata)");
-}
-
-VataSymbol Translator::to_vata(const cola::Command& command, const cola::VariableDeclaration* ptr) {
-	return to_vata(to_symbol(command, ptr));
-}
 
 //===================== inference
+
+GuaranteeSet combine_guarteeset(std::vector<GuaranteeSet> sets) {
+	if (sets.empty()) {
+		throw std::logic_error("Cannot compute intersection of empty list.");
+		// return {};
+	} else {
+		GuaranteeSet result = sets.back();
+		sets.pop_back();
+		while (!sets.empty()) {
+			GuaranteeSet new_result;
+			std::set_intersection(result.begin(),result.end(),sets.back().begin(),sets.back().end(), std::inserter(new_result, new_result.begin()));
+			result = std::move(new_result);
+		}
+		return result;
+	}
+}
 
 VataNfa nfa_intersection_for_guarantees(Translator& translator, const GuaranteeSet& guarantees) {
 	// returns universal automaton if guarantees are empty
@@ -391,9 +479,15 @@ bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa&
 	return is_incl (subset, superset, translator.get_vata_alphabet());
 }
 
-GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa) {
-	GuaranteeSet result;
+GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
+	GuaranteeSet result = std::move(baseline);
 	for (const Guarantee& guarantee : translator.get_all_guarantees()) {
+		// if already present (passed as baseline), no need to infer
+		if (result.count(guarantee) > 0) {
+			continue;
+		}
+
+		// inference by nfa language inclusion
 		auto infer = translator.nfa_for(guarantee);
 		if (nfa_inclusion(translator, from_nfa, infer)) {
 			result.insert(guarantee);
@@ -402,16 +496,44 @@ GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa) {
 	return result;
 }
 
-std::vector<Symbol> compute_symbols_for_event(Translator& translator, const Command& command, const VariableDeclaration* ptr) {
+std::unique_ptr<Guard> make_guard_for_enter(const Enter& enter, const VariableDeclaration& ptr) {
+	auto thread_var = std::make_unique<ThreadObserverVariable>("Obs$Thread");
+	auto pointer_var = std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("Obs&Pointer", Observer::free_function().args.at(0)->type, false));
+
+	// always make the executing thread observed
+	std::unique_ptr<Guard> result = std::make_unique<EqGuard>(*thread_var, std::make_unique<SelfGuardVariable>());
+
+	// check if an argument to enter is ptr, if so match it to the enter.decl.arg variable declaration; collect those decls
+	std::vector<std::reference_wrapper<const VariableDeclaration>> matches;
+	assert(enter.args.size() == enter.decl.args.size());
+	for (std::size_t i = 0; i < enter.args.size(); i++) {
+		if (is_expression_variable(*enter.args.at(i), ptr)) {
+			matches.push_back(*enter.decl.args.at(i));
+		}
+	}
+
+	// conjoin matches to result
+	while (!matches.empty()) {
+		const VariableDeclaration& decl = matches.back();
+		matches.pop_back();
+		auto eq = std::make_unique<EqGuard>(*pointer_var, std::make_unique<ArgumentGuardVariable>(decl));
+		result = std::make_unique<ConjunctionGuard>(std::move(result), std::move(eq));
+	}
+
+	// done
+	return result;
+}
+
+std::vector<Symbol> compute_symbols_for_event(const Command& command, const VariableDeclaration* ptr) {
+	// note: the implicit thread argument is *not* OTHER by definition (see paper)
 	if (ptr) {
 		// enter event
 		auto& enter = static_cast<const Enter&>(command);
-		// TODO: create handcrafted guard for proper restriction; this requires to match the expressions from the invocations to the argument from the function declaration
-		throw std::logic_error("not yet implemented (compute_symbols_for_event)");
-		// return make_symbols_for_function(enter.decl, Transition::INVOCATION, guard);
+		auto guard = make_guard_for_enter(enter, *ptr);
+		return make_symbols_for_function(enter.decl, Transition::INVOCATION, guard.get());
 
 	} else {
-		// exit event: the implicit thread argument is not OTHER by definition (see paper)
+		// exit event
 		auto& exit = static_cast<const Exit&>(command);
 		Symbol result({ exit.decl, Transition::RESPONSE, { SymbolicValue::THREAD } });
 		return { result };
@@ -426,13 +548,11 @@ VataNfa nfa_concatenation_with_symbols(Translator& translator, VataNfa nfa, std:
 
 GuaranteeSet compute_inference_epsilon(Translator& translator, const GuaranteeSet& guarantees) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
-	return infer_guarantees(translator, intersection); // TODO: one does not need to consider guarantees already present
+	return infer_guarantees(translator, intersection, guarantees);
 }
 
-GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
-	// TODO: this function should take a (vector of) symbol instead of command and ptr
+GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSet& guarantees, std::vector<Symbol> symbols) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
-	auto symbols = compute_symbols_for_event(translator, command, ptr);
 	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
 	return infer_guarantees(translator, concatenation);
 }
@@ -470,15 +590,21 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 
 GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
 	auto key = get_key(guarantees);
-	auto sym = translator.to_vata(command, ptr); // TODO: this gives a set, no??
-	// TODO: question: just always compute inference, compute it for a set of symbols, or for individual symbols and do intersection on guarteeset
-
 	auto map = inference_map_command[key];
-	if (map.count(sym) == 0) {
-		map[sym] = compute_inference_command(translator, guarantees, command, ptr);
+	auto symbols = compute_symbols_for_event(command, ptr);
+	
+	std::vector<GuaranteeSet> sets;
+	for (auto sym : symbols) {
+		auto symkey = sym.vata_symbol;
+
+		if (map.count(symkey) == 0) {
+			map[symkey] = compute_inference_command(translator, guarantees, { sym });
+		}
+
+		sets.push_back(map.at(symkey));
 	}
 
-	return map.at(sym);
+	return combine_guarteeset(std::move(sets));
 }
 
 GuaranteeSet InferenceEngine::infer_enter(const GuaranteeSet& guarantees, const Enter& command, const VariableDeclaration& ptr) {
