@@ -426,9 +426,11 @@ std::unique_ptr<VataAlphabet> convert_alphabet(Alphabet& alphabet) {
 }
 
 Translator::Translator(const Program& program_, GuaranteeSet all_guarantees_) : program(program_), all_guarantees(all_guarantees_) {
+	// init alphabet
 	alphabet = alphabet_from_program(program);
 	vata_alphabet = convert_alphabet(alphabet);
 
+	// init lookup map for base observers
 	for (const auto& guarantee : all_guarantees) {
 		auto nfa = to_nfa(*guarantee.get().observer);
 		auto res = guarantee2nfa.insert({ guarantee, nfa });
@@ -437,8 +439,13 @@ Translator::Translator(const Program& program_, GuaranteeSet all_guarantees_) : 
 		}
 	}
 
-	// TODO: init universalnfa;
-	throw std::logic_error("not yet implemented (initialization of universalnfa)");
+	// init universalnfa;
+	std::uintptr_t state = -1;
+	universalnfa.add_initial(state);
+	for (auto symbol : vata_alphabet->get_symbols()) {
+		universalnfa.add_trans(state, symbol, state);
+	}
+	assert(Vata2::Nfa::is_universal(universalnfa, *vata_alphabet));
 }
 
 VataNfa Translator::to_nfa(const Observer& observer) {
