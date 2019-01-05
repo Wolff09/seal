@@ -340,35 +340,101 @@ std::unique_ptr<VataAlphabet> convert_alphabet(Alphabet& alphabet) {
 	return result;
 }
 
-Translator::Translator(const Program& program_) : program(program_) {
+Translator::Translator(const Program& program_, GuaranteeSet all_guarantees_) : program(program_), all_guarantees(all_guarantees_) {
 	alphabet = alphabet_from_program(program);
 	vata_alphabet = convert_alphabet(alphabet);
+
+	for (const auto& guarantee : all_guarantees) {
+		auto nfa = to_nfa(*guarantee.get().observer);
+		auto res = guarantee2nfa.insert({ guarantee, nfa });
+		if (!res.second) {
+			throw std::logic_error("Unexpected non-unique guarantees in set.");
+		}
+	}
+
+	// TODO: init universalnfa;
+	throw std::logic_error("not yet implemented (initialization of universalnfa)");
 }
 
 VataNfa Translator::to_nfa(const Observer& observer) {
 	return translate_observer(observer, alphabet, *vata_alphabet);
 }
 
-Symbol Translator::to_symbol(const Command& /*command*/, const VariableDeclaration* /*ptr*/) {
+// TODO: maybe rewrite the definition of the following functions depending on what we need
+Symbol Translator::to_symbol(const Command& command, const VariableDeclaration* ptr) {
 	// assumption: command is of type enter => ptr != nullptr; command is of type exit => ptr == nullptr; command is either of type enter or exit
-	throw std::logic_error("not yet implemented(to_symbol)");
+	throw std::logic_error("not yet implemented (to_symbol)");
+}
+
+VataSymbol Translator::to_vata(Symbol symbol) {
+	throw std::logic_error("not yet implemented (to_vata)");
 }
 
 VataSymbol Translator::to_vata(const cola::Command& command, const cola::VariableDeclaration* ptr) {
 	return to_vata(to_symbol(command, ptr));
 }
-VataSymbol Translator::to_vata(Symbol /*symbol*/) {
-	throw std::logic_error("not yet implemented(to_vata)");
-}
 
 //===================== inference
 
+VataNfa nfa_intersection_for_guarantees(Translator& translator, const GuaranteeSet& guarantees) {
+	// returns universal automaton if guarantees are empty
+	VataNfa result = translator.get_universal_nfa();
+	for (auto iterator = guarantees.begin(); iterator != guarantees.end(); iterator++) {
+		const VataNfa& nfa = translator.nfa_for(*iterator);
+		VataNfa new_result = Vata2::Nfa::intersection(result, nfa);
+		result = std::move(new_result);
+	}
+	return result;
+}
+
+bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa& superset) {
+	return is_incl (subset, superset, translator.get_vata_alphabet());
+}
+
+GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa) {
+	GuaranteeSet result;
+	for (const Guarantee& guarantee : translator.get_all_guarantees()) {
+		auto infer = translator.nfa_for(guarantee);
+		if (nfa_inclusion(translator, from_nfa, infer)) {
+			result.insert(guarantee);
+		}
+	}
+	return result;
+}
+
+std::vector<Symbol> compute_symbols_for_event(Translator& translator, const Command& command, const VariableDeclaration* ptr) {
+	if (ptr) {
+		// enter event
+		auto& enter = static_cast<const Enter&>(command);
+		// TODO: create handcrafted guard for proper restriction; this requires to match the expressions from the invocations to the argument from the function declaration
+		throw std::logic_error("not yet implemented (compute_symbols_for_event)");
+		// return make_symbols_for_function(enter.decl, Transition::INVOCATION, guard);
+
+	} else {
+		// exit event: the implicit thread argument is not OTHER by definition (see paper)
+		auto& exit = static_cast<const Exit&>(command);
+		Symbol result({ exit.decl, Transition::RESPONSE, { SymbolicValue::THREAD } });
+		return { result };
+	}
+}
+
+VataNfa nfa_concatenation_with_symbols(Translator& translator, VataNfa nfa, std::vector<Symbol> symbols) {
+	// concat intersection with symbol (with all symbols at once? probably yes)
+	// should the result be complete?? i.e. should symbols lead to final states and complement-symbols stay in their current state???
+	throw std::logic_error("not yet implemented (nfa_concatenation_with_symbols)");
+}
+
 GuaranteeSet compute_inference_epsilon(Translator& translator, const GuaranteeSet& guarantees) {
-	throw std::logic_error("not yet implemented(compute_inference_epsilon)");
+	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
+	return infer_guarantees(translator, intersection); // TODO: one does not need to consider guarantees already present
 }
 
 GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
-	throw std::logic_error("not yet implemented(compute_inference_command)");
+	// TODO: this function should take a (vector of) symbol instead of command and ptr
+	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
+	auto symbols = compute_symbols_for_event(translator, command, ptr);
+	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
+	return infer_guarantees(translator, concatenation);
 }
 
 InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantees) {
@@ -379,7 +445,7 @@ InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantee
 	return result;
 }
 
-InferenceEngine::InferenceEngine(const Program& program, const GuaranteeSet& all_guarantees) : translator(program) {
+InferenceEngine::InferenceEngine(const Program& program, const GuaranteeSet& all_guarantees) : translator(program, all_guarantees) {
 	// init key_helper
 	guarantee_count = 0;
 	for (const auto& guarantee : all_guarantees) {
@@ -404,7 +470,8 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 
 GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
 	auto key = get_key(guarantees);
-	auto sym = translator.to_vata(command, ptr);
+	auto sym = translator.to_vata(command, ptr); // TODO: this gives a set, no??
+	// TODO: question: just always compute inference, compute it for a set of symbols, or for individual symbols and do intersection on guarteeset
 
 	auto map = inference_map_command[key];
 	if (map.count(sym) == 0) {
@@ -421,20 +488,3 @@ GuaranteeSet InferenceEngine::infer_enter(const GuaranteeSet& guarantees, const 
 GuaranteeSet InferenceEngine::infer_exit(const GuaranteeSet& guarantees, const Exit& command) {
 	return infer_command(guarantees, command, nullptr);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

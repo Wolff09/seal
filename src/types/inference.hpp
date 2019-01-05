@@ -32,18 +32,23 @@ namespace prtypes {
 	class Translator {
 		private:
 			const cola::Program& program;
+			const GuaranteeSet all_guarantees;
 			Alphabet alphabet;
 			std::unique_ptr<VataAlphabet> vata_alphabet;
+			std::map<std::reference_wrapper<const Guarantee>, VataNfa> guarantee2nfa;
+			VataNfa universalnfa;
 			// TODO?: map<uintptr_t, Symbol> vata2symbol;
 			// TODO?: enter/exit to function map
-			// TODO?: map for nfas of base guarantees
 
 		public:
-			Translator(const cola::Program& program);
+			Translator(const cola::Program& program, GuaranteeSet all_guarantees);
 
 			const Alphabet& get_alphabet() const { return alphabet; }
 			const VataAlphabet& get_vata_alphabet() const { return *vata_alphabet; }
-
+			const GuaranteeSet& get_all_guarantees() const { return all_guarantees; }
+			const VataNfa& get_universal_nfa() const { return universalnfa; }
+			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(guarantee); }
+			
 			VataNfa to_nfa(const cola::Observer& observer);
 			Symbol to_symbol(const cola::Command& command, const cola::VariableDeclaration* ptr=nullptr);
 			VataSymbol to_vata(const cola::Command& command, const cola::VariableDeclaration* ptr=nullptr);
