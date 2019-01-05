@@ -304,11 +304,11 @@ Alphabet alphabet_from_program(const Program& program) {
 	auto free_symbols = make_symbols_for_function(Observer::free_function(), Transition::INVOCATION);
 	copy_vector_contents(result, free_symbols);
 
-	// set ids
-	std::uintptr_t counter = 0;
-	for (auto& symbol : result) {
-		symbol.vata_id = counter++;
-	}
+	// // set ids
+	// std::uintptr_t counter = 0;
+	// for (auto& symbol : result) {
+	// 	symbol.vata_id = counter++;
+	// }
 
 	return result;
 }
@@ -547,10 +547,40 @@ std::vector<Symbol> compute_symbols_for_event(const Command& command, const Vari
 	}
 }
 
-VataNfa nfa_concatenation_with_symbols(Translator& translator, VataNfa nfa, std::vector<Symbol> symbols) {
-	// concat intersection with symbol (with all symbols at once? probably yes)
-	// should the result be complete?? i.e. should symbols lead to final states and complement-symbols stay in their current state???
-	throw std::logic_error("not yet implemented (nfa_concatenation_with_symbols)");
+std::uintptr_t make_new_state(const VataNfa& nfa) {
+	std::set<std::uintptr_t> in_use;
+	for (auto it = nfa.begin(); it != nfa.end(); ++it) {
+		auto vata_trans = *it;
+		in_use.insert(vata_trans.src);
+		in_use.insert(vata_trans.tgt);
+	}
+	for (std::uintptr_t result = 0;; result++) {
+		if (in_use.count(result) == 0) {
+			return result;
+		}
+	}
+	throw std::logic_error("Could not make a new state for automaton.");
+}
+
+VataNfa nfa_concatenation_with_symbols(Translator& /*translator*/, VataNfa nfa, std::vector<Symbol> symbols) {
+	// w in L(nfa) ==> w.symbol in L(result) for all symbols
+
+	// replace final states with new one
+	std::set<std::uintptr_t> old_final_states = nfa.finalstates;
+	auto new_final_state = make_new_state(nfa);
+	nfa.finalstates = { new_final_state };
+	assert(nfa.has_final(new_final_state));
+
+	// add transition from old final states to new one, labeled by symbols
+	for (auto symbol : symbols) {
+		for (auto state : old_final_states) {
+			// TODO: there could already be an outgoing transition from state labeled by symbol; could this be problematic?
+			nfa.add_trans(state, symbol.vata_id, new_final_state);
+		}
+	}
+
+	// there are not outgoing transitions from the new final state
+	return nfa;
 }
 
 GuaranteeSet compute_inference_epsilon(Translator& translator, const GuaranteeSet& guarantees) {
