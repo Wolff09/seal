@@ -25,4 +25,4 @@ set(SOURCES
 
 add_library(PRTypes ${SOURCES})
 # add_dependencies(PRTypes CoLa)
-target_link_libraries(PRTypes CoLa)
+target_link_libraries(PRTypes CoLa ${VATA2_LIB_STATIC})

@@ -130,19 +130,17 @@ namespace cola {
 		std::vector<std::unique_ptr<Transition>> transitions;
 		virtual ~Observer() = default;
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
-		static const Function& free_function();
-	};
-
-	const Function& Observer::free_function() {
-		static auto mkfreefun = [](const Type& ptrtype) -> Function {
-			Function freefun("free", Type::void_type(), Function::SMR);
-			freefun.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
+		static const Function& free_function() {
+			static auto mkfreefun = [](const Type& ptrtype) -> Function {
+				Function freefun("free", Type::void_type(), Function::SMR);
+				freefun.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
+				return freefun;
+			};
+			static Type ptrtype("$PTR$", Sort::PTR);
+			static Function freefun = mkfreefun(ptrtype);
 			return freefun;
-		};
-		static Type ptrtype("$PTR$", Sort::PTR);
-		static Function freefun = mkfreefun(ptrtype);
-		return freefun;
-	}
+		}
+	};
 
 } // namespace cola
 

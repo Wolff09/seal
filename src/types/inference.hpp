@@ -37,10 +37,8 @@ namespace prtypes {
 			const GuaranteeSet all_guarantees;
 			Alphabet alphabet;
 			std::unique_ptr<VataAlphabet> vata_alphabet;
-			std::map<std::reference_wrapper<const Guarantee>, VataNfa> guarantee2nfa;
+			std::map<const Guarantee*, VataNfa> guarantee2nfa;
 			VataNfa universalnfa;
-			// TODO?: map<uintptr_t, Symbol> vata2symbol;
-			// TODO?: enter/exit to function map
 
 		public:
 			Translator(const cola::Program& program, GuaranteeSet all_guarantees);
@@ -49,7 +47,7 @@ namespace prtypes {
 			const VataAlphabet& get_vata_alphabet() const { return *vata_alphabet; }
 			const GuaranteeSet& get_all_guarantees() const { return all_guarantees; }
 			const VataNfa& get_universal_nfa() const { return universalnfa; }
-			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(guarantee); }
+			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(&guarantee); }
 			
 			VataNfa to_nfa(const cola::Observer& observer);
 	};
@@ -64,9 +62,10 @@ namespace prtypes {
 			Translator translator;
 			epsilon_inference_map_type inference_map_epsilon;
 			command_inference_map_type inference_map_command;
-			std::map<std::reference_wrapper<const Guarantee>, std::size_t> key_helper;
+			std::map<const Guarantee*, std::size_t> key_helper;
 			std::size_t guarantee_count;
 
+			std::size_t get_index(const Guarantee& guarantee);
 			key_type get_key(const GuaranteeSet& guarantees);
 			GuaranteeSet infer_command(const GuaranteeSet& guarantees, const cola::Command& command, const cola::VariableDeclaration* ptr);
 

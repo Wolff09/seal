@@ -15,18 +15,29 @@ namespace prtypes {
 	struct Guarantee final {
 		std::string name;
 		std::unique_ptr<cola::Observer> observer;
-		Guarantee(std::string name_, std::unique_ptr<cola::Observer> observer_) : name(name_), observer(std::move(observer_)) {}
+		Guarantee(std::string name_, std::unique_ptr<cola::Observer> observer_) : name(name_), observer(std::move(observer_)) {
+			assert(observer);
+		}
 	};
 
-	inline bool operator< (const std::reference_wrapper<const Guarantee>& lhs, const std::reference_wrapper<const Guarantee>& rhs){
-		return &lhs < &rhs;
-	}
+	// inline bool operator< (const std::reference_wrapper<const Guarantee>& lhs, const std::reference_wrapper<const Guarantee>& rhs){
+	// 	return &(lhs.get()) < &(rhs.get());
+	// }
 
-	using GuaranteeSet = std::set<std::reference_wrapper<const Guarantee>>;
+	struct GuaranteeSetComparator {
+		bool operator() (const std::reference_wrapper<const Guarantee>& lhs, const std::reference_wrapper<const Guarantee>& rhs) const {
+			return &(lhs.get()) < &(rhs.get());
+		}
+	};
+
+	using GuaranteeSet = std::set<std::reference_wrapper<const Guarantee>, GuaranteeSetComparator>;
 
 	using TypeEnv = std::map<std::reference_wrapper<const cola::VariableDeclaration>, GuaranteeSet>;
 
 	bool type_check(const cola::Program& program, std::set<std::reference_wrapper<const Guarantee>> guarantees);
+
+
+	void test();
 
 } // namespace prtypes
 

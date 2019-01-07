@@ -9,10 +9,13 @@ using namespace cola;
 using namespace prtypes;
 
 
+static Vata2::Nfa::StringDict VATA_PARAMS = {{ "algo", "naive" }}; // algos: "naive" and "antichains"
+
 //===================== helper
 
 template<typename T>
 void copy_vector_contents(std::vector<T>& to, std::vector<T>& from) {
+	// TODO: throw std::logic_error("copy_vector_contents seems to broken.");
 	for (T elem : from) {
 		to.push_back(elem);
 	}
@@ -46,6 +49,10 @@ std::string symbolic_value_to_string(SymbolicValue value) {
 std::string symbol_to_string(const Symbol& symbol) {
 	// return std::to_string(symbol.vata_id);
 	std::stringstream builder;
+	switch(symbol.kind) {
+		case Transition::INVOCATION: builder << "enter:"; break;
+		case Transition::RESPONSE: builder << "exit:"; break;
+	}
 	builder << symbol.func.name;
 	builder << "(";
 	if (!symbol.args.empty()) {
@@ -277,9 +284,8 @@ std::vector<Symbol> make_symbols_for_function(const Function& function, Transiti
 			std::vector<Symbol> copy(result);
 			for (auto symbol : copy) {
 				symbol.args.push_back(val);
-				// new_result.push_back(symbol);
+				new_result.push_back(symbol);
 			}
-			copy_vector_contents(new_result, copy);
 		}
 
 		result = std::move(new_result);
@@ -294,9 +300,11 @@ Alphabet alphabet_from_program(const Program& program) {
 
 	// add SMR functions defined by program
 	for (const auto& function : program.functions) {
-		for (auto kind : { Transition::INVOCATION, Transition::RESPONSE }) {
-			auto function_symbols = make_symbols_for_function(*function, kind);
-			copy_vector_contents(result, function_symbols);
+		if (function->kind == Function::SMR) {
+			for (auto kind : { Transition::INVOCATION, Transition::RESPONSE }) {
+				auto function_symbols = make_symbols_for_function(*function, kind);
+				copy_vector_contents(result, function_symbols);
+			}
 		}
 	}
 
@@ -365,19 +373,20 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 		auto symbols = get_symbol_for_transition(*transition, alphabet);
 		for (const auto& sym : symbols) {
 			nfa.add_trans(src_state, sym.vata_id, dst_state);
-			outgoing_vata[&transition->src].insert({ sym.vata_id });
+			outgoing_vata[&transition->src].insert(sym.vata_id);
 		}
 	}
 
 	// make nfa complete by adding self-loops for "missing" transitions
 	auto missing_symbols = [&](const State& state) -> std::set<std::uintptr_t> {
 		std::set<std::uintptr_t> result;
-		auto outgoing = outgoing_vata.at(&state);
+		std::set<std::uintptr_t> outgoing = outgoing_vata[&state]; // if there are no outgoing, we want {}
 		for (const auto& symbol : alphabet) {
 			if (outgoing.count(symbol.vata_id) == 0) {
 				result.insert(symbol.vata_id);
 			}
 		}
+		assert(result.size() + outgoing.size() == alphabet.size());
 		return result;
 	};
 	for (const auto& state : observer.states) {
@@ -433,7 +442,7 @@ Translator::Translator(const Program& program_, GuaranteeSet all_guarantees_) : 
 	// init lookup map for base observers
 	for (const auto& guarantee : all_guarantees) {
 		auto nfa = to_nfa(*guarantee.get().observer);
-		auto res = guarantee2nfa.insert({ guarantee, nfa });
+		auto res = guarantee2nfa.insert({ &(guarantee.get()), nfa });
 		if (!res.second) {
 			throw std::logic_error("Unexpected non-unique guarantees in set.");
 		}
@@ -442,10 +451,11 @@ Translator::Translator(const Program& program_, GuaranteeSet all_guarantees_) : 
 	// init universalnfa;
 	std::uintptr_t state = -1;
 	universalnfa.add_initial(state);
+	universalnfa.add_final(state);
 	for (auto symbol : vata_alphabet->get_symbols()) {
 		universalnfa.add_trans(state, symbol, state);
 	}
-	assert(Vata2::Nfa::is_universal(universalnfa, *vata_alphabet));
+	assert(Vata2::Nfa::is_universal(universalnfa, *vata_alphabet, VATA_PARAMS));
 }
 
 VataNfa Translator::to_nfa(const Observer& observer) {
@@ -464,7 +474,7 @@ GuaranteeSet combine_guarteeset(std::vector<GuaranteeSet> sets) {
 		sets.pop_back();
 		while (!sets.empty()) {
 			GuaranteeSet new_result;
-			std::set_intersection(result.begin(),result.end(),sets.back().begin(),sets.back().end(), std::inserter(new_result, new_result.begin()));
+			std::set_intersection(result.begin(),result.end(),sets.back().begin(),sets.back().end(), std::inserter(new_result, new_result.begin()), GuaranteeSetComparator());
 			result = std::move(new_result);
 		}
 		return result;
@@ -483,7 +493,7 @@ VataNfa nfa_intersection_for_guarantees(Translator& translator, const GuaranteeS
 }
 
 bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa& superset) {
-	return is_incl (subset, superset, translator.get_vata_alphabet());
+	return is_incl (subset, superset, translator.get_vata_alphabet(), VATA_PARAMS);
 }
 
 GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
@@ -503,12 +513,19 @@ GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa, G
 	return result;
 }
 
-std::unique_ptr<Guard> make_guard_for_enter(const Enter& enter, const VariableDeclaration& ptr) {
-	auto thread_var = std::make_unique<ThreadObserverVariable>("Obs$Thread");
-	auto pointer_var = std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("Obs&Pointer", Observer::free_function().args.at(0)->type, false));
+struct DummyGuardContainer {
+	std::unique_ptr<ThreadObserverVariable> thread;
+	std::unique_ptr<ProgramObserverVariable> pointer;
+	std::unique_ptr<Guard> guard;
+};
+
+DummyGuardContainer make_guard_for_enter(const Enter& enter, const VariableDeclaration& ptr) {
+	DummyGuardContainer container;
+	container.thread = std::make_unique<ThreadObserverVariable>("Obs$Thread");
+	container.pointer = std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("Obs&Pointer", Observer::free_function().args.at(0)->type, false));
 
 	// always make the executing thread observed
-	std::unique_ptr<Guard> result = std::make_unique<EqGuard>(*thread_var, std::make_unique<SelfGuardVariable>());
+	container.guard = std::make_unique<EqGuard>(*container.thread, std::make_unique<SelfGuardVariable>());
 
 	// check if an argument to enter is ptr, if so match it to the enter.decl.arg variable declaration; collect those decls
 	std::vector<std::reference_wrapper<const VariableDeclaration>> matches;
@@ -523,12 +540,12 @@ std::unique_ptr<Guard> make_guard_for_enter(const Enter& enter, const VariableDe
 	while (!matches.empty()) {
 		const VariableDeclaration& decl = matches.back();
 		matches.pop_back();
-		auto eq = std::make_unique<EqGuard>(*pointer_var, std::make_unique<ArgumentGuardVariable>(decl));
-		result = std::make_unique<ConjunctionGuard>(std::move(result), std::move(eq));
+		auto eq = std::make_unique<EqGuard>(*container.pointer, std::make_unique<ArgumentGuardVariable>(decl));
+		container.guard = std::make_unique<ConjunctionGuard>(std::move(container.guard), std::move(eq));
 	}
 
 	// done
-	return result;
+	return container;
 }
 
 std::vector<Symbol> compute_symbols_for_event(const Command& command, const VariableDeclaration* ptr) {
@@ -536,8 +553,8 @@ std::vector<Symbol> compute_symbols_for_event(const Command& command, const Vari
 	if (ptr) {
 		// enter event
 		auto& enter = static_cast<const Enter&>(command);
-		auto guard = make_guard_for_enter(enter, *ptr);
-		return make_symbols_for_function(enter.decl, Transition::INVOCATION, guard.get());
+		auto container = make_guard_for_enter(enter, *ptr);
+		return make_symbols_for_function(enter.decl, Transition::INVOCATION, container.guard.get());
 
 	} else {
 		// exit event
@@ -594,10 +611,14 @@ GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSe
 	return infer_guarantees(translator, concatenation);
 }
 
+std::size_t InferenceEngine::get_index(const Guarantee& guarantee) {
+	return key_helper.at(&guarantee);
+}
+
 InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantees) {
 	key_type result(guarantee_count, false);
 	for (const auto& guarantee : guarantees) {
-		result.at(key_helper.at(guarantee)) = true;
+		result.at(get_index(guarantee)) = true;
 	}
 	return result;
 }
@@ -606,13 +627,15 @@ InferenceEngine::InferenceEngine(const Program& program, const GuaranteeSet& all
 	// init key_helper
 	guarantee_count = 0;
 	for (const auto& guarantee : all_guarantees) {
-		auto res = key_helper.insert({ guarantee, guarantee_count++ });
+		auto res = key_helper.insert({ &(guarantee.get()), guarantee_count++ });
 		if (!res.second) {
 			throw std::logic_error("Failed to create key_helper.");
 		}
 	}
 	assert(guarantee_count == all_guarantees.size());
 	assert(guarantee_count == key_helper.size());
+
+	// TODO: ensure that the observers of all guarantees satisfy our 1thread1ptr assumption
 }
 
 GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
