@@ -6,9 +6,9 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # # set default release type
-# if(NOT CMAKE_BUILD_TYPE)
-# 	set(CMAKE_BUILD_TYPE Release)
-# endif(NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release)
+endif(NOT CMAKE_BUILD_TYPE)
 
 # remain in testing mode for the moment
 set(CMAKE_BUILD_TYPE Debug)
@@ -24,8 +24,6 @@ add_definitions(-fshow-column)
 enable_testing()
 
 # includes
-# include_directories(${CMAKE_BINARY_DIR}/antlr4cpp_generated_src)
-# include_directories(${CMAKE_BINARY_DIR}/locals/antlr4cpp/include/antlr4-runtime)
 include_directories(src)
 
 # sources/executables
