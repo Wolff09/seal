@@ -506,74 +506,74 @@ namespace cola {
 
 	/*--------------- base visitor ---------------*/
 
-	struct BaseVisitor : public Visitor, public NonConstVisitor {
-		virtual void visit(const VariableDeclaration& /*node*/) {}
-		virtual void visit(const Expression& /*node*/) {}
-		virtual void visit(const BooleanValue& /*node*/) {}
-		virtual void visit(const NullValue& /*node*/) {}
-		virtual void visit(const EmptyValue& /*node*/) {}
-		virtual void visit(const NDetValue& /*node*/) {}
-		virtual void visit(const VariableExpression& /*node*/) {}
-		virtual void visit(const NegatedExpression& /*node*/) {}
-		virtual void visit(const BinaryExpression& /*node*/) {}
-		virtual void visit(const Dereference& /*node*/) {}
-		virtual void visit(const InvariantExpression& /*node*/) {}
-		virtual void visit(const InvariantActive& /*node*/) {}
-		virtual void visit(const Sequence& /*node*/) {}
-		virtual void visit(const Scope& /*node*/) {}
-		virtual void visit(const Atomic& /*node*/) {}
-		virtual void visit(const Choice& /*node*/) {}
-		virtual void visit(const IfThenElse& /*node*/) {}
-		virtual void visit(const Loop& /*node*/) {}
-		virtual void visit(const While& /*node*/) {}
-		virtual void visit(const Skip& /*node*/) {}
-		virtual void visit(const Break& /*node*/) {}
-		virtual void visit(const Continue& /*node*/) {}
-		virtual void visit(const Assume& /*node*/) {}
-		virtual void visit(const Assert& /*node*/) {}
-		virtual void visit(const Return& /*node*/) {}
-		virtual void visit(const Malloc& /*node*/) {}
-		virtual void visit(const Assignment& /*node*/) {}
-		virtual void visit(const Enter& /*node*/) {}
-		virtual void visit(const Exit& /*node*/) {}
-		virtual void visit(const Macro& /*node*/) {}
-		virtual void visit(const CompareAndSwap& /*node*/) {}
-		virtual void visit(const Function& /*node*/) {}
-		virtual void visit(const Program& /*node*/) {}
-		virtual void visit(VariableDeclaration& /*node*/) {}
-		virtual void visit(Expression& /*node*/) {}
-		virtual void visit(BooleanValue& /*node*/) {}
-		virtual void visit(NullValue& /*node*/) {}
-		virtual void visit(EmptyValue& /*node*/) {}
-		virtual void visit(NDetValue& /*node*/) {}
-		virtual void visit(VariableExpression& /*node*/) {}
-		virtual void visit(NegatedExpression& /*node*/) {}
-		virtual void visit(BinaryExpression& /*node*/) {}
-		virtual void visit(Dereference& /*node*/) {}
-		virtual void visit(InvariantExpression& /*node*/) {}
-		virtual void visit(InvariantActive& /*node*/) {}
-		virtual void visit(Sequence& /*node*/) {}
-		virtual void visit(Scope& /*node*/) {}
-		virtual void visit(Atomic& /*node*/) {}
-		virtual void visit(Choice& /*node*/) {}
-		virtual void visit(IfThenElse& /*node*/) {}
-		virtual void visit(Loop& /*node*/) {}
-		virtual void visit(While& /*node*/) {}
-		virtual void visit(Skip& /*node*/) {}
-		virtual void visit(Break& /*node*/) {}
-		virtual void visit(Continue& /*node*/) {}
-		virtual void visit(Assume& /*node*/) {}
-		virtual void visit(Assert& /*node*/) {}
-		virtual void visit(Return& /*node*/) {}
-		virtual void visit(Malloc& /*node*/) {}
-		virtual void visit(Assignment& /*node*/) {}
-		virtual void visit(Enter& /*node*/) {}
-		virtual void visit(Exit& /*node*/) {}
-		virtual void visit(Macro& /*node*/) {}
-		virtual void visit(CompareAndSwap& /*node*/) {}
-		virtual void visit(Function& /*node*/) {}
-		virtual void visit(Program& /*node*/) {}
-	};
+	// struct BaseVisitor : public Visitor, public NonConstVisitor {
+	// 	virtual void visit(const VariableDeclaration& /*node*/) {}
+	// 	virtual void visit(const Expression& /*node*/) {}
+	// 	virtual void visit(const BooleanValue& /*node*/) {}
+	// 	virtual void visit(const NullValue& /*node*/) {}
+	// 	virtual void visit(const EmptyValue& /*node*/) {}
+	// 	virtual void visit(const NDetValue& /*node*/) {}
+	// 	virtual void visit(const VariableExpression& /*node*/) {}
+	// 	virtual void visit(const NegatedExpression& /*node*/) {}
+	// 	virtual void visit(const BinaryExpression& /*node*/) {}
+	// 	virtual void visit(const Dereference& /*node*/) {}
+	// 	virtual void visit(const InvariantExpression& /*node*/) {}
+	// 	virtual void visit(const InvariantActive& /*node*/) {}
+	// 	virtual void visit(const Sequence& /*node*/) {}
+	// 	virtual void visit(const Scope& /*node*/) {}
+	// 	virtual void visit(const Atomic& /*node*/) {}
+	// 	virtual void visit(const Choice& /*node*/) {}
+	// 	virtual void visit(const IfThenElse& /*node*/) {}
+	// 	virtual void visit(const Loop& /*node*/) {}
+	// 	virtual void visit(const While& /*node*/) {}
+	// 	virtual void visit(const Skip& /*node*/) {}
+	// 	virtual void visit(const Break& /*node*/) {}
+	// 	virtual void visit(const Continue& /*node*/) {}
+	// 	virtual void visit(const Assume& /*node*/) {}
+	// 	virtual void visit(const Assert& /*node*/) {}
+	// 	virtual void visit(const Return& /*node*/) {}
+	// 	virtual void visit(const Malloc& /*node*/) {}
+	// 	virtual void visit(const Assignment& /*node*/) {}
+	// 	virtual void visit(const Enter& /*node*/) {}
+	// 	virtual void visit(const Exit& /*node*/) {}
+	// 	virtual void visit(const Macro& /*node*/) {}
+	// 	virtual void visit(const CompareAndSwap& /*node*/) {}
+	// 	virtual void visit(const Function& /*node*/) {}
+	// 	virtual void visit(const Program& /*node*/) {}
+	// 	virtual void visit(VariableDeclaration& /*node*/) {}
+	// 	virtual void visit(Expression& /*node*/) {}
+	// 	virtual void visit(BooleanValue& /*node*/) {}
+	// 	virtual void visit(NullValue& /*node*/) {}
+	// 	virtual void visit(EmptyValue& /*node*/) {}
+	// 	virtual void visit(NDetValue& /*node*/) {}
+	// 	virtual void visit(VariableExpression& /*node*/) {}
+	// 	virtual void visit(NegatedExpression& /*node*/) {}
+	// 	virtual void visit(BinaryExpression& /*node*/) {}
+	// 	virtual void visit(Dereference& /*node*/) {}
+	// 	virtual void visit(InvariantExpression& /*node*/) {}
+	// 	virtual void visit(InvariantActive& /*node*/) {}
+	// 	virtual void visit(Sequence& /*node*/) {}
+	// 	virtual void visit(Scope& /*node*/) {}
+	// 	virtual void visit(Atomic& /*node*/) {}
+	// 	virtual void visit(Choice& /*node*/) {}
+	// 	virtual void visit(IfThenElse& /*node*/) {}
+	// 	virtual void visit(Loop& /*node*/) {}
+	// 	virtual void visit(While& /*node*/) {}
+	// 	virtual void visit(Skip& /*node*/) {}
+	// 	virtual void visit(Break& /*node*/) {}
+	// 	virtual void visit(Continue& /*node*/) {}
+	// 	virtual void visit(Assume& /*node*/) {}
+	// 	virtual void visit(Assert& /*node*/) {}
+	// 	virtual void visit(Return& /*node*/) {}
+	// 	virtual void visit(Malloc& /*node*/) {}
+	// 	virtual void visit(Assignment& /*node*/) {}
+	// 	virtual void visit(Enter& /*node*/) {}
+	// 	virtual void visit(Exit& /*node*/) {}
+	// 	virtual void visit(Macro& /*node*/) {}
+	// 	virtual void visit(CompareAndSwap& /*node*/) {}
+	// 	virtual void visit(Function& /*node*/) {}
+	// 	virtual void visit(Program& /*node*/) {}
+	// };
 
 } // namespace cola
 
