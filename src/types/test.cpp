@@ -1,27 +1,7 @@
 #include "types/check.hpp"
-#include "types/check/check_impl.hpp"
-#include "types/inference.hpp"
-
-using namespace cola;
-using namespace prtypes;
-
-
-bool prtypes::type_check(const cola::Program& /*program*/, const GuaranteeTable& /*guarantee_table*/) {
-	throw std::logic_error("not yet implemented (prtypes::type_check)");
-}
-
-
-
-
-////////////////////////////
-////////////////////////////
-////////////////////////////
-////////////////////////////
-////////////////////////////
-////////////////////////////
-////////////////////////////
 #include "cola/ast.hpp"
 #include "cola/observer.hpp"
+#include "types/inference.hpp"
 
 using namespace cola;
 using namespace prtypes;
