@@ -25,7 +25,7 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 	current_type_environment.at(ptr).insert(guarantee_table.local_guarantee());
 }
 
-void TypeChecker::check_enter(const Enter& /*enter*/, std::vector<std::reference_wrapper<VariableDeclaration>> /*params*/) {
+void TypeChecker::check_enter(const Enter& /*enter*/, std::vector<std::reference_wrapper<const VariableDeclaration>> /*params*/) {
 	throw std::logic_error("not yet implemented: TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<VariableDeclaration>> params)");
 }
 

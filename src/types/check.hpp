@@ -4,11 +4,12 @@
 
 #include "cola/ast.hpp"
 #include "types/guarantees.hpp"
+#include <optional>
 
 
 namespace prtypes {
 
-	class TypeChecker final : private cola::Visitor {
+	class TypeChecker final : public cola::Visitor {
 		public:
 			TypeChecker(const GuaranteeTable& table) : guarantee_table(table) {}
 
@@ -18,6 +19,7 @@ namespace prtypes {
 				return true;
 			}
 
+		public: // cola::Visitor interface
 			void visit(const cola::VariableDeclaration& node) override;
 			void visit(const cola::Expression& node) override;
 			void visit(const cola::BooleanValue& node) override;
@@ -52,13 +54,10 @@ namespace prtypes {
 			void visit(const cola::Function& node) override;
 			void visit(const cola::Program& node) override;
 
-		private:
-			const GuaranteeTable& guarantee_table;
-			TypeEnv current_type_environment;
-
+		private: // type check interface (called from visitor interface)
 			void check_skip(const cola::Skip& skip);
 			void check_malloc(const cola::Malloc& malloc, const cola::VariableDeclaration& ptr);
-			void check_enter(const cola::Enter& enter, std::vector<std::reference_wrapper<cola::VariableDeclaration>> params);
+			void check_enter(const cola::Enter& enter, std::vector<std::reference_wrapper<const cola::VariableDeclaration>> params);
 			void check_exit(const cola::Exit& exit);
 			void check_assume_nonpointer(const cola::Assume& assume, const cola::Expression& expr);
 			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::VariableDeclaration& rhs);
@@ -82,7 +81,22 @@ namespace prtypes {
 			void check_interface_function(const cola::Function& function);
 			void check_program(const cola::Program& program);
 
+		private: // helpers
+			const GuaranteeTable& guarantee_table;
+			TypeEnv current_type_environment;
+			bool inside_atomic = false;
+			const cola::Assert* current_assert;
+
+			struct FlatBinaryExpression {
+				const cola::VariableDeclaration* lhs;
+				cola::BinaryExpression::Operator op;
+				std::optional<const cola::VariableDeclaration*> rhs_var;
+				std::optional<const cola::NullValue*> rhs_null;
+			};
+
 			void ensure_valid(const cola::VariableDeclaration& variable);
+			const cola::VariableDeclaration& expression_to_variable(const cola::Expression& expression);
+			FlatBinaryExpression expression_to_flat_binary_expression(const cola::Expression& expression);
 	};
 
 
