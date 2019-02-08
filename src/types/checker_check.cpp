@@ -7,6 +7,8 @@ using namespace cola;
 using namespace prtypes;
 
 
+// TODO: decend further ==> we are currently not traversing the AST!!!
+
 void TypeChecker::ensure_valid(const VariableDeclaration& variable) {
 	assert(prtypes::has_binding(current_type_environment, variable));
 	bool is_valid = entails_valid(current_type_environment.at(variable));
@@ -204,4 +206,5 @@ void TypeChecker::check_program(const Program& program) {
 	for (const auto& function : program.functions) {
 		function->accept(*this);
 	}
+	throw std::logic_error("THE TYPE CHECK CURRENTLY DOES NOT TRAVERSE THE AST!!");
 }

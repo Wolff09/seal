@@ -87,15 +87,20 @@ namespace prtypes {
 			bool inside_atomic = false;
 			const cola::Assert* current_assert;
 
+			struct VariableOrDereferenceOrNull {
+				std::optional<const cola::VariableDeclaration*> var;
+				std::optional<const cola::Dereference*> deref;
+				std::optional<const cola::NullValue*> null;
+			};
 			struct FlatBinaryExpression {
 				const cola::VariableDeclaration* lhs;
 				cola::BinaryExpression::Operator op;
-				std::optional<const cola::VariableDeclaration*> rhs_var;
-				std::optional<const cola::NullValue*> rhs_null;
+				VariableOrDereferenceOrNull rhs;
 			};
 
 			void ensure_valid(const cola::VariableDeclaration& variable);
 			const cola::VariableDeclaration& expression_to_variable(const cola::Expression& expression);
+			VariableOrDereferenceOrNull expression_to_variable_or_dereference_or_null(const cola::Expression& expression);
 			FlatBinaryExpression expression_to_flat_binary_expression(const cola::Expression& expression);
 	};
 
