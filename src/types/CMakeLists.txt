@@ -20,7 +20,9 @@ link_directories(${VATA2_LIBS})
 
 set(SOURCES
 	inference.cpp
-	check.cpp
+	check/check.cpp
+	check/check_impl.cpp
+	check/check_impl_assertassume.cpp
 )
 
 add_library(PRTypes ${SOURCES})
