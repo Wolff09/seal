@@ -3,6 +3,7 @@
 #define PRTYPES_UTIL
 
 #include <algorithm>
+#include "types/guarantees.hpp"
 
 
 namespace prtypes {

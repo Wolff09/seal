@@ -89,9 +89,9 @@ namespace cola {
 	};
 
 	struct ConjunctionGuard : public Guard {
-		std::unique_ptr<Guard> lhs;
-		std::unique_ptr<Guard> rhs;
-		ConjunctionGuard(std::unique_ptr<Guard> lhs_, std::unique_ptr<Guard> rhs_) : lhs(std::move(lhs_)), rhs(std::move(rhs_)) {}
+		std::vector<std::unique_ptr<Guard>> conjuncts;
+		ConjunctionGuard(std::unique_ptr<Guard> lhs_, std::unique_ptr<Guard> rhs_) { conjuncts.push_back(std::move(lhs_)); conjuncts.push_back(std::move(rhs_)); }
+		ConjunctionGuard(std::vector<std::unique_ptr<Guard>> conjuncts_) : conjuncts(std::move(conjuncts_)) { assert(conjuncts.size() > 0); }
 		virtual void accept(ObserverVisitor& visitor) const override { visitor.visit(*this); }
 	};
 

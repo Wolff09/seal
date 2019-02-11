@@ -21,7 +21,7 @@ add_definitions(-fshow-column)
 # add_definitions(-Wno-unused-parameter -Wno-unused-function)
 
 # adds test target
-enable_testing()
+# enable_testing()
 
 # includes
 include_directories(src)

@@ -203,8 +203,9 @@ struct ValuationPruningVisitor final : ObserverVisitor {
 	}
 
 	void visit(const ConjunctionGuard& guard) override {
-		guard.lhs->accept(*this);
-		guard.rhs->accept(*this);
+		for (const auto& sub_guard : guard.conjuncts) {
+			sub_guard->accept(*this);
+		}
 	}
 
 	void visit(const TrueGuard& /*obj*/) override { /* do nothing */ }
