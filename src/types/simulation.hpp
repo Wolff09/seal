@@ -8,20 +8,19 @@
 
 namespace prtypes {
 
-	using SimulationPair = std::pair<std::reference_wrapper<const cola::State>, std::reference_wrapper<const cola::State>>;
+	class SimulationEngine {
+		public:
+			using SimulationRelation = std::set<std::pair<const cola::State*, const cola::State*>>;
 
-	struct SimulationRelationComparator {
-		bool operator() (const SimulationPair& lhs, const SimulationPair& rhs) const {
-			std::pair<const cola::State*, const cola::State*> lhs_pair = { &(lhs.first.get()), &(lhs.second.get()) };
-			std::pair<const cola::State*, const cola::State*> rhs_pair = { &(rhs.first.get()), &(rhs.second.get()) };
-			return std::less()(lhs_pair, rhs_pair);
-		}
+		private:
+			SimulationRelation all_simulations;
+			std::set<const cola::Observer*> observers;
+
+		public:
+			void compute_simulation(const cola::Observer& observer);
+			bool is_in_simulation_relation(const cola::State& state, const cola::State& other);
+			// TODO: export function to compute the post states wrt. to a guard and validity ==> or just offer the safe predice here
 	};
-
-	using SimulationRelation = std::set<SimulationPair, SimulationRelationComparator>;
-
-
-	SimulationRelation compute_simulation(const cola::Observer& observer);
 
 } // namespace prtypes
 

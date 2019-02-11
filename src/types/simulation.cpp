@@ -97,24 +97,24 @@ bool is_definitely_disabled(const Guard& to_enable, const Guard& premise) {
 	}
 }
 
-std::vector<std::reference_wrapper<const State>> abstract_post(const Observer& observer, const Transition& match, const State& state) {
-	std::vector<std::reference_wrapper<const State>> result;
+std::vector<const State*> abstract_post(const Observer& observer, const Transition& match, const State& state) {
+	std::vector<const State*> result;
 	for (const auto& transition : observer.transitions) {
 		if (&transition->src == &state && &transition->label == &match.label && !is_definitely_disabled(*transition->guard, *match.guard)) {
-			result.push_back(transition->dst);
+			result.push_back(&transition->dst);
 		}
 	}
-	result.push_back(state); // TODO: implement a check and add 'state' conditionally // TODO: needed? the simulation relation should not be affected!?
+	result.push_back(&state); // TODO: implement a check and add 'state' conditionally // TODO: needed? the simulation relation should not be affected!?
 	return result;
 }
 
-bool simulation_holds(const Observer& observer, SimulationRelation current, const State& to_simulate, const State& simulator) {
+bool simulation_holds(const Observer& observer, SimulationEngine::SimulationRelation current, const State& to_simulate, const State& simulator) {
 	for (const auto& transition : observer.transitions) {
 		if (&transition->src == &to_simulate) {
-			auto next_to_simulate = transition->dst;
+			auto next_to_simulate = &transition->dst;
 			auto simulator_post = abstract_post(observer, *transition, simulator);
 			for (const auto& next_simulator : simulator_post) {
-				SimulationPair required = { next_to_simulate, next_simulator };
+				auto required = std::make_pair(next_to_simulate, next_simulator);
 				if (!current.count(required)) {
 					return false;
 				}
@@ -124,14 +124,14 @@ bool simulation_holds(const Observer& observer, SimulationRelation current, cons
 	return true;
 }
 
-SimulationRelation prtypes::compute_simulation(const Observer& observer) {
-	SimulationRelation result;
+void SimulationEngine::compute_simulation(const Observer& observer) {
+	SimulationEngine::SimulationRelation result;
 
 	// start with all-relation, pruned by those that are definitely in a simulation relation
 	for (const auto& lhs : observer.states) {
 		for (const auto& rhs : observer.states) {
 			if (prtypes::implies(rhs->final, lhs->final)) {
-				result.insert({ *lhs.get(), *rhs.get() });
+				result.insert({ lhs.get(), rhs.get() });
 			}
 		}
 	}
@@ -142,7 +142,7 @@ SimulationRelation prtypes::compute_simulation(const Observer& observer) {
 		removed = false;
 		auto it = result.begin();
 		while (it != result.end()) {
-			if (!simulation_holds(observer, result, it->first, it->second)) {
+			if (!simulation_holds(observer, result, *it->first, *it->second)) {
 				removed = true;
 				it = result.erase(it); // progresses it
 			} else {
@@ -151,5 +151,11 @@ SimulationRelation prtypes::compute_simulation(const Observer& observer) {
 		}
 	} while (removed);
 
-	return result;
+	// store information
+	this->observers.insert(&observer);
+	this->all_simulations.insert(result.begin(), result.end());
+}
+
+bool SimulationEngine::is_in_simulation_relation(const cola::State& state, const cola::State& other) {
+	return all_simulations.count({ &state, &other }) > 0;
 }
