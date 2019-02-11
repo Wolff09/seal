@@ -98,7 +98,7 @@ namespace prtypes {
 				VariableOrDereferenceOrNull rhs;
 			};
 
-			void ensure_valid(const cola::VariableDeclaration& variable);
+			bool is_pointer_valid(const cola::VariableDeclaration& variable);
 			const cola::VariableDeclaration& expression_to_variable(const cola::Expression& expression);
 			VariableOrDereferenceOrNull expression_to_variable_or_dereference_or_null(const cola::Expression& expression);
 			FlatBinaryExpression expression_to_flat_binary_expression(const cola::Expression& expression);

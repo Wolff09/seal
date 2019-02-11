@@ -64,7 +64,7 @@ struct BinaryExpressionVisitor final : public TypeCheckBaseVisitor {
 const VariableDeclaration& TypeChecker::expression_to_variable(const Expression& expression) {
 	VariableExpressionVisitor visitor;
 	expression.accept(visitor);
-	raise_unsupported_if(!visitor.decl, "unsupported expression; expected a variable");
+	conditionally_raise_error<UnsupportedConstructError>(!visitor.decl, "unsupported expression; expected a variable");
 	assert(visitor.decl);
 	return *visitor.decl;
 }
@@ -72,7 +72,7 @@ const VariableDeclaration& TypeChecker::expression_to_variable(const Expression&
 TypeChecker::VariableOrDereferenceOrNull TypeChecker::expression_to_variable_or_dereference_or_null(const Expression& expression) {
 	VariableExpressionOrDereferenceOrNullValueVisitor visitor;
 	expression.accept(visitor);
-	raise_unsupported_if(!visitor.decl && !visitor.deref && !visitor.null, "unsupported expression; expected a variable, a dereference, or 'NULL'");
+	conditionally_raise_error<UnsupportedConstructError>(!visitor.decl && !visitor.deref && !visitor.null, "unsupported expression; expected a variable, a dereference, or 'NULL'");
 	assert(!!visitor.decl ^ !!visitor.deref ^ !!visitor.null);
 	TypeChecker::VariableOrDereferenceOrNull result;
 	if (visitor.decl) {
@@ -90,7 +90,7 @@ TypeChecker::VariableOrDereferenceOrNull TypeChecker::expression_to_variable_or_
 TypeChecker::FlatBinaryExpression TypeChecker::expression_to_flat_binary_expression(const Expression& expression) {
 	BinaryExpressionVisitor visitor;
 	expression.accept(visitor);
-	raise_unsupported_if(!visitor.binary, "unsupported expression; expected a binary expression");
+	conditionally_raise_error<UnsupportedConstructError>(!visitor.binary, "unsupported expression; expected a binary expression");
 	assert(visitor.binary);
 	assert(visitor.binary->lhs);
 	assert(visitor.binary->rhs);
@@ -152,7 +152,7 @@ void TypeChecker::visit(const Scope& scope) {
 }
 
 void TypeChecker::visit(const Atomic& atomic) {
-	raise_unsupported_if(inside_atomic, "nested atomic blocks are not supported");
+	conditionally_raise_error<UnsupportedConstructError>(inside_atomic, "nested atomic blocks are not supported");
 	inside_atomic = true;
 	this->check_atomic(atomic);
 	inside_atomic = false;
@@ -163,7 +163,7 @@ void TypeChecker::visit(const Choice& choice) {
 }
 
 void TypeChecker::visit(const IfThenElse& /*node*/) {
-	raise_unsupported("'if' statements are not supported");
+	raise_error<UnsupportedConstructError>("'if' statements are not supported");
 }
 
 void TypeChecker::visit(const Loop& loop) {
@@ -171,7 +171,7 @@ void TypeChecker::visit(const Loop& loop) {
 }
 
 void TypeChecker::visit(const While& /*node*/) {
-	raise_unsupported("'while' statements are not supported");
+	raise_error<UnsupportedConstructError>("'while' statements are not supported");
 }
 
 void TypeChecker::visit(const Skip& skip) {
@@ -179,18 +179,18 @@ void TypeChecker::visit(const Skip& skip) {
 }
 
 void TypeChecker::visit(const Break& /*node*/) {
-	raise_unsupported("'break' statements are not supported");
+	raise_error<UnsupportedConstructError>("'break' statements are not supported");
 }
 
 void TypeChecker::visit(const Continue& /*node*/) {
-	raise_unsupported("'continue' statements are not supported");
+	raise_error<UnsupportedConstructError>("'continue' statements are not supported");
 }
 
 void TypeChecker::visit(const Assume& assume) {
 	assert(assume.expr);
 	if (assume.expr->sort() == Sort::PTR) {
 		auto flat = expression_to_flat_binary_expression(*assume.expr);
-		raise_unsupported_if(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
+		conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
 		assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
 		if (flat.rhs.var.has_value()) {
 			this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.var);
@@ -214,7 +214,7 @@ void TypeChecker::visit(const InvariantExpression& invariant) {
 	assert(invariant.expr);
 	if (invariant.expr->sort() == Sort::PTR) {
 		auto flat = expression_to_flat_binary_expression(*invariant.expr);
-		raise_unsupported_if(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
+		conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
 		assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
 		if (flat.rhs.var.has_value()) {
 			this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.var);
@@ -223,7 +223,7 @@ void TypeChecker::visit(const InvariantExpression& invariant) {
 		}
 	
 	} else {
-		raise_unsupported("assertions with data expressions are not supported");
+		raise_error<UnsupportedConstructError>("assertions with data expressions are not supported");
 	}
 }
 
@@ -248,8 +248,8 @@ void TypeChecker::visit(const Assignment& assignment) {
 	auto lhs = expression_to_variable_or_dereference_or_null(*assignment.lhs);
 	auto rhs = expression_to_variable_or_dereference_or_null(*assignment.rhs);
 
-	raise_unsupported_if(lhs.null.has_value(), "cannot assign to 'NULL'");
-	raise_unsupported_if(lhs.deref.has_value() && rhs.deref.has_value(), "simultanious dereference on left-hand-side and right-hand-side of assignment are not supported");
+	conditionally_raise_error<UnsupportedConstructError>(lhs.null.has_value(), "cannot assign to 'NULL'");
+	conditionally_raise_error<UnsupportedConstructError>(lhs.deref.has_value() && rhs.deref.has_value(), "simultanious dereference on left-hand-side and right-hand-side of assignment are not supported");
 	assert(lhs.var.has_value() ^ lhs.deref.has_value());
 	assert(rhs.var.has_value() ^ rhs.deref.has_value() ^ rhs.null.has_value());
 
@@ -292,11 +292,11 @@ void TypeChecker::visit(const Exit& exit) {
 }
 
 void TypeChecker::visit(const Macro& /*node*/) {
-	raise_unsupported("calls to 'MACRO' functions are not supported");
+	raise_error<UnsupportedConstructError>("calls to 'MACRO' functions are not supported");
 }
 
 void TypeChecker::visit(const CompareAndSwap& /*node*/) {
-	raise_unsupported("CAS statements are not supported");
+	raise_error<UnsupportedConstructError>("CAS statements are not supported");
 }
 
 void TypeChecker::visit(const Function& function) {
@@ -306,7 +306,7 @@ void TypeChecker::visit(const Function& function) {
 			return;
 
 		case Function::Kind::MACRO:
-			raise_unsupported("unsupported function kind 'MACRO'"); // TODO: support this or assume inlineing?
+			raise_error<UnsupportedConstructError>("unsupported function kind 'MACRO'"); // TODO: support this or assume inlineing?
 			return;
 
 		case Function::Kind::SMR:

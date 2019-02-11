@@ -9,10 +9,9 @@ using namespace prtypes;
 
 // TODO: decend further ==> we are currently not traversing the AST!!!
 
-void TypeChecker::ensure_valid(const VariableDeclaration& variable) {
+bool TypeChecker::is_pointer_valid(const VariableDeclaration& variable) {
 	assert(prtypes::has_binding(current_type_environment, variable));
-	bool is_valid = entails_valid(current_type_environment.at(variable));
-	raise_type_error_if(!is_valid, "invalid pointer used");
+	return entails_valid(current_type_environment.at(variable));
 }
 
 
@@ -21,7 +20,7 @@ void TypeChecker::check_skip(const Skip& /*skip*/) {
 }
 
 void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclaration& ptr) {
-	raise_type_error_if(ptr.is_shared, "allocations must not target shared variables");
+	conditionally_raise_error<UnsupportedConstructError>(ptr.is_shared, "allocations must not target shared variables");
 	assert(prtypes::has_binding(current_type_environment, ptr));
 	current_type_environment.at(ptr).clear();
 	current_type_environment.at(ptr).insert(guarantee_table.local_guarantee());
@@ -39,13 +38,14 @@ void TypeChecker::check_assume_nonpointer(const Assume& /*assume*/, const Expres
 	// do nothing
 }
 
-void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableDeclaration& lhs, BinaryExpression::Operator op, const VariableDeclaration& rhs) {
-	if (op == BinaryExpression::Operator::EQ) {
+void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDeclaration& lhs, BinaryExpression::Operator op, const VariableDeclaration& rhs) {
+	assert(assume.expr);
+	if (assume.expr->sort() == Sort::PTR && op == BinaryExpression::Operator::EQ) {
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		assert(prtypes::has_binding(current_type_environment, rhs));
 		
-		ensure_valid(lhs);
-		ensure_valid(rhs);
+		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(lhs), assume, lhs);
+		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(rhs), assume, rhs);
 		
 		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
 		sum.erase(guarantee_table.local_guarantee());
@@ -57,11 +57,12 @@ void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableD
 	}
 }
 
-void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
-	if (op == BinaryExpression::Operator::EQ) {
+void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
+	assert(assume.expr);
+	if (assume.expr->sort() == Sort::PTR && op == BinaryExpression::Operator::EQ) {
 		// NULL is always valid
 		assert(prtypes::has_binding(current_type_environment, lhs));
-		ensure_valid(lhs);
+		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(lhs), assume, lhs);
 		current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
 
 	} else {
@@ -80,7 +81,7 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 		current_type_environment.at(rhs) = sum;
 
 	} else {
-		raise_unsupported("unsupported comparison operator in assertions; must be '=='");
+		raise_error<UnsupportedConstructError>("unsupported comparison operator in assertions; must be '=='");
 	}
 }
 
@@ -90,7 +91,7 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 		current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
 
 	} else {
-		raise_unsupported("unsupported comparison operator in assertions; must be '=='");
+		raise_error<UnsupportedConstructError>("unsupported comparison operator in assertions; must be '=='");
 	}
 }
 
@@ -115,11 +116,11 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Variabl
 	current_type_environment.at(lhs).clear();
 }
 
-void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Dereference& /*lhs_deref*/, const VariableDeclaration& lhs_var, const VariableDeclaration& rhs) {
+void TypeChecker::check_assign_pointer(const Assignment& assignment, const Dereference& lhs_deref, const VariableDeclaration& lhs_var, const VariableDeclaration& rhs) {
 	assert(prtypes::has_binding(current_type_environment, lhs_var));
 	assert(prtypes::has_binding(current_type_environment, rhs));
 
-	ensure_valid(lhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
 	current_type_environment.at(rhs).erase(guarantee_table.local_guarantee());
 }
 
@@ -127,11 +128,11 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Derefer
 	// do nothing
 }
 
-void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const Dereference& /*rhs_deref*/, const VariableDeclaration& rhs_var) {
+void TypeChecker::check_assign_pointer(const Assignment& assignment, const VariableDeclaration& lhs, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 
-	ensure_valid(rhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 	current_type_environment.at(lhs).clear();
 }
 
@@ -139,21 +140,21 @@ void TypeChecker::check_assign_nonpointer(const Assignment& /*node*/, const Expr
 	// do nothing
 }
 
-void TypeChecker::check_assign_nonpointer(const Assignment& /*node*/, const Dereference& /*lhs_deref*/, const VariableDeclaration& lhs_var, const Expression& /*rhs*/) {
+void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Dereference& lhs_deref, const VariableDeclaration& lhs_var, const Expression& /*rhs*/) {
 	assert(prtypes::has_binding(current_type_environment, lhs_var));
-	ensure_valid(lhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
 }
 
-void TypeChecker::check_assign_nonpointer(const Assignment& /*node*/, const Expression& /*lhs*/, const Dereference& /*rhs_deref*/, const VariableDeclaration& rhs_var) {
+void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Expression& /*lhs*/, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
-	ensure_valid(rhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 }
 
 void TypeChecker::check_scope(const Scope& scope) {
 	// populate current_type_environment with empty guarantees for declared pointer variables
 	for (const auto& decl : scope.variables) {
 		auto insertion = current_type_environment.insert({ *decl, GuaranteeSet() });
-		raise_unsupported_if(!insertion.second, "hiding variable declaration of outer scope not supported");
+		conditionally_raise_error<UnsupportedConstructError>(!insertion.second, "hiding variable declaration of outer scope not supported");
 	}
 
 	// type check body
