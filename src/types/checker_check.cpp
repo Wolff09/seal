@@ -49,6 +49,7 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 		
 		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
 		sum.erase(guarantee_table.local_guarantee());
+		sum = inference.infer(sum);
 		current_type_environment.at(lhs) = sum;
 		current_type_environment.at(rhs) = sum;
 
@@ -77,6 +78,7 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 		
 		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
 		sum.erase(guarantee_table.local_guarantee()); // TODO: correct?
+		sum = inference.infer(sum);
 		current_type_environment.at(lhs) = sum;
 		current_type_environment.at(rhs) = sum;
 
@@ -97,7 +99,10 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 
 void TypeChecker::check_assert_active(const Assert& /*assert*/, const VariableDeclaration& ptr) {
 	assert(prtypes::has_binding(current_type_environment, ptr));
-	current_type_environment.at(ptr).insert(guarantee_table.active_guarantee());
+	GuaranteeSet guarantees = std::move(current_type_environment.at(ptr));
+	guarantees.insert(guarantee_table.active_guarantee());
+	guarantees = inference.infer(guarantees);
+	current_type_environment.at(ptr) = std::move(guarantees);
 }
 
 
