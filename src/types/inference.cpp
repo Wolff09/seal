@@ -1,6 +1,7 @@
 #include "inference.hpp"
 #include "vata2/nfa.hh"
 #include "cola/ast.hpp"
+#include "types/util.hpp"
 #include <vector>
 #include <sstream>
 #include <memory>
@@ -602,15 +603,24 @@ VataNfa nfa_concatenation_with_symbols(Translator& /*translator*/, VataNfa nfa, 
 	return nfa;
 }
 
+bool check_inference(const GuaranteeTable& table, const GuaranteeSet& pre, const GuaranteeSet& post) {
+	// returns false if the post set is valid / contains local guarantee but the pre set does not
+	return prtypes::implies(prtypes::entails_valid(post), prtypes::entails_valid(pre)) && prtypes::implies(post.count(table.local_guarantee()), pre.count(table.local_guarantee()));
+}
+
 GuaranteeSet compute_inference_epsilon(Translator& translator, const GuaranteeSet& guarantees) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
-	return infer_guarantees(translator, intersection, guarantees);
+	auto result = infer_guarantees(translator, intersection, guarantees);
+	assert(check_inference(translator.get_guarantee_table(), guarantees, result));
+	return result;
 }
 
 GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSet& guarantees, std::vector<Symbol> symbols) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
 	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
-	return infer_guarantees(translator, concatenation);
+	auto result = infer_guarantees(translator, concatenation);
+	assert(check_inference(translator.get_guarantee_table(), guarantees, result));
+	return result;
 }
 
 std::size_t InferenceEngine::get_index(const Guarantee& guarantee) {

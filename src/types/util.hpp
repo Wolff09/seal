@@ -7,6 +7,10 @@
 
 namespace prtypes {
 
+	inline bool implies(bool lhs, bool rhs) {
+		return !lhs || rhs;
+	}
+
 	inline bool entails_valid(const GuaranteeSet& guarantees) {
 		for (const auto& guarantee : guarantees) {
 			if (guarantee.get().entails_validity) {
@@ -50,7 +54,7 @@ namespace prtypes {
 		return result;
 	}
 
-	bool equals (const TypeEnv& lhs, const TypeEnv& rhs) {
+	inline bool equals (const TypeEnv& lhs, const TypeEnv& rhs) {
 		static struct TypeEnvEqual {
 			bool operator()(const TypeEnv::value_type& value, const TypeEnv::value_type& other) const {
 				static TypeEnvComparator key_cmp;

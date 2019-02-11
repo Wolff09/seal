@@ -6,7 +6,6 @@
 using namespace cola;
 using namespace prtypes;
 
-// TODO: type inference
 
 bool TypeChecker::is_pointer_valid(const VariableDeclaration& variable) {
 	assert(prtypes::has_binding(current_type_environment, variable));
@@ -25,12 +24,23 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 	current_type_environment.at(ptr).insert(guarantee_table.local_guarantee());
 }
 
-void TypeChecker::check_enter(const Enter& /*enter*/, std::vector<std::reference_wrapper<const VariableDeclaration>> /*params*/) {
+void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> /*params*/) {
+	// TODO: check safe predicate
 	throw std::logic_error("not yet implemented: TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<VariableDeclaration>> params)");
+
+	TypeEnv result;
+	for (const auto& [decl, guarantees] : this->current_type_environment) {
+		result[decl] = inference.infer_enter(guarantees, enter, decl);
+	}
+	this->current_type_environment = std::move(result);
 }
 
-void TypeChecker::check_exit(const Exit& /*exit*/) {
-	throw std::logic_error("not yet implemented: TypeChecker::check_exit(const Exit& exit)");
+void TypeChecker::check_exit(const Exit& exit) {
+	TypeEnv result;
+	for (const auto& [decl, guarantees] : this->current_type_environment) {
+		result[decl] = inference.infer_exit(guarantees, exit);
+	}
+	this->current_type_environment = std::move(result);
 }
 
 
