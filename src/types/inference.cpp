@@ -434,15 +434,15 @@ std::unique_ptr<VataAlphabet> convert_alphabet(Alphabet& alphabet) {
 	return result;
 }
 
-Translator::Translator(const Program& program_, GuaranteeSet all_guarantees_) : program(program_), all_guarantees(all_guarantees_) {
+Translator::Translator(const Program& program_, const GuaranteeTable& guarantee_table_) : program(program_), guarantee_table(guarantee_table_) {
 	// init alphabet
 	alphabet = alphabet_from_program(program);
 	vata_alphabet = convert_alphabet(alphabet);
 
 	// init lookup map for base observers
-	for (const auto& guarantee : all_guarantees) {
-		auto nfa = to_nfa(*guarantee.get().observer);
-		auto res = guarantee2nfa.insert({ &(guarantee.get()), nfa });
+	for (const auto& guarantee : guarantee_table.all_guarantees) {
+		auto nfa = to_nfa(*guarantee.get()->observer);
+		auto res = guarantee2nfa.insert({ guarantee.get(), nfa });
 		if (!res.second) {
 			throw std::logic_error("Unexpected non-unique guarantees in set.");
 		}
@@ -498,7 +498,9 @@ bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa&
 
 GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
 	GuaranteeSet result = std::move(baseline);
-	for (const Guarantee& guarantee : translator.get_all_guarantees()) {
+	for (const auto& guarantee_ptr : translator.get_guarantee_table().all_guarantees) {
+		const Guarantee& guarantee = *guarantee_ptr;
+
 		// if already present (passed as baseline), no need to infer
 		if (result.count(guarantee) > 0) {
 			continue;
@@ -623,16 +625,16 @@ InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantee
 	return result;
 }
 
-InferenceEngine::InferenceEngine(const Program& program, const GuaranteeSet& all_guarantees) : translator(program, all_guarantees) {
+InferenceEngine::InferenceEngine(const Program& program, const GuaranteeTable& guarantee_table) : translator(program, guarantee_table) {
 	// init key_helper
 	guarantee_count = 0;
-	for (const auto& guarantee : all_guarantees) {
-		auto res = key_helper.insert({ &(guarantee.get()), guarantee_count++ });
+	for (const auto& guarantee : guarantee_table.all_guarantees) {
+		auto res = key_helper.insert({ guarantee.get(), guarantee_count++ });
 		if (!res.second) {
 			throw std::logic_error("Failed to create key_helper.");
 		}
 	}
-	assert(guarantee_count == all_guarantees.size());
+	assert(guarantee_count == guarantee_table.all_guarantees.size());
 	assert(guarantee_count == key_helper.size());
 
 	// TODO: ensure that the observers of all guarantees satisfy our 1thread1ptr assumption

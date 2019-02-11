@@ -1,4 +1,4 @@
-#include "types/check.hpp"
+#include "types/checker.hpp"
 #include "types/error.hpp"
 
 using namespace cola;

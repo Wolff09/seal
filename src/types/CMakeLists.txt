@@ -23,7 +23,7 @@ set(SOURCES
 	guarantees.cpp
 	checker_accept.cpp
 	checker_check.cpp
-	test.cpp
+	check.cpp
 )
 
 add_library(PRTypes ${SOURCES})

@@ -1,4 +1,4 @@
-#include "types/check.hpp"
+#include "types/checker.hpp"
 #include "types/inference.hpp"
 #include "types/error.hpp"
 #include "types/util.hpp"
@@ -6,8 +6,7 @@
 using namespace cola;
 using namespace prtypes;
 
-
-// TODO: decend further ==> we are currently not traversing the AST!!!
+// TODO: type inference
 
 bool TypeChecker::is_pointer_valid(const VariableDeclaration& variable) {
 	assert(prtypes::has_binding(current_type_environment, variable));
@@ -33,6 +32,7 @@ void TypeChecker::check_enter(const Enter& /*enter*/, std::vector<std::reference
 void TypeChecker::check_exit(const Exit& /*exit*/) {
 	throw std::logic_error("not yet implemented: TypeChecker::check_exit(const Exit& exit)");
 }
+
 
 void TypeChecker::check_assume_nonpointer(const Assume& /*assume*/, const Expression& /*expr*/) {
 	// do nothing
@@ -100,6 +100,7 @@ void TypeChecker::check_assert_active(const Assert& /*assert*/, const VariableDe
 	current_type_environment.at(ptr).insert(guarantee_table.active_guarantee());
 }
 
+
 void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const VariableDeclaration& rhs) {
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs));
@@ -149,6 +150,7 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Ex
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 }
+
 
 void TypeChecker::check_scope(const Scope& scope) {
 	// populate current_type_environment with empty guarantees for declared pointer variables
@@ -207,5 +209,4 @@ void TypeChecker::check_program(const Program& program) {
 	for (const auto& function : program.functions) {
 		function->accept(*this);
 	}
-	throw std::logic_error("THE TYPE CHECK CURRENTLY DOES NOT TRAVERSE THE AST!!");
 }

@@ -6,7 +6,7 @@
 #include <string>
 #include <set>
 #include <map>
-#include "types/check.hpp"
+#include "types/guarantees.hpp"
 #include "cola/ast.hpp"
 #include "cola/observer.hpp"
 #include "vata2/nfa.hh"
@@ -34,18 +34,18 @@ namespace prtypes {
 	class Translator {
 		private:
 			const cola::Program& program;
-			const GuaranteeSet all_guarantees;
+			const GuaranteeTable& guarantee_table;
 			Alphabet alphabet;
 			std::unique_ptr<VataAlphabet> vata_alphabet;
 			std::map<const Guarantee*, VataNfa> guarantee2nfa;
 			VataNfa universalnfa;
 
 		public:
-			Translator(const cola::Program& program, GuaranteeSet all_guarantees);
+			Translator(const cola::Program& program, const GuaranteeTable& table);
 
 			const Alphabet& get_alphabet() const { return alphabet; }
 			const VataAlphabet& get_vata_alphabet() const { return *vata_alphabet; }
-			const GuaranteeSet& get_all_guarantees() const { return all_guarantees; }
+			const GuaranteeTable& get_guarantee_table() const { return guarantee_table; }
 			const VataNfa& get_universal_nfa() const { return universalnfa; }
 			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(&guarantee); }
 			
@@ -70,7 +70,7 @@ namespace prtypes {
 			GuaranteeSet infer_command(const GuaranteeSet& guarantees, const cola::Command& command, const cola::VariableDeclaration* ptr);
 
 		public:
-			InferenceEngine(const cola::Program& program, const GuaranteeSet& all_guarantees);
+			InferenceEngine(const cola::Program& program, const GuaranteeTable& table);
 			GuaranteeSet infer(const GuaranteeSet& guarantees);
 			GuaranteeSet infer_enter(const GuaranteeSet& guarantees, const cola::Enter& enter, const cola::VariableDeclaration& ptr);
 			GuaranteeSet infer_exit(const GuaranteeSet& guarantees, const cola::Exit& exit);
