@@ -197,12 +197,41 @@ void TypeChecker::check_atomic(const Atomic& atomic) {
 	}
 }
 
-void TypeChecker::check_choice(const Choice& /*choice*/) {
-	throw std::logic_error("not yet implemented: TypeChecker::check_choice(const Choice& choice)");
+void TypeChecker::check_choice(const Choice& choice) {
+	TypeEnv pre_types = this->current_type_environment;
+	std::vector<TypeEnv> post_types;
+	post_types.reserve(choice.branches.size());
+
+	// compute typing of each branch individually
+	for (const auto& branch : choice.branches) {
+		this->current_type_environment = pre_types;
+		assert(branch);
+		branch->accept(*this);
+		post_types.push_back(std::move(this->current_type_environment));
+	}
+
+	// merge type info: guarantees they agree on
+	TypeEnv result = std::move(post_types.back());
+	post_types.pop_back();
+	while (!post_types.empty()) {
+		result = intersection(result, post_types.back());
+		post_types.pop_back();
+	}
+
+	this->current_type_environment = std::move(result);
 }
 
-void TypeChecker::check_loop(const Loop& /*loop*/) {
-	throw std::logic_error("not yet implemented: TypeChecker::check_loop(const Loop& loop)");
+void TypeChecker::check_loop(const Loop& loop) {
+	TypeEnv pre_types = this->current_type_environment;
+	assert(loop.body);
+	loop.body->accept(*this);
+
+	// compute the largest fixpoint of types that can go into the loop and survive; starting from the pre type environment
+	while (!equals(pre_types, this->current_type_environment)) {
+		pre_types = prtypes::intersection(pre_types, this->current_type_environment);
+		this->current_type_environment = pre_types;
+		loop.body->accept(*this);
+	}
 }
 
 void TypeChecker::check_interface_function(const Function& function) {

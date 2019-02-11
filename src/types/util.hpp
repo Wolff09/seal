@@ -2,6 +2,8 @@
 #ifndef PRTYPES_UTIL
 #define PRTYPES_UTIL
 
+#include <algorithm>
+
 
 namespace prtypes {
 
@@ -29,6 +31,35 @@ namespace prtypes {
 		GuaranteeSet result(lhs);
 		result.insert(rhs.cbegin(), rhs.cend());
 		return result;
+	}
+
+	inline GuaranteeSet intersection(const GuaranteeSet& lhs, const GuaranteeSet& rhs) {
+		GuaranteeSet result;
+		std::set_intersection(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), std::inserter(result, result.begin()), GuaranteeSetComparator());
+		return result;
+	}
+
+	inline TypeEnv intersection(const TypeEnv& lhs, const TypeEnv& rhs) {
+		TypeEnv result;
+		for (const auto& [decl, guarantees] : lhs) {
+			auto rhs_find = rhs.find(decl);
+			if (rhs_find != rhs.end()) {
+				result.insert({ decl, intersection(guarantees, rhs_find->second) });
+			}
+		}
+		return result;
+	}
+
+	bool equals (const TypeEnv& lhs, const TypeEnv& rhs) {
+		static struct TypeEnvEqual {
+			bool operator()(const TypeEnv::value_type& value, const TypeEnv::value_type& other) const {
+				static TypeEnvComparator key_cmp;
+				static GuaranteeSetComparator mapped_cmp;
+				return !key_cmp(value.first, other.first) && !key_cmp(other.first, value.first)
+				    && value.second.size() == other.second.size() && std::equal(value.second.begin(), value.second.end(), other.second.begin(), mapped_cmp);
+			}
+		} comparator;
+		return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin(), comparator);
 	}
 
 	template<typename Container, typename Key>
