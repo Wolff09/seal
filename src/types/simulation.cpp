@@ -156,6 +156,28 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 	this->all_simulations.insert(result.begin(), result.end());
 }
 
-bool SimulationEngine::is_in_simulation_relation(const cola::State& state, const cola::State& other) {
+bool SimulationEngine::is_in_simulation_relation(const State& state, const State& other) const {
 	return all_simulations.count({ &state, &other }) > 0;
 }
+
+bool SimulationEngine::is_safe(const Enter& /*enter*/, const std::vector<std::reference_wrapper<const VariableDeclaration>>& /*params*/, const VariableDeclarationSet& /*invalid_params*/) const {
+	/*
+		for all observers o
+			for all states s1
+				for all post states s2
+					let t=(lab(params...),g) be the transition leading from s1 to s2
+					compute all post states of s1 using tranrsitions t'=(lab(params'...),g') s.t. g' is allowed by g mod invalidity
+					for all such post states s2'
+						check s2' < s1
+							if yes: continue
+							if no: error
+	*/
+	throw std::logic_error("not yet implement");
+}
+
+
+
+
+
+
+

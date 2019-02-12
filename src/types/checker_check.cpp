@@ -8,6 +8,7 @@ using namespace prtypes;
 
 
 bool TypeChecker::is_pointer_valid(const VariableDeclaration& variable) {
+	assert(variable.type.sort == Sort::PTR);
 	assert(prtypes::has_binding(current_type_environment, variable));
 	return entails_valid(current_type_environment.at(variable));
 }
@@ -24,10 +25,18 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 	current_type_environment.at(ptr).insert(guarantee_table.local_guarantee());
 }
 
-void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> /*params*/) {
-	// TODO: check safe predicate
-	throw std::logic_error("not yet implemented: TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<VariableDeclaration>> params)");
+void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
+	// check safe
+	SimulationEngine::VariableDeclarationSet invalid;
+	for (const auto& variable : params) {
+		if (variable.get().type.sort == Sort::PTR && !is_pointer_valid(variable)) {
+			invalid.insert(variable);
+		}
+	}
+	bool is_safe_call = simulation.is_safe(enter, params, invalid);
+	conditionally_raise_error<UnsafeCallError>(!is_safe_call, enter);
 
+	// update types
 	TypeEnv result;
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
 		result[decl] = inference.infer_enter(guarantees, enter, decl);

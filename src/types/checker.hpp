@@ -6,6 +6,7 @@
 #include "cola/ast.hpp"
 #include "types/guarantees.hpp"
 #include "types/inference.hpp"
+#include "types/simulation.hpp"
 
 
 namespace prtypes {
@@ -15,9 +16,12 @@ namespace prtypes {
 			const cola::Program& program;
 			const GuaranteeTable& guarantee_table;
 			InferenceEngine inference;
+			SimulationEngine simulation;
 
 		public:
-			TypeChecker(const cola::Program& prog, const GuaranteeTable& table) : program(prog), guarantee_table(table), inference(program, guarantee_table) {}
+			TypeChecker(const cola::Program& prog, const GuaranteeTable& table) : program(prog), guarantee_table(table), inference(program, guarantee_table) {
+				throw std::logic_error("not yet implemented: TypeChecker::TypeChecker (TODO: initialize simulation engine)");
+			}
 
 			bool is_well_typed(const cola::AstNode& node) {
 				// TODO: proper exception handling
