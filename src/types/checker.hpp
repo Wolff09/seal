@@ -20,7 +20,8 @@ namespace prtypes {
 
 		public:
 			TypeChecker(const cola::Program& prog, const GuaranteeTable& table) : program(prog), guarantee_table(table), inference(program, guarantee_table) {
-				throw std::logic_error("not yet implemented: TypeChecker::TypeChecker (TODO: initialize simulation engine)");
+				simulation.compute_simulation(guarantee_table.smr_base_observer);
+				simulation.compute_simulation(guarantee_table.smr_impl_observer);
 			}
 
 			bool is_well_typed(const cola::AstNode& node) {

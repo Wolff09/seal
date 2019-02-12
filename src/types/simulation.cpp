@@ -160,19 +160,24 @@ bool SimulationEngine::is_in_simulation_relation(const State& state, const State
 	return all_simulations.count({ &state, &other }) > 0;
 }
 
-bool SimulationEngine::is_safe(const Enter& /*enter*/, const std::vector<std::reference_wrapper<const VariableDeclaration>>& /*params*/, const VariableDeclarationSet& /*invalid_params*/) const {
-	/*
-		for all observers o
-			for all states s1
-				for all post states s2
-					let t=(lab(params...),g) be the transition leading from s1 to s2
-					compute all post states of s1 using tranrsitions t'=(lab(params'...),g') s.t. g' is allowed by g mod invalidity
-					for all such post states s2'
-						check s2' < s1
-							if yes: continue
-							if no: error
-	*/
-	throw std::logic_error("not yet implement");
+bool SimulationEngine::is_safe(const Enter& enter, const std::vector<std::reference_wrapper<const VariableDeclaration>>& /*params*/, const VariableDeclarationSet& /*invalid_params*/) const {
+	for (const auto& observer : observers) {
+		for (const auto& transition : observer->transitions) {
+			if (&transition->label == &enter.decl /* TODO: && enabled(transition->guard, params) */) {
+				const State& pre_state = transition->src;
+				const State& post_state = transition->dst;
+				std::vector<const State*> post_pre;
+				throw std::logic_error("not yet implemented: SimulationEngine::is_safe(...)");
+				// TODO: compute post images of pre_state that can be reached with transitions that are enabled under params and are implied by transition->guard mod invalid_params
+				for (const State* to_simulate : post_pre) {
+					if (!is_in_simulation_relation(*to_simulate, post_state)) {
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return true;
 }
 
 
