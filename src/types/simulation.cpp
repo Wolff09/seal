@@ -160,15 +160,162 @@ bool SimulationEngine::is_in_simulation_relation(const State& state, const State
 	return all_simulations.count({ &state, &other }) > 0;
 }
 
-bool SimulationEngine::is_safe(const Enter& enter, const std::vector<std::reference_wrapper<const VariableDeclaration>>& /*params*/, const VariableDeclarationSet& /*invalid_params*/) const {
+
+
+
+
+
+struct TranslationVisitorWithPrefix : public ObserverVisitor {
+	const std::string prefix;
+	std::set<std::string> names;
+	std::string result = "";
+
+	TranslationVisitorWithPrefix(std::string prefix) : prefix(prefix) {}
+
+	std::string get_decls() {
+		std::string result = "";
+		for (auto name : names) {
+			result = result + "(declare-const " + name + " Int) ";
+		}
+		return result;
+	}
+
+	std::pair<std::string, std::string> get_result() {
+		return { get_decls(), result };
+	}
+
+	void visit(const ThreadObserverVariable& var) {
+		result = "$" + var.name;
+		names.insert(result);
+	}
+	void visit(const ProgramObserverVariable& var) {
+		result = "&" + var.decl->name;
+		names.insert(result);
+	}
+	void visit(const SelfGuardVariable& /*var*/) {
+		result = "@self";
+		names.insert(result);
+	}
+	void visit(const ArgumentGuardVariable& var) {
+		// result = prefix + "#" + var.decl.name;
+		result = prefix + var.decl.name;
+	}
+	void visit(const TrueGuard& /*guard*/) {
+		result = "true";
+	}
+
+	void handle_comparison(const ComparisonGuard& guard, std::string cmp_op) {
+		result = "";
+		guard.lhs.accept(*this);
+		std::string lhs = result;
+		result = "";
+		guard.rhs->accept(*this);
+		std::string rhs = result;
+		result = "(" + cmp_op + " " + lhs + " " + rhs + ")";
+	}
+	void visit(const EqGuard& guard) {
+		handle_comparison(guard, "=");
+	}
+	void visit(const NeqGuard& guard) {
+		handle_comparison(guard, "!=");
+	}
+	void visit(const ConjunctionGuard& guard) {
+		std::vector<std::string> conjuncts;
+		result = "";
+		for (const auto& conj : guard.conjuncts) {
+			conj->accept(*this);
+			conjuncts.push_back(result);
+		}
+		result = "(and ";
+		for (const auto& conj : conjuncts) {
+			result = result + " " + conj;
+		}
+		result = ")";
+	}
+
+	void visit(const State& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationVisitorWithPrefix::visit(const State&)"); }
+	void visit(const Transition& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationVisitorWithPrefix::visit(const Transition&)"); }
+	void visit(const Observer& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationVisitorWithPrefix::visit(const Observer&)"); }
+};
+
+
+// returns pair <decl, enc> containing the variable declarations and the actual encoding
+std::pair<std::string, std::string> make_formula(const Guard& guard, std::string param_prefix) {
+	TranslationVisitorWithPrefix visitor(param_prefix);
+	guard.accept(visitor);
+	return visitor.get_result();
+}
+
+// returns pair <"", formula>
+std::string make_relation_formula(const Function& label, const std::string& prefix, const std::string& otherPrefix, const SimulationEngine::VariableDeclarationSet& skip) {
+	std::string result;
+	for (const auto& decl : label.args) {
+		if (skip.count(*decl) == 0) {
+			std::string var = prefix + decl->name;
+			std::string otherVar = otherPrefix + decl->name;
+			result = result + "(assert (= " + var + " " + otherVar + ")) ";
+		}
+	}
+	return result;
+}
+
+std::string combine_formulas(std::vector<std::pair<std::string, std::string>> formulas) {
+	std::string result_decl;
+	std::string result_formula;
+	for (const auto& [decl, formula] : formulas) {
+		result_decl = result_decl + decl + " ";
+		result_formula = result_formula + formula + " ";
+	}
+	return result_decl + result_formula;
+}
+
+z3::check_result check_formula(std::string formula) {
+	z3::context context;
+	auto parse_result = context.parse_string(formula.c_str());
+	z3::solver solver(context);
+	return solver.check();
+}
+
+std::vector<const State*> abstract_post(const Observer& observer, const State& to_post, const Transition& match, const SimulationEngine::VariableDeclarationSet& unrelated={}) {
+	static const std::string PREFIX_MATCH = "::1::";
+	static const std::string PREFIX_TRANS = "::2::";
+
+	auto match_enc = make_formula(*match.guard, PREFIX_MATCH);
+	auto relation = make_relation_formula(match.label, PREFIX_MATCH, PREFIX_TRANS, unrelated);
+
+	std::vector<const State*> result;
+	for (const auto& transition : observer.transitions) {
+		if (&transition->src == &to_post && &transition->label == &match.label) {
+			auto trans_enc = make_formula(*transition->guard, PREFIX_TRANS);
+			auto formula = combine_formulas({{ match_enc, trans_enc, { "", relation } }});
+
+			// TODO: use push/pop to avoid repeated construction of z3::context/z3::solver objects
+			auto check_result = check_formula(formula);
+			switch (check_result) {
+				case z3::sat:
+				case z3::unknown:
+					// transition->guard may be enabled
+					result.push_back(&transition->dst);
+					break;
+				case z3::unsat:
+					// transition->guard is definitely not enabled
+					break;
+			}
+		}
+	}
+
+	result.push_back(&to_post); // TODO: implement a check and add 'state' conditionally // TODO: needed? the simulation relation should not be affected!?
+	return result;
+}
+
+
+bool SimulationEngine::is_safe(const Enter& enter, const std::vector<std::reference_wrapper<const VariableDeclaration>>& /*params*/, const VariableDeclarationSet& invalid_params) const {
 	for (const auto& observer : observers) {
 		for (const auto& transition : observer->transitions) {
 			if (&transition->label == &enter.decl /* TODO: && enabled(transition->guard, params) */) {
 				const State& pre_state = transition->src;
 				const State& post_state = transition->dst;
-				std::vector<const State*> post_pre;
-				throw std::logic_error("not yet implemented: SimulationEngine::is_safe(...)");
-				// TODO: compute post images of pre_state that can be reached with transitions that are enabled under params and are implied by transition->guard mod invalid_params
+				std::vector<const State*> post_pre = abstract_post(*observer, pre_state, *transition, invalid_params);
 				for (const State* to_simulate : post_pre) {
 					if (!is_in_simulation_relation(*to_simulate, post_state)) {
 						return false;

@@ -74,7 +74,7 @@ namespace cola {
 	};
 
 	struct ArgumentGuardVariable : GuardVariable {
-		const VariableDeclaration& decl;
+		const VariableDeclaration& decl; // reference to element of cola::Function::args
 		ArgumentGuardVariable(const VariableDeclaration& decl_) : decl(decl_) {}
 		virtual void accept(ObserverVisitor& visitor) const override { visitor.visit(*this); }
 	};
