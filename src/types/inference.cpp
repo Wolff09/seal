@@ -442,9 +442,9 @@ Translator::Translator(const Program& program_, const GuaranteeTable& guarantee_
 	vata_alphabet = convert_alphabet(alphabet);
 
 	// init lookup map for base observers
-	for (const auto& guarantee : guarantee_table.all_guarantees) {
-		auto nfa = to_nfa(*guarantee.get()->observer);
-		auto res = guarantee2nfa.insert({ guarantee.get(), nfa });
+	for (const auto& guarantee : guarantee_table) {
+		auto nfa = to_nfa(*guarantee.observer);
+		auto res = guarantee2nfa.insert({ &guarantee, nfa });
 		if (!res.second) {
 			throw std::logic_error("Unexpected non-unique guarantees in set.");
 		}
@@ -500,9 +500,7 @@ bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa&
 
 GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
 	GuaranteeSet result = std::move(baseline);
-	for (const auto& guarantee_ptr : translator.get_guarantee_table().all_guarantees) {
-		const Guarantee& guarantee = *guarantee_ptr;
-
+	for (const auto& guarantee : translator.get_guarantee_table()) {
 		// if already present (passed as baseline), no need to infer
 		if (result.count(guarantee) > 0) {
 			continue;
@@ -639,8 +637,8 @@ InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantee
 InferenceEngine::InferenceEngine(const Program& program, const GuaranteeTable& guarantee_table) : translator(program, guarantee_table) {
 	// init key_helper
 	guarantee_count = 0;
-	for (const auto& guarantee : guarantee_table.all_guarantees) {
-		auto res = key_helper.insert({ guarantee.get(), guarantee_count++ });
+	for (const auto& guarantee : guarantee_table) {
+		auto res = key_helper.insert({ &guarantee, guarantee_count++ });
 		if (!res.second) {
 			throw std::logic_error("Failed to create key_helper.");
 		}
