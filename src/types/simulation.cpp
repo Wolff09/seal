@@ -332,6 +332,11 @@ std::vector<const State*> abstract_post(const Observer& observer, const State& t
 			//  - add the negated assertion from trans_enc to the solver
 			//  - solve (check unsat)
 			//  - pop
+			// Note:
+			//  - one has to be careful to avoid duplicate variable declarations
+			//  - one should add all possible variables (computable from observer and match.label.args) in the beginning
+			//  - one should use the visitors to build a z3::expr directly (no string detour)
+
 			auto check_result = check_formula(formula);
 			switch (check_result) {
 				case z3::sat:
