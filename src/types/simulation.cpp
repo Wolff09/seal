@@ -163,193 +163,153 @@ using namespace prtypes;
 
 
 struct TranslationUnit {
-	std::set<std::string> names;
-	std::vector<std::string> assertions;
+	z3::context context;
+	z3::solver solver;
+	std::map<std::string, z3::expr> name2expr;
 
-	template<typename... Targs>
-	static TranslationUnit merge(const Targs&... units) {
-		TranslationUnit result;
-		for (const auto& unit : { units... }) {
-			result.names.insert(unit.names.begin(), unit.names.end());
-			std::copy(unit.assertions.begin(), unit.assertions.end(), std::back_inserter(result.assertions));
-		}
-		return result;
-	}
+	TranslationUnit() : solver(context) {}
 
-	std::string to_string() const {
-		static const std::string BREAK = "\n";
-		// static const std::string BREAK = " ";
-		std::string result;
-		for (auto& name : this->names) {
-			result += "(declare-const " + name + " Int)" + BREAK;
+	const z3::expr& variable(std::string name) {
+		auto find = name2expr.find(name);
+		if (find == name2expr.end()) {
+			// add new variable
+			auto insertion = name2expr.insert({ name, context.int_const(name.c_str()) });
+			assert(insertion.second);
+			return insertion.first->second;
+		} else {
+			// get existing variable
+			return find->second;
 		}
-		result += BREAK;
-		for (auto& assertion : this->assertions) {
-			result += "(assert " + assertion + ")" + BREAK;
-		}
-		result += BREAK + "(check-sat)";
-		return result;
 	}
 };
 
-struct TranslationVisitorWithPrefix : public ObserverVisitor {
+struct TranslationWithPrefixVisitor : public ObserverVisitor {
 	const std::string prefix;
-	TranslationUnit translation;
-	std::set<std::string> names;
-	std::string result = "";
+	TranslationUnit& translation;
+	z3::expr result;
 
-	TranslationVisitorWithPrefix(std::string prefix) : prefix(prefix) {}
+	TranslationWithPrefixVisitor(std::string prefix, TranslationUnit& unit) : prefix(prefix), translation(unit), result(unit.context.bool_val(true)) {}
 
-	TranslationUnit get_result() {
-		translation.assertions.push_back(result);
-		return translation;
+	z3::expr get_expr() {
+		return result;
 	}
 
 	void visit(const ThreadObserverVariable& var) {
-		result = "oThr__" + var.name;
-		translation.names.insert(result);
+		result = translation.variable("oThr__" + var.name);
 	}
 	void visit(const ProgramObserverVariable& var) {
-		result = "oPtr__" + var.decl->name;
-		translation.names.insert(result);
+		result = translation.variable("oPtr__" + var.decl->name);
 	}
 	void visit(const SelfGuardVariable& /*var*/) {
-		result = "__self__";
-		translation.names.insert(result);
+		result = translation.variable("__self__");
 	}
 	void visit(const ArgumentGuardVariable& var) {
-		// result = prefix + "#" + var.decl.name;
-		result = prefix + var.decl.name;
+		result = translation.variable(prefix + var.decl.name);
 	}
 	void visit(const TrueGuard& /*guard*/) {
-		result = "true";
+		result = translation.context.bool_val(true);
 	}
 
-	void handle_comparison(const ComparisonGuard& guard, std::string cmp_op) {
-		result = "";
+	void mk_equality(const ComparisonGuard& guard) {
 		guard.lhs.accept(*this);
-		std::string lhs = result;
-		result = "";
+		z3::expr lhs = result;
 		guard.rhs->accept(*this);
-		std::string rhs = result;
-		result = "(" + cmp_op + " " + lhs + " " + rhs + ")";
+		z3::expr rhs = result;
+		result = (lhs == rhs);
 	}
 	void visit(const EqGuard& guard) {
-		handle_comparison(guard, "=");
+		mk_equality(guard);
 	}
 	void visit(const NeqGuard& guard) {
-		handle_comparison(guard, "=");
-		result = "(not " + result + ")";
+		mk_equality(guard);
+		result = !result;
 	}
 	void visit(const ConjunctionGuard& guard) {
-		std::vector<std::string> conjuncts;
-		result = "";
+		z3::expr_vector conjuncts(translation.context);
 		for (const auto& conj : guard.conjuncts) {
 			conj->accept(*this);
 			conjuncts.push_back(result);
 		}
-		result = "(and ";
-		assert(conjuncts.size() > 0);
-		for (const auto& conj : conjuncts) {
-			result += " " + conj;
-		}
-		result += ")";
+		result = z3::mk_and(conjuncts);
 	}
 
-	void visit(const State& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationVisitorWithPrefix::visit(const State&)"); }
-	void visit(const Transition& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationVisitorWithPrefix::visit(const Transition&)"); }
-	void visit(const Observer& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationVisitorWithPrefix::visit(const Observer&)"); }
+	void visit(const State& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationWithPrefixVisitor::visit(const State&)"); }
+	void visit(const Transition& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationWithPrefixVisitor::visit(const Transition&)"); }
+	void visit(const Observer& /*obj*/) { throw std::logic_error("Unexpected invocation: TranslationWithPrefixVisitor::visit(const Observer&)"); }
 };
 
 
-TranslationUnit make_formula(const Guard& guard, std::string param_prefix) {
-	TranslationVisitorWithPrefix visitor(param_prefix);
+z3::expr make_formula(const Guard& guard, std::string param_prefix, TranslationUnit& unit) {
+	TranslationWithPrefixVisitor visitor(param_prefix, unit);
 	guard.accept(visitor);
-	return visitor.get_result();
+	return visitor.get_expr();
 }
 
-TranslationUnit make_relation_formula(const Function& label, const std::string& prefix, const std::string& otherPrefix, const SimulationEngine::VariableDeclarationSet& skip) {
-	TranslationUnit result;
+z3::expr make_relation_formula(const Function& label, const std::string& prefix, const std::string& otherPrefix, TranslationUnit& unit, const SimulationEngine::VariableDeclarationSet& skip) {
+	z3::expr_vector conjuncts(unit.context);
 	for (const auto& decl : label.args) {
 		if (skip.count(*decl) == 0) {
-			// TODO: better way to compute names that is guaranteed to be consistent with TranslationVisitorWithPrefix
-			std::string var = prefix + decl->name;
-			std::string otherVar = otherPrefix + decl->name;
-			result.names.insert(var);
-			result.names.insert(otherVar);
-			result.assertions.push_back("(= " + var + " " + otherVar + ")");
+			// TODO: better way to compute names that is guaranteed to be consistent with TranslationWithPrefixVisitor
+			auto variable = unit.variable(prefix + decl->name);
+			auto other = unit.variable(otherPrefix + decl->name);
+			conjuncts.push_back(variable == other);
 		}
 	}
-	return result;
+	return z3::mk_and(conjuncts);
 }
 
-z3::check_result check_formula(std::string formula) {
-	z3::context context;
-	z3::solver solver(context);
-	solver.from_string(formula.c_str());
-	return solver.check();
-}
+// bool is_transition_definitely_enabled(const TranslationUnit& relation, const TranslationUnit& match, const TranslationUnit& transition) {
+// 	// construct implication formula
+// 	auto implication = TranslationUnit::merge(match, transition);
+// 	implication.assertions.clear();
+// 	assert(match.assertions.size() == 1);
+// 	assert(transition.assertions.size() == 1);
+// 	std::string impl = "(not (=> " + match.assertions.at(0) + " " + transition.assertions.at(0) + "))";
+// 	implication.assertions = { impl };
 
-bool is_transition_definitely_enabled(const TranslationUnit& relation, const TranslationUnit& match, const TranslationUnit& transition) {
-	// construct implication formula
-	auto implication = TranslationUnit::merge(match, transition);
-	implication.assertions.clear();
-	assert(match.assertions.size() == 1);
-	assert(transition.assertions.size() == 1);
-	std::string impl = "(not (=> " + match.assertions.at(0) + " " + transition.assertions.at(0) + "))";
-	implication.assertions = { impl };
-
-	// check for the implication being a tautology (iff the negation is unsat)
-	auto to_check = TranslationUnit::merge(relation, implication);
-	return check_formula(to_check.to_string()) == z3::unsat;
-}
+// 	// check for the implication being a tautology (iff the negation is unsat)
+// 	auto to_check = TranslationUnit::merge(relation, implication);
+// 	return check_formula(to_check.to_string()) == z3::unsat;
+// }
 
 std::vector<const State*> abstract_post(const Observer& observer, const State& to_post, const Transition& match, const SimulationEngine::VariableDeclarationSet& unrelated={}) {
 	static const std::string PREFIX_MATCH = "arg1__";
 	static const std::string PREFIX_TRANS = "arg2__";
 
-	auto match_enc = make_formula(*match.guard, PREFIX_MATCH);
-	auto relation = make_relation_formula(match.label, PREFIX_MATCH, PREFIX_TRANS, unrelated);
+	TranslationUnit translation;
+	z3::expr match_enc = make_formula(*match.guard, PREFIX_MATCH, translation);
+	z3::expr relation = make_relation_formula(match.label, PREFIX_MATCH, PREFIX_TRANS, translation, unrelated);
+	translation.solver.add(relation);
+	translation.solver.add(match_enc);
 
 	std::vector<const State*> result;
 	bool definitely_has_post = false;
 	for (const auto& transition : observer.transitions) {
 		if (&transition->src == &to_post && &transition->label == &match.label && transition->kind == match.kind) {
-			auto trans_enc = make_formula(*transition->guard, PREFIX_TRANS);
-			auto formula = TranslationUnit::merge(relation, match_enc, trans_enc).to_string();
-			// std::cout << "Z3 string: " << formula << std::endl;
+			z3::expr trans_enc = make_formula(*transition->guard, PREFIX_TRANS, translation);
 
-			// TODO: use push/pop to avoid repeated construction of z3::context/z3::solver objects
-			// One could do the following:
-			//  - Create a context and solver per invocation of this function.
-			//  - add the decl/assertions from relation to the solver
-			//  - add the decl/assertions from match_enc to the solver
-			//  - push
-			//  - add the decl/assertions from trans_enc to the solver
-			//  - solve (check sat)
-			//  - pop
-			//  - push
-			//  - add the decl from trans_enc to the solver
-			//  - add the negated assertion from trans_enc to the solver
-			//  - solve (check unsat)
-			//  - pop
-			// Note:
-			//  - one has to be careful to avoid duplicate variable declarations
-			//  - one should add all possible variables (computable from observer and match.label.args) in the beginning
-			//  - one should use the visitors to build a z3::expr directly (no string detour)
+			translation.solver.push();
+			translation.solver.add(trans_enc);
+			auto check_result = translation.solver.check();
+			translation.solver.pop();
 
-			auto check_result = check_formula(formula);
 			switch (check_result) {
-				case z3::sat:
-					// transition->guard may be enabled
-					result.push_back(&transition->dst);
-					definitely_has_post = definitely_has_post || is_transition_definitely_enabled(relation, match_enc, trans_enc);
-					break;
+				case z3::unknown:
+					throw std::logic_error("SMT solving failed: Z3 was unable to prove SAT/UNSAT, returned 'UNKNOWN'. Cannot recover.");
 				case z3::unsat:
 					// transition->guard is definitely not enabled
 					break;
-				case z3::unknown:
-					throw std::logic_error("SMT solving failed: Z3 was unable to prove SAT/UNSAT, returned 'UNKNOWN'. Cannot recover.");
+				case z3::sat:
+					// transition->guard may be enabled
+					result.push_back(&transition->dst);
+					if (!definitely_has_post) {
+						translation.solver.push();
+						translation.solver.add(!trans_enc);
+						auto check_post_result = translation.solver.check();
+						translation.solver.pop();
+						definitely_has_post |= (check_post_result == z3::unsat);
+					}
+
 			}
 		}
 	}
@@ -427,12 +387,12 @@ bool simulation_holds(const Observer& observer, const SimulationEngine::Simulati
 	return true;
 }
 
-// void debug_sim_rel(const SimulationEngine::SimulationRelation& sim) {
-// 	std::cout << "Simulation Relation: " << std::endl;
-// 	for (const auto& [lhs, rhs] : sim) {
-// 			std::cout << "  " << lhs->name << "  -  " << rhs->name << std::endl;
-// 	}
-// }
+void debug_simulation_relation(const SimulationEngine::SimulationRelation& sim) {
+	std::cout << "Simulation Relation: " << std::endl;
+	for (const auto& [lhs, rhs] : sim) {
+			std::cout << "  " << lhs->name << "  -  " << rhs->name << std::endl;
+	}
+}
 
 void SimulationEngine::compute_simulation(const Observer& observer) {
 	SimulationEngine::SimulationRelation result;
@@ -464,7 +424,7 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 	// store information
 	this->observers.insert(&observer);
 	this->all_simulations.insert(result.begin(), result.end());
-	// debug_sim_rel(result);
+	debug_simulation_relation(result);
 }
 
 bool SimulationEngine::is_in_simulation_relation(const State& state, const State& other) const {
