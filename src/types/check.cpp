@@ -93,10 +93,21 @@ void prtypes::test() {
 	obs_hp.transitions.push_back(mk_transition_invocation_self_neg(*obs_hp.states.at(2), *obs_hp.states.at(0), protect, *obs_hp.variables.at(0), *obs_hp.variables.at(1)));
 	obs_hp.transitions.push_back(mk_transition_invocation_self_neg(*obs_hp.states.at(3), *obs_hp.states.at(0), protect, *obs_hp.variables.at(0), *obs_hp.variables.at(1)));
 
+	// simiulation
 	std::cout << std::endl << "Computing simulation... " << std::flush;
 	SimulationEngine engine;
 	engine.compute_simulation(obs_hp);
 	std::cout << "done" << std::endl;
+
+	// safe predicate
+	// std::cout << std::endl << "Checking safe predicate... " << std::endl;
+	// Enter enter(retire);
+	// VariableDeclaration ptr("ptr", ptrtype, false);
+	// enter.args.push_back(std::make_unique<VariableExpression>(ptr));
+	// bool safe = engine.is_safe(enter, { ptr }, { ptr });
+	// std::cout << "Call is: " << (safe ? "safe" : "not safe") << std::endl;
+
+
 
 
 	// std::cout << std::endl << std::endl << "Testing..." << std::endl;

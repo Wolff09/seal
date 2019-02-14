@@ -317,6 +317,7 @@ std::vector<const State*> abstract_post(const Observer& observer, const State& t
 		if (&transition->src == &to_post && &transition->label == &match.label && transition->kind == match.kind) {
 			auto trans_enc = make_formula(*transition->guard, PREFIX_TRANS);
 			auto formula = TranslationUnit::merge(relation, match_enc, trans_enc).to_string();
+			// std::cout << "Z3 string: " << formula << std::endl;
 
 			// TODO: use push/pop to avoid repeated construction of z3::context/z3::solver objects
 			// One could do the following:
@@ -362,14 +363,25 @@ std::vector<const State*> abstract_post(const Observer& observer, const State& t
 }
 
 
-bool SimulationEngine::is_safe(const Enter& enter, const std::vector<std::reference_wrapper<const VariableDeclaration>>& /*params*/, const VariableDeclarationSet& invalid_params) const {
+bool SimulationEngine::is_safe(const Enter& enter, const std::vector<std::reference_wrapper<const VariableDeclaration>>& params, const VariableDeclarationSet& invalid_params) const {
+	// translate invalid parameters to function internal argument declarations
+	VariableDeclarationSet invalid_translated;
+	assert(enter.decl.args.size() == params.size());
+	for (std::size_t i = 0; i < params.size(); i++) {
+		if (invalid_params.count(params.at(i)) != 0) {
+			invalid_translated.insert(*enter.decl.args.at(i));
+		}
+	}
+
+	// chech safe
 	for (const auto& observer : observers) {
 		for (const auto& transition : observer->transitions) {
-			if (&transition->label == &enter.decl /* TODO: && enabled(transition->guard, params) */) {
+			if (&transition->label == &enter.decl && transition->kind == Transition::INVOCATION /* TODO: && enabled(transition->guard, params) */) {
 				const State& pre_state = transition->src;
 				const State& post_state = transition->dst;
-				std::vector<const State*> post_pre = abstract_post(*observer, pre_state, *transition, invalid_params);
+				std::vector<const State*> post_pre = abstract_post(*observer, pre_state, *transition, invalid_translated);
 				for (const State* to_simulate : post_pre) {
+					// std::cout << "Checking: " << pre_state.name << "  --  " << post_state.name << "  ||  " << to_simulate->name << std::endl;
 					if (!is_in_simulation_relation(*to_simulate, post_state)) {
 						return false;
 					}
