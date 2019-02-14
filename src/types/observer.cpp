@@ -28,7 +28,6 @@ bool SmrObserverStore::supports_elison(const Observer& observer) const {
 	// assumption ==> swapping <unobserved> addresses has no effect
 	// remains to check: <any state> in simulation relation with <initial state>
 
-	std::cout << "Checking elision (iii) of " << observer.states.at(0)->name << std::endl;
 	for (const auto& state : observer.states) {
 		if (state->initial) {
 			for (const auto& other : observer.states) {
