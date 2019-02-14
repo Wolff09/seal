@@ -8,6 +8,7 @@
 #include <map>
 #include "cola/ast.hpp"
 #include "cola/observer.hpp"
+#include "types/observer.hpp"
 
 
 namespace prtypes {
@@ -15,7 +16,7 @@ namespace prtypes {
 	struct Guarantee final {
 		std::string name;
 		std::unique_ptr<cola::Observer> observer;
-		bool is_transient = true; // false ==> stable under interference // TODO: initialize this in the constructor?
+		bool is_transient = true; // false ==> stable under interference
 		bool entails_validity = false; // true ==> pointer is guaranteed to be valid
 		Guarantee(std::string name_, std::unique_ptr<cola::Observer> observer_) : name(name_), observer(std::move(observer_)) {
 			assert(observer);
@@ -44,10 +45,9 @@ namespace prtypes {
 
 	struct GuaranteeTable final {
 		std::vector<std::unique_ptr<Guarantee>> all_guarantees;
-		const cola::Observer& smr_base_observer;
-		const cola::Observer& smr_impl_observer;
+		const SmrObserverStore& observer_store;
 		
-		GuaranteeTable(const cola::Observer& base, const cola::Observer& impl);
+		GuaranteeTable(const SmrObserverStore& observer_store);
 		const Guarantee& active_guarantee() const;
 		const Guarantee& local_guarantee() const;
 		const Guarantee& add_guarantee(std::unique_ptr<cola::Observer> observer);

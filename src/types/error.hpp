@@ -19,6 +19,10 @@ namespace prtypes {
 		UnsupportedConstructError(std::string cause) : TypeCheckError("Type check failed due to unsupported construct or expression: " + cause + ".") {}
 	};
 
+	struct UnsupportedObserverError : public TypeCheckError {
+		UnsupportedObserverError(std::string cause) : TypeCheckError("Type check failed due to unsupported observer: " + cause + ".") {}
+	};
+
 	struct PointerRaceError : public TypeCheckError {
 		PointerRaceError(std::string cause) : TypeCheckError("Type check failed tue to pointer race: " + cause + ".") {}
 	};

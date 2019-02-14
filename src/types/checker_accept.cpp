@@ -4,6 +4,7 @@
 using namespace cola;
 using namespace prtypes;
 
+// TODO: raise error for commands that are not inside an atomic block
 
 struct TypeCheckBaseVisitor : public Visitor {
 	virtual void visit(const VariableDeclaration& /*node*/) override { /* do nothing */ }

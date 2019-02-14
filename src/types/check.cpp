@@ -3,6 +3,9 @@
 #include "cola/ast.hpp"
 #include "cola/observer.hpp"
 #include "types/inference.hpp"
+#include "types/observer.hpp"
+#include "types/factory.hpp"
+#include "types/guarantees.hpp"
 
 using namespace cola;
 using namespace prtypes;
@@ -71,41 +74,30 @@ void prtypes::test() {
 	Function& protect = *program.functions.back();
 	protect.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
 
-	// hp observer
-	auto obs_hp_ptr = std::make_unique<Observer>();
-	auto& obs_hp = *obs_hp_ptr;
-	obs_hp.negative_specification = true;
-	obs_hp.variables.push_back(std::make_unique<ThreadObserverVariable>("T"));
-	obs_hp.variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("P", ptrtype, false)));
-
-	obs_hp.states.push_back(std::make_unique<State>("HP.0", true, false));
-	obs_hp.states.push_back(std::make_unique<State>("HP.1", false, false));
-	obs_hp.states.push_back(std::make_unique<State>("HP.2", false, false));
-	obs_hp.states.push_back(std::make_unique<State>("HP.3", false, false));
-	obs_hp.states.push_back(std::make_unique<State>("HP.4", false, true));
-
-	obs_hp.transitions.push_back(mk_transition_invocation_self(*obs_hp.states.at(0), *obs_hp.states.at(1), protect, *obs_hp.variables.at(0), *obs_hp.variables.at(1)));
-	obs_hp.transitions.push_back(mk_transition_response_self(*obs_hp.states.at(1), *obs_hp.states.at(2), protect, *obs_hp.variables.at(0)));
-	obs_hp.transitions.push_back(mk_transition_any_thread(*obs_hp.states.at(2), *obs_hp.states.at(3), retire, *obs_hp.variables.at(1)));
-	obs_hp.transitions.push_back(mk_transition_any_thread(*obs_hp.states.at(3), *obs_hp.states.at(4), Observer::free_function(), *obs_hp.variables.at(1)));
-
-	obs_hp.transitions.push_back(mk_transition_invocation_self_neg(*obs_hp.states.at(1), *obs_hp.states.at(0), protect, *obs_hp.variables.at(0), *obs_hp.variables.at(1)));
-	obs_hp.transitions.push_back(mk_transition_invocation_self_neg(*obs_hp.states.at(2), *obs_hp.states.at(0), protect, *obs_hp.variables.at(0), *obs_hp.variables.at(1)));
-	obs_hp.transitions.push_back(mk_transition_invocation_self_neg(*obs_hp.states.at(3), *obs_hp.states.at(0), protect, *obs_hp.variables.at(0), *obs_hp.variables.at(1)));
-
-	// simiulation
+	// create stuff
 	std::cout << std::endl << "Computing simulation... " << std::flush;
-	SimulationEngine engine;
-	engine.compute_simulation(obs_hp);
+	SmrObserverStore store(retire);
+	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect));
+	GuaranteeTable table(store);
 	std::cout << "done" << std::endl;
 
 	// safe predicate
-	// std::cout << std::endl << "Checking safe predicate... " << std::endl;
-	// Enter enter(retire);
-	// VariableDeclaration ptr("ptr", ptrtype, false);
-	// enter.args.push_back(std::make_unique<VariableExpression>(ptr));
-	// bool safe = engine.is_safe(enter, { ptr }, { ptr });
-	// std::cout << "Call is: " << (safe ? "safe" : "not safe") << std::endl;
+	bool safe_valid, safe_invalid;
+	std::cout << std::endl << "Checking safe predicate. " << std::endl;
+	Enter enter_retire(retire);
+	VariableDeclaration ptr("ptr", ptrtype, false);
+	enter_retire.args.push_back(std::make_unique<VariableExpression>(ptr));
+	safe_valid = store.simulation.is_safe(enter_retire, { ptr }, {  });
+	std::cout << "  - enter retire(<valid>):   " << (safe_valid ? "safe" : "not safe") << std::endl;
+	safe_invalid = store.simulation.is_safe(enter_retire, { ptr }, { ptr });
+	std::cout << "  - enter retire(<invalid>): " << (safe_invalid ? "safe" : "not safe") << std::endl;
+
+	Enter enter_protect(protect);
+	enter_protect.args.push_back(std::make_unique<VariableExpression>(ptr));
+	safe_valid = store.simulation.is_safe(enter_protect, { ptr }, {  });
+	std::cout << "  - enter protect(<valid>):   " << (safe_valid ? "safe" : "not safe") << std::endl;
+	safe_invalid = store.simulation.is_safe(enter_protect, { ptr }, { ptr });
+	std::cout << "  - enter protect(<invalid>): " << (safe_invalid ? "safe" : "not safe") << std::endl;
 
 
 

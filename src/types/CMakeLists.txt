@@ -35,6 +35,8 @@ set(SOURCES
 	checker_check.cpp
 	check.cpp
 	simulation.cpp
+	observer.cpp
+	factory.cpp
 )
 
 add_library(PRTypes ${SOURCES})

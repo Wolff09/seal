@@ -33,7 +33,7 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 			invalid.insert(variable);
 		}
 	}
-	bool is_safe_call = simulation.is_safe(enter, params, invalid);
+	bool is_safe_call = guarantee_table.observer_store.simulation.is_safe(enter, params, invalid);
 	conditionally_raise_error<UnsafeCallError>(!is_safe_call, enter);
 
 	// update types

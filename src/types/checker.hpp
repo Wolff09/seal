@@ -16,13 +16,9 @@ namespace prtypes {
 			const cola::Program& program;
 			const GuaranteeTable& guarantee_table;
 			InferenceEngine inference;
-			SimulationEngine simulation;
 
 		public:
-			TypeChecker(const cola::Program& prog, const GuaranteeTable& table) : program(prog), guarantee_table(table), inference(program, guarantee_table) {
-				simulation.compute_simulation(guarantee_table.smr_base_observer);
-				simulation.compute_simulation(guarantee_table.smr_impl_observer);
-			}
+			TypeChecker(const cola::Program& prog, const GuaranteeTable& table) : program(prog), guarantee_table(table), inference(program, guarantee_table) {}
 
 			bool is_well_typed(const cola::AstNode& node) {
 				// TODO: proper exception handling
