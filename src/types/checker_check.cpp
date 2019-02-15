@@ -69,7 +69,7 @@ void TypeChecker::check_assume_nonpointer(const Assume& /*assume*/, const Expres
 
 void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDeclaration& lhs, BinaryExpression::Operator op, const VariableDeclaration& rhs) {
 	assert(assume.expr);
-	if (assume.expr->sort() == Sort::PTR && op == BinaryExpression::Operator::EQ) {
+	if (lhs.type.sort == Sort::PTR && op == BinaryExpression::Operator::EQ) {
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		assert(prtypes::has_binding(current_type_environment, rhs));
 		
@@ -89,7 +89,7 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 
 void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
 	assert(assume.expr);
-	if (assume.expr->sort() == Sort::PTR && op == BinaryExpression::Operator::EQ) {
+	if (lhs.type.sort == Sort::PTR && op == BinaryExpression::Operator::EQ) {
 		// NULL is always valid
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(lhs), assume, lhs);
@@ -270,6 +270,7 @@ void TypeChecker::check_interface_function(const Function& function) {
 
 void TypeChecker::check_program(const Program& program) {
 	// TODO: what about program.initalizer?
+	// TODO: add shared variables
 	for (const auto& function : program.functions) {
 		function->accept(*this);
 	}
