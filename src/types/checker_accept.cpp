@@ -194,8 +194,8 @@ void TypeChecker::visit(const Continue& /*node*/) {
 void TypeChecker::visit(const Assume& assume) {
 	this->check_command(assume);
 	assert(assume.expr);
-	if (assume.expr->sort() == Sort::PTR) {
-		auto flat = expression_to_flat_binary_expression(*assume.expr);
+	auto flat = expression_to_flat_binary_expression(*assume.expr);
+	if (flat.lhs->type.sort == Sort::PTR) {
 		conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
 		assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
 		if (flat.rhs.var.has_value()) {
@@ -219,8 +219,8 @@ void TypeChecker::visit(const Assert& assrt) {
 
 void TypeChecker::visit(const InvariantExpression& invariant) {
 	assert(invariant.expr);
-	if (invariant.expr->sort() == Sort::PTR) {
-		auto flat = expression_to_flat_binary_expression(*invariant.expr);
+	auto flat = expression_to_flat_binary_expression(*invariant.expr);
+	if (flat.lhs->type.sort == Sort::PTR) {
 		conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
 		assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
 		if (flat.rhs.var.has_value()) {

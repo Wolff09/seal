@@ -7,8 +7,8 @@ using namespace cola;
 using namespace prtypes;
 
 
-void TypeChecker::check_annotated_statement(const cola::AnnotatedStatement& /*stmt*/) {
-	raise_error<UnsupportedConstructError>("annotations are not supported, use 'assume' statements instead");
+void TypeChecker::check_annotated_statement(const cola::AnnotatedStatement& stmt) {
+	conditionally_raise_error<UnsupportedConstructError>(stmt.annotation != nullptr, "annotations are not supported, use 'assume' statements instead");
 }
 
 void TypeChecker::check_command(const cola::Command& command) {
@@ -269,6 +269,7 @@ void TypeChecker::check_interface_function(const Function& function) {
 }
 
 void TypeChecker::check_program(const Program& program) {
+	// TODO: what about program.initalizer?
 	for (const auto& function : program.functions) {
 		function->accept(*this);
 	}

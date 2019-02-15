@@ -1,41 +1,22 @@
 
-struct Bar {
-	bool b1, b2, b3;
-	data_t d;
-	Bar* bbb;
-	Foobar* fff;
+struct Node {
+	data_t data;
+	Node* next;
 }
 
-struct Foobar {
-	bool b;
-	Bar* bbb;
-	Foobar* fff;
-}
+Node* Head;
 
-bool Test1, Test2, Test3;
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
 
 void init() {
-	skip;
+	Head = NULL;
 }
 
-inline void bar(bool b) {
-	skip;
-}
-
-inline void foo(bool b, data_t x, Bar* s, Foobar* l) {
-	Foobar* fff;
-	Bar* bbb;
-	skip;
-	if (b) {
-		bool test;
-		s = s->bbb->bbb;
+void bar() {
+	atomic {
 		skip;
-	} else {
-		bool test;
-	}
-	if (b) {
-		bool test;
-	} else {
-		bool test;
+		assume(Head == NULL);
 	}
 }

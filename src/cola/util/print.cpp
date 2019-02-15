@@ -56,7 +56,7 @@ struct PrintExpressionVisitor final : public Visitor {
 
 
 	void set_precedence_op(BinaryExpression::Operator op) {
-		throw std::logic_error("not yet implemented (set_precedence_op)");
+		// TODO: correct
 		switch (op) {
 			case BinaryExpression::Operator::EQ: precedence = 1; break;
 			case BinaryExpression::Operator::NEQ: precedence = 1; break;
@@ -232,10 +232,12 @@ struct PrintVisitor final : public Visitor {
 
 	void visit(const Function& function) {
 		std::string modifier;
+		bool has_body;
+
 		switch (function.kind) {
-			case Function::INTERFACE: modifier = ""; break;
-			case Function::SMR: modifier = "extern "; break;
-			case Function::MACRO: modifier = "inline "; break;
+			case Function::INTERFACE: modifier = ""; has_body = true; assert(function.body); break;
+			case Function::SMR: modifier = "extern "; has_body = false; assert(!function.body); break;
+			case Function::MACRO: modifier = "inline "; has_body = true; assert(function.body); break;
 		}
 
 		stream << std::endl << modifier << function.return_type.name << " " << function.name << "(";
@@ -246,8 +248,13 @@ struct PrintVisitor final : public Visitor {
 				function.args.at(i)->accept(*this);
 			}
 		}
-		stream << ") ";
-		print_scope(*function.body);
+		stream << ")";
+		if (has_body) {
+			stream << " ";
+			print_scope(*function.body);
+		} else {
+			stream << ";";
+		}
 		stream << std::endl;
 	}
 

@@ -1,0 +1,41 @@
+
+struct Bar {
+	bool b1, b2, b3;
+	data_t d;
+	Bar* bbb;
+	Foobar* fff;
+}
+
+struct Foobar {
+	bool b;
+	Bar* bbb;
+	Foobar* fff;
+}
+
+bool Test1, Test2, Test3;
+
+void init() {
+	skip;
+}
+
+inline void bar(bool b) {
+	skip;
+}
+
+inline void foo(bool b, data_t x, Bar* s, Foobar* l) {
+	Foobar* fff;
+	Bar* bbb;
+	skip;
+	if (b) {
+		bool test;
+		s = s->bbb->bbb;
+		skip;
+	} else {
+		bool test;
+	}
+	if (b) {
+		bool test;
+	} else {
+		bool test;
+	}
+}

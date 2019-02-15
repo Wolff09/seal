@@ -132,7 +132,7 @@ antlrcpp::Any AstBuilder::visitProgram(cola::CoLaParser::ProgramContext* context
 	}
 
 	if (!_program->initalizer) {
-		throw std::logic_error("Program has not init function.");
+		throw std::logic_error("Program has no 'init' function.");
 	}
 
 	// finish
@@ -201,8 +201,13 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	}
 
 	// handle body
-	auto body = context->body->accept(this).as<Scope*>();
-	function->body = std::unique_ptr<Scope>(body);
+	if (context->body) {
+		assert(kind != Function::SMR);
+		auto body = context->body->accept(this).as<Scope*>();
+		function->body = std::unique_ptr<Scope>(body);
+	} else {
+		assert(kind == Function::SMR);
+	}
 
 	// get variable decls
 	function->args = popScope();

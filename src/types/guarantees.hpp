@@ -52,7 +52,7 @@ namespace prtypes {
 		const Guarantee& local_guarantee() const;
 		const Guarantee& add_guarantee(std::unique_ptr<cola::Observer> observer, std::string name);
 		const Guarantee& add_guarantee(std::unique_ptr<cola::Observer> observer) {
-			return this->add_guarantee(std::move(observer), "G" + std::to_string(this->all_guarantees.size()));
+			return this->add_guarantee(std::move(observer), "G-" + std::to_string(this->all_guarantees.size()));
 		}
 
 		GuaranteeTableIterator begin() const { return GuaranteeTableIterator(all_guarantees.cbegin()); }

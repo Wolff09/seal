@@ -248,8 +248,7 @@ namespace cola {
 		BinaryExpression(Operator op_, std::unique_ptr<Expression> lhs_, std::unique_ptr<Expression> rhs_) : op(op_), lhs(std::move(lhs_)), rhs(std::move(rhs_)) {
 			assert(lhs);
 			assert(rhs);
-			assert(lhs->sort() == Sort::BOOL);
-			assert(rhs->sort() == Sort::BOOL);
+			assert(lhs->sort() == rhs->sort());
 		}
 		const Type& type() const override { return Type::bool_type(); }
 		ACCEPT_COLA_VISITOR
