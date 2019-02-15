@@ -76,7 +76,7 @@ void prtypes::test() {
 
 	// create stuff
 	std::cout << std::endl << "Computing simulation... " << std::flush;
-	SmrObserverStore store(retire);
+	SmrObserverStore store(program, retire);
 	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect));
 	std::cout << "done" << std::endl;
 

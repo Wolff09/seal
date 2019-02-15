@@ -150,25 +150,44 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	obs_exited->states.at(4)->final = true;
 
 	// observer guarantee: enter protect has been called and exited and the protection is sucessful
-	auto obs_safe = prtypes::make_hp_no_transfer_observer(retire_function, protect_function, "-P" + id);
+	auto obs_safe = std::make_unique<Observer>();
 	obs_safe->negative_specification = false;
-	obs_safe->states.at(0)->final = false;
-	obs_safe->states.at(1)->final = false;
-	obs_safe->states.at(2)->final = true;
-	obs_safe->states.at(3)->final = true;
-	obs_safe->states.at(4)->final = true;
 
-	// additional states
+	// variables
+	obs_safe->variables.push_back(std::make_unique<ThreadObserverVariable>("HP-P:thread"));
+	obs_safe->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("HP-P:address", ptrtype, false)));
+
+	// states
+	obs_safe->states.push_back(std::make_unique<State>("HP-P.0", true, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-P.1", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-P.2", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-P.3", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-P.4", false, true));
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.5", false, false));
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.6", false, false));
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.7", false, false));
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.8", false, false));
 
-	// additional transitions: to copy
+	// 'forward' transitions
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(0), *obs_safe->states.at(1), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(1), *obs_safe->states.at(2), protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(2), *obs_safe->states.at(3), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(3), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(5), *obs_safe->states.at(6), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(6), *obs_safe->states.at(7), protect_function, *obs_safe->variables.at(0)));
+
+	// 'backward' transitions
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(1), *obs_safe->states.at(0), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(2), *obs_safe->states.at(0), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(3), *obs_safe->states.at(5), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(6), *obs_safe->states.at(5), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(7), *obs_safe->states.at(5), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+
+	// 'to copy'
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(0), *obs_safe->states.at(5), retire_function, *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(1), *obs_safe->states.at(6), retire_function, *obs_safe->variables.at(1)));
 
-	// additional transitions: from copy
+	// 'from copy'
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(5), *obs_safe->states.at(0), free_function, *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(6), *obs_safe->states.at(1), free_function, *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(7), *obs_safe->states.at(2), free_function, *obs_safe->variables.at(1)));
@@ -183,4 +202,41 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	result.push_back(std::move(obs_exited));
 	result.push_back(std::move(obs_safe));
 	return result;
+}
+
+std::unique_ptr<Observer> prtypes::make_last_free_observer(const Program& /*program*/, std::string /*name_prefix*/) {
+	throw std::logic_error("not implemented");
+	// auto [free_function, ptrtype] = get_basics();
+	// assert(takes_single_pointer(free_function));
+
+	// auto result = std::make_unique<Observer>();
+	// result->negative_specification = false;
+
+	// // variables
+	// result->variables.push_back(std::make_unique<ThreadObserverVariable>(name_prefix + ":thread"));
+	// result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
+
+	// // states
+	// result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
+	// result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, true));
+	// result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, false));
+
+	// // free transitions
+	// result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(0), *result->states.at(1), free_function, *result->variables.at(1)));
+
+	// // subsequent transitions
+	// auto add_trans = [&](const Function& label, Transition::Kind kind) {
+	// 	result->transitions.push_back(std::make_unique<Transition>(*result->states.at(1), *result->states.at(2), label, kind, std::make_unique<TrueGuard>()));
+	// };
+	// add_trans(free_function, Transition::INVOCATION);
+	// // add_trans(free_function, Transition::RESPONSE); // free has only invocations by design
+	// for (const auto& function : program.functions) {
+	// 	if (function->kind == Function::SMR) {
+	// 		for (auto kind : { Transition::INVOCATION, Transition::RESPONSE }) {
+	// 			add_trans(*function, kind);
+	// 		}
+	// 	}
+	// }
+
+	// return result;
 }

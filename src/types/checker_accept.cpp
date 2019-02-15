@@ -4,8 +4,6 @@
 using namespace cola;
 using namespace prtypes;
 
-// TODO: raise error for commands that are not inside an atomic block
-
 struct TypeCheckBaseVisitor : public Visitor {
 	virtual void visit(const VariableDeclaration& /*node*/) override { /* do nothing */ }
 	virtual void visit(const Expression& /*node*/) override { /* do nothing */ }
@@ -153,6 +151,7 @@ void TypeChecker::visit(const Scope& scope) {
 }
 
 void TypeChecker::visit(const Atomic& atomic) {
+	this->check_annotated_statement(atomic);
 	conditionally_raise_error<UnsupportedConstructError>(inside_atomic, "nested atomic blocks are not supported");
 	inside_atomic = true;
 	this->check_atomic(atomic);
@@ -165,6 +164,7 @@ void TypeChecker::visit(const Choice& choice) {
 
 void TypeChecker::visit(const IfThenElse& /*node*/) {
 	raise_error<UnsupportedConstructError>("'if' statements are not supported");
+	// this->check_annotated_statement(node);
 }
 
 void TypeChecker::visit(const Loop& loop) {
@@ -173,21 +173,26 @@ void TypeChecker::visit(const Loop& loop) {
 
 void TypeChecker::visit(const While& /*node*/) {
 	raise_error<UnsupportedConstructError>("'while' statements are not supported");
+	// this->check_annotated_statement(node);
 }
 
 void TypeChecker::visit(const Skip& skip) {
+	this->check_command(skip);
 	this->check_skip(skip);
 }
 
 void TypeChecker::visit(const Break& /*node*/) {
 	raise_error<UnsupportedConstructError>("'break' statements are not supported");
+	// this->check_command(node);
 }
 
 void TypeChecker::visit(const Continue& /*node*/) {
 	raise_error<UnsupportedConstructError>("'continue' statements are not supported");
+	// this->check_command(node);
 }
 
 void TypeChecker::visit(const Assume& assume) {
+	this->check_command(assume);
 	assert(assume.expr);
 	if (assume.expr->sort() == Sort::PTR) {
 		auto flat = expression_to_flat_binary_expression(*assume.expr);
@@ -205,6 +210,7 @@ void TypeChecker::visit(const Assume& assume) {
 }
 
 void TypeChecker::visit(const Assert& assrt) {
+	this->check_command(assrt);
 	this->current_assert = &assrt;
 	assert(assrt.inv);
 	assrt.inv->accept(*this);
@@ -234,15 +240,18 @@ void TypeChecker::visit(const InvariantActive& invariant) {
 }
 
 void TypeChecker::visit(const Return& retrn) {
+	this->check_command(retrn);
 	assert(retrn.expr);
 	expression_to_variable(*retrn.expr);
 }
 
 void TypeChecker::visit(const Malloc& malloc) {
+	this->check_command(malloc);
 	this->check_malloc(malloc, malloc.lhs);
 }
 
 void TypeChecker::visit(const Assignment& assignment) {
+	this->check_command(assignment);
 	assert(assignment.lhs);
 	assert(assignment.rhs);
 
@@ -279,6 +288,7 @@ void TypeChecker::visit(const Assignment& assignment) {
 }
 
 void TypeChecker::visit(const Enter& enter) {
+	this->check_command(enter);
 	std::vector<std::reference_wrapper<const VariableDeclaration>> params;
 	for (const auto& arg : enter.args) {
 		assert(arg);
@@ -289,15 +299,18 @@ void TypeChecker::visit(const Enter& enter) {
 }
 
 void TypeChecker::visit(const Exit& exit) {
+	this->check_command(exit);
 	this->check_exit(exit);
 }
 
 void TypeChecker::visit(const Macro& /*node*/) {
 	raise_error<UnsupportedConstructError>("calls to 'MACRO' functions are not supported");
+	// this->check_command(node);
 }
 
 void TypeChecker::visit(const CompareAndSwap& /*node*/) {
 	raise_error<UnsupportedConstructError>("CAS statements are not supported");
+	// this->check_command(node);
 }
 
 void TypeChecker::visit(const Function& function) {

@@ -34,22 +34,23 @@ namespace prtypes {
 	class Translator {
 		private:
 			const cola::Program& program;
-			const GuaranteeTable& guarantee_table;
 			Alphabet alphabet;
 			std::unique_ptr<VataAlphabet> vata_alphabet;
 			std::map<const Guarantee*, VataNfa> guarantee2nfa;
 			VataNfa universalnfa;
 
 		public:
-			Translator(const cola::Program& program, const GuaranteeTable& table);
+			// Translator(const cola::Program& program, const GuaranteeTable& table);
+			template<typename Iterable>
+			Translator(const cola::Program& program, const Iterable& guarantees);
 
 			const Alphabet& get_alphabet() const { return alphabet; }
 			const VataAlphabet& get_vata_alphabet() const { return *vata_alphabet; }
-			const GuaranteeTable& get_guarantee_table() const { return guarantee_table; }
 			const VataNfa& get_universal_nfa() const { return universalnfa; }
 			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(&guarantee); }
 			
 			VataNfa to_nfa(const cola::Observer& observer);
+			VataNfa concatenate_step(const VataNfa& nfa, const cola::Transition& info); // ignores info.src/info.dst
 	};
 
 	class InferenceEngine final {
@@ -64,6 +65,7 @@ namespace prtypes {
 			command_inference_map_type inference_map_command;
 			std::map<const Guarantee*, std::size_t> key_helper;
 			std::size_t guarantee_count;
+			const GuaranteeTable& guarantee_table;
 
 			std::size_t get_index(const Guarantee& guarantee);
 			key_type get_key(const GuaranteeSet& guarantees);

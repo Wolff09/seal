@@ -12,12 +12,13 @@
 namespace prtypes {
 
 	struct SmrObserverStore {
+		const cola::Program& program;
 		const cola::Function& retire_function;
 		std::unique_ptr<cola::Observer> base_observer;
 		std::vector<std::unique_ptr<cola::Observer>> impl_observer;
 		SimulationEngine simulation;
 
-		SmrObserverStore(const cola::Function& retire_function);
+		SmrObserverStore(const cola::Program& program, const cola::Function& retire_function);
 		
 		bool supports_elison(const cola::Observer& observer) const;
 		

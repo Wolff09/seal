@@ -6,7 +6,7 @@ using namespace cola;
 using namespace prtypes;
 
 
-SmrObserverStore::SmrObserverStore(const cola::Function& retire_function) : retire_function(retire_function), base_observer(prtypes::make_base_smr_observer(retire_function)) {
+SmrObserverStore::SmrObserverStore(const cola::Program& program, const cola::Function& retire_function) : program(program), retire_function(retire_function), base_observer(prtypes::make_base_smr_observer(retire_function)) {
 	this->simulation.compute_simulation(*this->base_observer);
 	// TODO: show in the paper that base_observer does not need to support elision part (iii)?
 	prtypes::raise_if_assumption_unsatisfied(*this->base_observer);

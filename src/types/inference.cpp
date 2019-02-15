@@ -5,6 +5,7 @@
 #include <vector>
 #include <sstream>
 #include <memory>
+#include <array>
 
 using namespace cola;
 using namespace prtypes;
@@ -407,6 +408,42 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 	}
 }
 
+std::uintptr_t make_new_state(const VataNfa& nfa) {
+	std::set<std::uintptr_t> in_use;
+	for (auto it = nfa.begin(); it != nfa.end(); ++it) {
+		auto vata_trans = *it;
+		in_use.insert(vata_trans.src);
+		in_use.insert(vata_trans.tgt);
+	}
+	for (std::uintptr_t result = 0;; result++) {
+		if (in_use.count(result) == 0) {
+			return result;
+		}
+	}
+	throw std::logic_error("Could not make a new state for automaton.");
+}
+
+VataNfa nfa_concatenation_with_symbols(Translator& /*translator*/, VataNfa nfa, std::vector<Symbol> symbols) {
+	// w in L(nfa) ==> w.symbol in L(result) for all symbols
+
+	// replace final states with new one
+	std::set<std::uintptr_t> old_final_states = nfa.finalstates;
+	auto new_final_state = make_new_state(nfa);
+	nfa.finalstates = { new_final_state };
+	assert(nfa.has_final(new_final_state));
+
+	// add transition from old final states to new one, labeled by symbols
+	for (auto symbol : symbols) {
+		for (auto state : old_final_states) {
+			// TODO: there could already be an outgoing transition from state labeled by symbol; could this be problematic?
+			nfa.add_trans(state, symbol.vata_id, new_final_state);
+		}
+	}
+
+	// there are not outgoing transitions from the new final state
+	return nfa;
+}
+
 
 //===================== translation
 
@@ -436,13 +473,14 @@ std::unique_ptr<VataAlphabet> convert_alphabet(Alphabet& alphabet) {
 	return result;
 }
 
-Translator::Translator(const Program& program_, const GuaranteeTable& guarantee_table_) : program(program_), guarantee_table(guarantee_table_) {
+template<typename Iterable>
+Translator::Translator(const Program& program_, const Iterable& guarantees_) : program(program_) {
 	// init alphabet
 	alphabet = alphabet_from_program(program);
 	vata_alphabet = convert_alphabet(alphabet);
 
 	// init lookup map for base observers
-	for (const auto& guarantee : guarantee_table) {
+	for (const Guarantee& guarantee : guarantees_) {
 		auto nfa = to_nfa(*guarantee.observer);
 		auto res = guarantee2nfa.insert({ &guarantee, nfa });
 		if (!res.second) {
@@ -460,10 +498,17 @@ Translator::Translator(const Program& program_, const GuaranteeTable& guarantee_
 	assert(Vata2::Nfa::is_universal(universalnfa, *vata_alphabet, VATA_PARAMS));
 }
 
+template Translator::Translator(const Program& program_, const GuaranteeTable& guarantees_);
+template Translator::Translator(const Program& program_, const std::array<std::reference_wrapper<const Guarantee>, 1>& guarantees_);
+
 VataNfa Translator::to_nfa(const Observer& observer) {
 	return translate_observer(observer, alphabet, *vata_alphabet);
 }
 
+VataNfa Translator::concatenate_step(const VataNfa& nfa, const Transition& info) {
+	auto symbols = get_symbol_for_transition(info, alphabet);
+	return nfa_concatenation_with_symbols(*this, nfa, symbols);
+}
 
 //===================== inference
 
@@ -498,9 +543,9 @@ bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa&
 	return is_incl (subset, superset, translator.get_vata_alphabet(), VATA_PARAMS);
 }
 
-GuaranteeSet infer_guarantees(Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
+GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
 	GuaranteeSet result = std::move(baseline);
-	for (const auto& guarantee : translator.get_guarantee_table()) {
+	for (const auto& guarantee : guarantee_table) {
 		// if already present (passed as baseline), no need to infer
 		if (result.count(guarantee) > 0) {
 			continue;
@@ -566,59 +611,23 @@ std::vector<Symbol> compute_symbols_for_event(const Command& command, const Vari
 	}
 }
 
-std::uintptr_t make_new_state(const VataNfa& nfa) {
-	std::set<std::uintptr_t> in_use;
-	for (auto it = nfa.begin(); it != nfa.end(); ++it) {
-		auto vata_trans = *it;
-		in_use.insert(vata_trans.src);
-		in_use.insert(vata_trans.tgt);
-	}
-	for (std::uintptr_t result = 0;; result++) {
-		if (in_use.count(result) == 0) {
-			return result;
-		}
-	}
-	throw std::logic_error("Could not make a new state for automaton.");
-}
-
-VataNfa nfa_concatenation_with_symbols(Translator& /*translator*/, VataNfa nfa, std::vector<Symbol> symbols) {
-	// w in L(nfa) ==> w.symbol in L(result) for all symbols
-
-	// replace final states with new one
-	std::set<std::uintptr_t> old_final_states = nfa.finalstates;
-	auto new_final_state = make_new_state(nfa);
-	nfa.finalstates = { new_final_state };
-	assert(nfa.has_final(new_final_state));
-
-	// add transition from old final states to new one, labeled by symbols
-	for (auto symbol : symbols) {
-		for (auto state : old_final_states) {
-			// TODO: there could already be an outgoing transition from state labeled by symbol; could this be problematic?
-			nfa.add_trans(state, symbol.vata_id, new_final_state);
-		}
-	}
-
-	// there are not outgoing transitions from the new final state
-	return nfa;
-}
-
 bool check_inference(const GuaranteeTable& table, const GuaranteeSet& pre, const GuaranteeSet& post) {
 	// returns false if the post set is valid / contains local guarantee but the pre set does not
 	return prtypes::implies(prtypes::entails_valid(post), prtypes::entails_valid(pre)) && prtypes::implies(post.count(table.local_guarantee()), pre.count(table.local_guarantee()));
 }
 
-GuaranteeSet compute_inference_epsilon(Translator& translator, const GuaranteeSet& guarantees) {
+GuaranteeSet compute_inference_epsilon(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
-	auto result = infer_guarantees(translator, intersection, guarantees);
-	assert(check_inference(translator.get_guarantee_table(), guarantees, result));
+	auto result = infer_guarantees(guarantee_table, translator, intersection, guarantees);
+	assert(check_inference(guarantee_table, guarantees, result));
 	return result;
 }
 
-GuaranteeSet compute_inference_command(Translator& translator, const GuaranteeSet& guarantees, std::vector<Symbol> symbols) {
+GuaranteeSet compute_inference_command(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees, std::vector<Symbol> symbols) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
 	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
-	auto result = infer_guarantees(translator, concatenation);
-	assert(check_inference(translator.get_guarantee_table(), guarantees, result));
+	auto result = infer_guarantees(guarantee_table, translator, concatenation);
+	assert(check_inference(guarantee_table, guarantees, result));
 	return result;
 }
 
@@ -634,7 +643,7 @@ InferenceEngine::key_type InferenceEngine::get_key(const GuaranteeSet& guarantee
 	return result;
 }
 
-InferenceEngine::InferenceEngine(const Program& program, const GuaranteeTable& guarantee_table) : translator(program, guarantee_table) {
+InferenceEngine::InferenceEngine(const Program& program, const GuaranteeTable& guarantee_table) : translator(program, guarantee_table), guarantee_table(guarantee_table) {
 	// init key_helper
 	guarantee_count = 0;
 	for (const auto& guarantee : guarantee_table) {
@@ -653,7 +662,7 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 	auto key = get_key(guarantees);
 
 	if (inference_map_epsilon.count(key) == 0) {
-		inference_map_epsilon[key] = compute_inference_epsilon(translator, guarantees);
+		inference_map_epsilon[key] = compute_inference_epsilon(guarantee_table, translator, guarantees);
 	}
 
 	return inference_map_epsilon.at(key);
@@ -669,7 +678,7 @@ GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, cons
 		auto symkey = sym.vata_symbol;
 
 		if (map.count(symkey) == 0) {
-			map[symkey] = compute_inference_command(translator, guarantees, { sym });
+			map[symkey] = compute_inference_command(guarantee_table, translator, guarantees, { sym });
 		}
 
 		sets.push_back(map.at(symkey));

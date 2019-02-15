@@ -1,7 +1,9 @@
 #include "types/guarantees.hpp"
 #include "types/factory.hpp"
 #include "types/inference.hpp"
+#include "vata2/nfa.hh"
 #include <deque>
+#include <array>
 
 using namespace cola;
 using namespace prtypes;
@@ -81,69 +83,68 @@ bool is_guarantee_transient(const Observer& observer) {
 		}
 	}
 	return false;
-
-	// std::set<const State*> reachable;
-	// std::deque<const State*> worklist;
-
-	// // add final states
-	// for (const auto& state : observer.states) {
-	// 	if (is_state_final(*state)) {
-	// 		reachable.insert(state.get());
-	// 		worklist.push_back(state.get());
-	// 	}
-	// }
-
-	// // explore reachable via interference events
-	// while (!worklist.empty()) {
-	// 	const State& current = *worklist.front();
-	// 	worklist.pop_front();
-
-	// 	for (const auto& transition : observer.transitions) {
-	// 		if (&transition->src == &current && may_interfere(*transition->guard)) {
-	// 			auto insertion = reachable.insert(&transition->dst);
-	// 			if (insertion.second) {
-	// 				worklist.push_back(&transition->dst);
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	// // check reachable
-	// for (const auto& state : reachable) {
-	// 	if (!is_state_final(*state)) {
-	// 		return true;
-	// 	}
-	// }
-	// return false;
 }
 
-bool entails_guarantee_validity(const Guarantee& guarantee) {
+struct FindObservedAddressVisitor final : public ObserverVisitor {
+	const ProgramObserverVariable* result = nullptr;
+	void visit(const SelfGuardVariable& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const SelfGuardVariable&)"); }
+	void visit(const ArgumentGuardVariable& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const ArgumentGuardVariable&)"); }
+	void visit(const TrueGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const TrueGuard&)"); }
+	void visit(const ConjunctionGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const ConjunctionGuard&)"); }
+	void visit(const EqGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const EqGuard&)"); }
+	void visit(const NeqGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const NeqGuard&)"); }
+	void visit(const State& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const State&)"); }
+	void visit(const Transition& /*obj*/) { throw std::logic_error("Unexpected invocation: FindObservedAddressVisitor::visit(const Transition&)"); }
+	void visit(const ThreadObserverVariable& /*obj*/) { /* do nothing*/ }
+	void visit(const ProgramObserverVariable& var) {
+		result = &var;
+	}
+	void visit(const Observer& observer) {
+		for (const auto& var : observer.variables) {
+			var->accept(*this);
+		}
+	}
+};
+
+Transition make_dummy_free_transition(const Observer& observer) {
+	assert(observer.states.size() > 0);
+	FindObservedAddressVisitor visitor;
+	observer.accept(visitor);
+	assert(visitor.result);
+	auto& free_function = Observer::free_function();
+	assert(free_function.args.size() == 1);
+	auto guard = std::make_unique<EqGuard>(*visitor.result, std::make_unique<ArgumentGuardVariable>(*free_function.args.at(0)));
+	auto& dummy_state = *observer.states.at(0);
+	return Transition(dummy_state, dummy_state, free_function, Transition::INVOCATION, std::move(guard));
+}
+
+bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& guarantee) {
 	if (guarantee.is_transient) {
 		// our check relies on the guarantee being non-transient (we explore just one free step)
 		return false;
 	}
 
-	throw std::logic_error("not yet implemented: entails_guarantee_validity");
+	// dummy translator
+	std::array<std::reference_wrapper<const Guarantee>, 1> dummy_container = { guarantee };
+	Translator translator(store.program, dummy_container);
+	
+	// get guarantee observer language, concate with free(*)
+	auto intersection = translator.nfa_for(guarantee);
+	intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.observer));
 
-	// where to get the program from ?
-	// how to create a dummy Guarantee Table?
-	// Translator translator(program, table);
-			// 	const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(&guarantee); }
-			
-			// VataNfa to_nfa(const cola::Observer& observer);
+	// intersection with observer languages
+	auto intersect = [&](const Observer& observer) {
+		auto automaton = translator.to_nfa(observer);
+		intersection = Vata2::Nfa::intersection(intersection, automaton);
+	};
 
+	// intersect with smr observer languages
+	intersect(*store.base_observer);
+	for (const auto& observer : store.impl_observer) {
+		intersect(*observer);
+	}
 
-	// auto is_state_final = [&](const State& state) -> bool {
-	// 	return state.final == !guarantee.observer->negative_specification;
-	// };
-
-	// // check if a final state can reach a final state using free, if so return false
-	// for (const auto& transition : guarantee.observer->transitions) {
-	// 	if (is_state_final(transition->src) && &transition->label == &Observer::free_function() && is_state_final(transition->dst)) {
-	// 		return false;
-	// 	}
-	// }
-	// return true;
+	return Vata2::Nfa::is_lang_empty(intersection);
 }
 
 const Guarantee& GuaranteeTable::add_guarantee(std::unique_ptr<Observer> observer, std::string name) {
@@ -154,6 +155,6 @@ const Guarantee& GuaranteeTable::add_guarantee(std::unique_ptr<Observer> observe
 	Guarantee& result = *this->all_guarantees.back().get();
 	// after adding, check its properties
 	result.is_transient = is_guarantee_transient(*result.observer);
-	result.entails_validity = entails_guarantee_validity(result);
+	result.entails_validity = entails_guarantee_validity(observer_store, result);
 	return result;
 }

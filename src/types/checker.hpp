@@ -66,6 +66,8 @@ namespace prtypes {
 			void visit(const cola::Program& node) override;
 
 		private: // type check interface (called from visitor interface)
+			void check_annotated_statement(const cola::AnnotatedStatement& stmt);
+			void check_command(const cola::Command& command);
 			void check_skip(const cola::Skip& skip);
 			void check_malloc(const cola::Malloc& malloc, const cola::VariableDeclaration& ptr);
 			void check_enter(const cola::Enter& enter, std::vector<std::reference_wrapper<const cola::VariableDeclaration>> params);

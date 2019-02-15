@@ -7,6 +7,16 @@ using namespace cola;
 using namespace prtypes;
 
 
+void TypeChecker::check_annotated_statement(const cola::AnnotatedStatement& /*stmt*/) {
+	raise_error<UnsupportedConstructError>("annotations are not supported, use 'assume' statements instead");
+}
+
+void TypeChecker::check_command(const cola::Command& command) {
+	this->check_annotated_statement(command);
+	conditionally_raise_error<UnsupportedConstructError>(!this->inside_atomic, "commands must appear inside an atomic block");
+}
+
+
 bool TypeChecker::is_pointer_valid(const VariableDeclaration& variable) {
 	assert(variable.type.sort == Sort::PTR);
 	assert(prtypes::has_binding(current_type_environment, variable));

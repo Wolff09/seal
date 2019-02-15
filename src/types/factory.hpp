@@ -17,6 +17,8 @@ namespace prtypes {
 
 	std::unique_ptr<cola::Observer> make_active_local_guarantee_observer(const cola::Function& retire_function, std::string prefix);
 
+	std::unique_ptr<cola::Observer> make_last_free_observer(const cola::Program& program, std::string prefix="FF"); // observer accpeting *.free(*)
+
 } // namespace prtypes
 
 #endif
