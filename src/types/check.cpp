@@ -78,8 +78,18 @@ void prtypes::test() {
 	std::cout << std::endl << "Computing simulation... " << std::flush;
 	SmrObserverStore store(retire);
 	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect));
-	GuaranteeTable table(store);
 	std::cout << "done" << std::endl;
+
+	std::cout << "Adding guarantees... " << std::flush;
+	GuaranteeTable table(store);
+	auto hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, protect, "protect");
+	auto& guarantee_e1 = table.add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1");
+	auto& guarantee_e2 = table.add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2");
+	auto& guarantee_p = table.add_guarantee(std::move(hp_guarantee_observers.at(2)), "P");
+	std::cout << "done" << std::endl;
+	std::cout << "  - E1: (transient, valid) = (" << guarantee_e1.is_transient << ", " << guarantee_e1.entails_validity << ")" << std::endl;
+	std::cout << "  - E2: (transient, valid) = (" << guarantee_e2.is_transient << ", " << guarantee_e2.entails_validity << ")" << std::endl;
+	std::cout << "  -  P: (transient, valid) = (" << guarantee_p.is_transient << ", " << guarantee_p.entails_validity << ")" << std::endl;
 
 	// safe predicate
 	bool safe_valid, safe_invalid;

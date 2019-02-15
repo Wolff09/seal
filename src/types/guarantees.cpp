@@ -75,58 +75,75 @@ bool is_guarantee_transient(const Observer& observer) {
 		return !visitor.no_interference;
 	};
 
-	std::set<const State*> reachable;
-	std::deque<const State*> worklist;
-
-	// add final states
-	for (const auto& state : observer.states) {
-		if (is_state_final(*state)) {
-			reachable.insert(state.get());
-			worklist.push_back(state.get());
-		}
-	}
-
-	// explore reachable via interference events
-	while (!worklist.empty()) {
-		const State& current = *worklist.front();
-		worklist.pop_front();
-
-		for (const auto& transition : observer.transitions) {
-			if (&transition->src == &current && may_interfere(*transition->guard)) {
-				auto insertion = reachable.insert(&transition->dst);
-				if (insertion.second) {
-					worklist.push_back(&transition->dst);
-				}
-			}
-		}
-	}
-
-	// check reachable
-	for (const auto& state : reachable) {
-		if (!is_state_final(*state)) {
+	for (const auto& transition : observer.transitions) {
+		if (is_state_final(transition->src) && may_interfere(*transition->guard) && !is_state_final(transition->dst)) {
 			return true;
 		}
 	}
 	return false;
+
+	// std::set<const State*> reachable;
+	// std::deque<const State*> worklist;
+
+	// // add final states
+	// for (const auto& state : observer.states) {
+	// 	if (is_state_final(*state)) {
+	// 		reachable.insert(state.get());
+	// 		worklist.push_back(state.get());
+	// 	}
+	// }
+
+	// // explore reachable via interference events
+	// while (!worklist.empty()) {
+	// 	const State& current = *worklist.front();
+	// 	worklist.pop_front();
+
+	// 	for (const auto& transition : observer.transitions) {
+	// 		if (&transition->src == &current && may_interfere(*transition->guard)) {
+	// 			auto insertion = reachable.insert(&transition->dst);
+	// 			if (insertion.second) {
+	// 				worklist.push_back(&transition->dst);
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	// // check reachable
+	// for (const auto& state : reachable) {
+	// 	if (!is_state_final(*state)) {
+	// 		return true;
+	// 	}
+	// }
+	// return false;
 }
 
 bool entails_guarantee_validity(const Guarantee& guarantee) {
-	if (!guarantee.is_transient) {
+	if (guarantee.is_transient) {
 		// our check relies on the guarantee being non-transient (we explore just one free step)
 		return false;
 	}
 
-	auto is_state_final = [&](const State& state) -> bool {
-		return state.final == !guarantee.observer->negative_specification;
-	};
+	throw std::logic_error("not yet implemented: entails_guarantee_validity");
 
-	// check if a final state can reach a final state using free, if so return false
-	for (const auto& transition : guarantee.observer->transitions) {
-		if (is_state_final(transition->src) && &transition->label == &Observer::free_function() && is_state_final(transition->dst)) {
-			return false;
-		}
-	}
-	return true;
+	// where to get the program from ?
+	// how to create a dummy Guarantee Table?
+	// Translator translator(program, table);
+			// 	const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(&guarantee); }
+			
+			// VataNfa to_nfa(const cola::Observer& observer);
+
+
+	// auto is_state_final = [&](const State& state) -> bool {
+	// 	return state.final == !guarantee.observer->negative_specification;
+	// };
+
+	// // check if a final state can reach a final state using free, if so return false
+	// for (const auto& transition : guarantee.observer->transitions) {
+	// 	if (is_state_final(transition->src) && &transition->label == &Observer::free_function() && is_state_final(transition->dst)) {
+	// 		return false;
+	// 	}
+	// }
+	// return true;
 }
 
 const Guarantee& GuaranteeTable::add_guarantee(std::unique_ptr<Observer> observer, std::string name) {
