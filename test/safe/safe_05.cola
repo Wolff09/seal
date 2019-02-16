@@ -17,16 +17,8 @@ void init() {
 void bar() {
 	Node* head;
 	atomic {
+		assert(active(Head));
 		head = Head;
-	}
-	atomic {
-		protect1(head);
-	}
-	atomic {
-		assert(active(head));
-		assume(head == NULL);
-	}
-	atomic {
 		assume(head == NULL);
 	}
 }

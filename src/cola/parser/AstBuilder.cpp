@@ -631,7 +631,7 @@ antlrcpp::Any AstBuilder::visitCmdCall(cola::CoLaParser::CmdCallContext* context
 	if (function.kind == Function::SMR) {
 		auto enter = std::make_unique<Enter>(function);
 		enter->args = std::move(args);
-		auto exit = std::make_unique<Enter>(function);
+		auto exit = std::make_unique<Exit>(function);
 		auto seq = new Sequence(std::move(enter), std::move(exit));
 		return as_command(seq, static_cast<Enter*>(seq->first.get()));
 

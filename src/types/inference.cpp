@@ -517,12 +517,14 @@ GuaranteeSet combine_guarteeset(std::vector<GuaranteeSet> sets) {
 		throw std::logic_error("Cannot compute intersection of empty list.");
 		// return {};
 	} else {
+		// TODO: more efficient intersection (iterating over all sets simultaneously)
 		GuaranteeSet result = sets.back();
 		sets.pop_back();
 		while (!sets.empty()) {
 			GuaranteeSet new_result;
 			std::set_intersection(result.begin(),result.end(),sets.back().begin(),sets.back().end(), std::inserter(new_result, new_result.begin()), GuaranteeSetComparator());
 			result = std::move(new_result);
+			sets.pop_back();
 		}
 		return result;
 	}
@@ -611,15 +613,19 @@ std::vector<Symbol> compute_symbols_for_event(const Command& command, const Vari
 	}
 }
 
-bool check_inference(const GuaranteeTable& table, const GuaranteeSet& pre, const GuaranteeSet& post) {
-	// returns false if the post set is valid / contains local guarantee but the pre set does not
-	return prtypes::implies(prtypes::entails_valid(post), prtypes::entails_valid(pre)) && prtypes::implies(post.count(table.local_guarantee()), pre.count(table.local_guarantee()));
+void preprocess_inference(const GuaranteeTable& table, const GuaranteeSet& guarantees, GuaranteeSet& inference) {
+	if (guarantees.count(table.local_guarantee()) == 0) {
+		inference.erase(table.local_guarantee());
+	}
+
+	assert(prtypes::implies(prtypes::entails_valid(inference), prtypes::entails_valid(guarantees)));
+	assert(prtypes::implies(inference.count(table.local_guarantee()), guarantees.count(table.local_guarantee())));
 }
 
 GuaranteeSet compute_inference_epsilon(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees) {
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
 	auto result = infer_guarantees(guarantee_table, translator, intersection, guarantees);
-	assert(check_inference(guarantee_table, guarantees, result));
+	preprocess_inference(guarantee_table, guarantees, result);
 	return result;
 }
 
@@ -627,7 +633,7 @@ GuaranteeSet compute_inference_command(const GuaranteeTable& guarantee_table, Tr
 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
 	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
 	auto result = infer_guarantees(guarantee_table, translator, concatenation);
-	assert(check_inference(guarantee_table, guarantees, result));
+	preprocess_inference(guarantee_table, guarantees, result);
 	return result;
 }
 

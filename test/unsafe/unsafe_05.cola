@@ -23,10 +23,6 @@ void bar() {
 		protect1(head);
 	}
 	atomic {
-		assert(active(head));
-		assume(head == NULL);
-	}
-	atomic {
 		assume(head == NULL);
 	}
 }

@@ -48,7 +48,7 @@ void prtypes::test() {
 	std::cout << std::endl << std::endl << "Testing..." << std::endl;
 	// const Type& ptrtype = Observer::free_function().args.at(0)->type;
 
-	std::string filename = "/Users/wolff/Tools/PointerRaceTypes/test.cola";
+	std::string filename = "/Users/wolff/Desktop/PointerRaceTypes/test.cola";
 	auto program_ptr = cola::parse(filename);
 	Program& program = *program_ptr;
 	program.name = "TestProgram";
@@ -90,7 +90,8 @@ void prtypes::test() {
 
 	// type check
 	std::cout << std::endl << "Checking typing..." << std::endl;
-	type_check(program, table);
+	bool type_safe = type_check(program, table);
+	std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
 
 	// // safe predicate
 	// bool safe_valid, safe_invalid;

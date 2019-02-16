@@ -73,8 +73,8 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		assert(prtypes::has_binding(current_type_environment, rhs));
 		
-		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(lhs), assume, lhs);
-		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(rhs), assume, rhs);
+		conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs), assume, lhs);
+		conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(rhs), assume, rhs);
 		
 		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
 		sum.erase(guarantee_table.local_guarantee());
@@ -92,7 +92,7 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 	if (lhs.type.sort == Sort::PTR && op == BinaryExpression::Operator::EQ) {
 		// NULL is always valid
 		assert(prtypes::has_binding(current_type_environment, lhs));
-		conditionally_raise_error<UnsafeAssumeError>(is_pointer_valid(lhs), assume, lhs);
+		conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs), assume, lhs);
 		current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
 
 	} else {
@@ -127,10 +127,20 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 }
 
 void TypeChecker::check_assert_active(const Assert& /*assert*/, const VariableDeclaration& ptr) {
+	std::cout << "Handling assert(active(...))" << std::endl;
+	std::cout << "  - current env for " << ptr.name << ": ";
+	for (const auto& g : current_type_environment.at(ptr)) { std::cout << g.get().name << ", "; }
+	std::cout << std::endl;
 	assert(prtypes::has_binding(current_type_environment, ptr));
 	GuaranteeSet guarantees = std::move(current_type_environment.at(ptr));
 	guarantees.insert(guarantee_table.active_guarantee());
+	std::cout << "  - mid env for " << ptr.name << ": ";
+	for (const auto& g : guarantees) { std::cout << g.get().name << ", "; }
+	std::cout << std::endl;
 	guarantees = inference.infer(guarantees);
+	std::cout << "  - post env for " << ptr.name << ": ";
+	for (const auto& g : guarantees) { std::cout << g.get().name << ", "; }
+	std::cout << std::endl;
 	current_type_environment.at(ptr) = std::move(guarantees);
 }
 
@@ -139,7 +149,7 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Variabl
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs));
 
-	GuaranteeSet result(current_type_environment.at(lhs));
+	GuaranteeSet result(current_type_environment.at(rhs));
 	result.erase(guarantee_table.local_guarantee());
 
 	current_type_environment.at(lhs) = result;
@@ -155,7 +165,7 @@ void TypeChecker::check_assign_pointer(const Assignment& assignment, const Deref
 	assert(prtypes::has_binding(current_type_environment, lhs_var));
 	assert(prtypes::has_binding(current_type_environment, rhs));
 
-	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
 	current_type_environment.at(rhs).erase(guarantee_table.local_guarantee());
 }
 
@@ -167,7 +177,7 @@ void TypeChecker::check_assign_pointer(const Assignment& assignment, const Varia
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 
-	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 	current_type_environment.at(lhs).clear();
 }
 
@@ -177,12 +187,12 @@ void TypeChecker::check_assign_nonpointer(const Assignment& /*node*/, const Expr
 
 void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Dereference& lhs_deref, const VariableDeclaration& lhs_var, const Expression& /*rhs*/) {
 	assert(prtypes::has_binding(current_type_environment, lhs_var));
-	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
 }
 
 void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Expression& /*lhs*/, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
-	conditionally_raise_error<UnsafeDereferenceError>(is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
+	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 }
 
 
@@ -264,13 +274,19 @@ void TypeChecker::check_loop(const Loop& loop) {
 }
 
 void TypeChecker::check_interface_function(const Function& function) {
-	current_type_environment.clear();
 	function.body->accept(*this);
 }
 
 void TypeChecker::check_program(const Program& program) {
 	// TODO: what about program.initalizer?
-	// TODO: add shared variables
+	
+	// populate current_type_environment with empty guarantees for shared pointer variables
+	for (const auto& decl : program.variables) {
+		auto insertion = current_type_environment.insert({ *decl, GuaranteeSet() });
+		conditionally_raise_error<UnsupportedConstructError>(!insertion.second, "multiple occurence of the same shared variable declaration");
+	}
+
+	// type check functions
 	for (const auto& function : program.functions) {
 		function->accept(*this);
 	}
