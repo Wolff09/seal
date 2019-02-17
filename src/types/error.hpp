@@ -24,7 +24,7 @@ namespace prtypes {
 	};
 
 	struct PointerRaceError : public TypeCheckError {
-		PointerRaceError(std::string cause) : TypeCheckError("Type check failed tue to pointer race: " + cause + ".") {}
+		PointerRaceError(std::string cause) : TypeCheckError("Type check failed due to pointer race: " + cause + ".") {}
 	};
 
 	struct UnsafeDereferenceError : public PointerRaceError {

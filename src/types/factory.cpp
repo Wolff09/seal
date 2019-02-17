@@ -165,7 +165,7 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.4", false, true));
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.5", false, false));
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.6", false, false));
-	obs_safe->states.push_back(std::make_unique<State>("HP-P.7", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-P.7", false, false)); // TODO: should this state be final?
 	obs_safe->states.push_back(std::make_unique<State>("HP-P.8", false, false));
 
 	// 'forward' transitions

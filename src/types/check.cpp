@@ -70,6 +70,7 @@ void prtypes::test() {
 	std::cout << std::endl << "Computing simulation... " << std::flush;
 	SmrObserverStore store(program, retire);
 	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1));
+	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
 	GuaranteeTable table(store);
 	std::cout << "done" << std::endl;
 
