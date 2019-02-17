@@ -76,7 +76,7 @@ void prtypes::test() {
 	// adding guarantees
 	auto add_guarantees = [&](const Function& func) {
 		std::cout << std::endl << "Adding guarantees for " << func.name << "... " << std::flush;
-		auto hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, protect1, func.name);
+		auto hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
 		auto& guarantee_e1 = table.add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
 		auto& guarantee_e2 = table.add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
 		auto& guarantee_p = table.add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);

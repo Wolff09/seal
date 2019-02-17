@@ -336,11 +336,11 @@ Symbol make_symbol_with_vata_id(Symbol symbol, const Alphabet& alphabet) {
 	throw std::logic_error("Unexpected symbol occured, not found in alphabet; cannot recover.");
 }
 
-std::vector<Symbol> get_symbol_for_transition(const Transition& transition, const Alphabet& alphabet) {
+std::vector<Symbol> get_symbol_for_event(const Function& label, Transition::Kind kind, const Guard& guard, const Alphabet& alphabet) {
 	std::vector<Symbol> result;
 
 	// get all possible symbols allowed by the function, pruned by transition guard
-	auto symbols = make_symbols_for_function(transition.label, transition.kind, transition.guard.get());
+	auto symbols = make_symbols_for_function(label, kind, &guard);
 
 	// resulting symbols lack vata_id -> look up in alphabet
 	for (auto symbol : symbols) {
@@ -348,6 +348,10 @@ std::vector<Symbol> get_symbol_for_transition(const Transition& transition, cons
 	}
 
 	return result;
+}
+
+std::vector<Symbol> get_symbol_for_transition(const Transition& transition, const Alphabet& alphabet) {
+	return get_symbol_for_event(transition.label, transition.kind, *transition.guard, alphabet);
 }
 
 VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, const VataAlphabet& vata_alphabet) {
@@ -506,6 +510,7 @@ VataNfa Translator::to_nfa(const Observer& observer) {
 }
 
 VataNfa Translator::concatenate_step(const VataNfa& nfa, const Transition& info) {
+	// TODO: replace transition with the info we really need?
 	auto symbols = get_symbol_for_transition(info, alphabet);
 	return nfa_concatenation_with_symbols(*this, nfa, symbols);
 }
@@ -597,19 +602,26 @@ DummyGuardContainer make_guard_for_enter(const Enter& enter, const VariableDecla
 	return container;
 }
 
-std::vector<Symbol> compute_symbols_for_event(const Command& command, const VariableDeclaration* ptr) {
+DummyGuardContainer make_guard_for_exit(const Exit& /*exit*/) {
+	DummyGuardContainer container;
+	container.thread = std::make_unique<ThreadObserverVariable>("Obs$Thread");
+	container.guard = std::make_unique<EqGuard>(*container.thread, std::make_unique<SelfGuardVariable>());
+	return container;
+}
+
+std::vector<Symbol> compute_symbols_for_event(const Alphabet& alphabet, const Command& command, const VariableDeclaration* ptr) {
 	// note: the implicit thread argument is *not* OTHER by definition (see paper)
 	if (ptr) {
 		// enter event
 		auto& enter = static_cast<const Enter&>(command);
 		auto container = make_guard_for_enter(enter, *ptr);
-		return make_symbols_for_function(enter.decl, Transition::INVOCATION, container.guard.get());
+		return get_symbol_for_event(enter.decl, Transition::INVOCATION, *container.guard, alphabet);
 
 	} else {
 		// exit event
 		auto& exit = static_cast<const Exit&>(command);
-		Symbol result({ exit.decl, Transition::RESPONSE, { SymbolicValue::THREAD } });
-		return { result };
+		auto container = make_guard_for_exit(exit);
+		return get_symbol_for_event(exit.decl, Transition::RESPONSE, *container.guard, alphabet);
 	}
 }
 
@@ -677,10 +689,11 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
 	auto key = get_key(guarantees);
 	auto map = inference_map_command[key];
-	auto symbols = compute_symbols_for_event(command, ptr);
+	auto symbols = compute_symbols_for_event(translator.get_alphabet(), command, ptr);
 	
 	std::vector<GuaranteeSet> sets;
 	for (auto sym : symbols) {
+		std::cout << "Need inference for command, symbol: " << sym.vata_id << std::endl;
 		auto symkey = sym.vata_symbol;
 
 		if (map.count(symkey) == 0) {

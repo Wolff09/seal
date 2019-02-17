@@ -136,9 +136,9 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	obs_entered->negative_specification = false;
 	obs_entered->states.at(0)->final = false;
 	obs_entered->states.at(1)->final = true;
-	obs_entered->states.at(2)->final = false;
-	obs_entered->states.at(3)->final = false;
-	obs_entered->states.at(4)->final = false;
+	obs_entered->states.at(2)->final = true;
+	obs_entered->states.at(3)->final = true;
+	obs_entered->states.at(4)->final = true;
 
 	// observer guarantee: enter protect has been called and exited
 	auto obs_exited = prtypes::make_hp_no_transfer_observer(retire_function, protect_function, "-E2" + id);
