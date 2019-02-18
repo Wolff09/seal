@@ -11,11 +11,12 @@ extern void protect1(Node* ptr);
 extern void protect2(Node* ptr);
 
 void init() {
-	Head = NULL;
+	Head = malloc;
+	Head->next = NULL;
 }
 
 void bar() {
-	Node* head;
+	Node* head, next;
 	atomic {
 		head = Head;
 		protect1(head);
@@ -23,6 +24,16 @@ void bar() {
 		assume(head == NULL);
 	}
 	atomic {
+		next = head->next;
+	}
+	atomic {
 		assume(head == NULL);
+	}
+	atomic {
+		assert(active(next));
+		protect1(next);
+	}
+	atomic {
+		assume(next == NULL);
 	}
 }

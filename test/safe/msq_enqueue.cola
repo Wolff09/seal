@@ -17,6 +17,7 @@ void init() {
 
 void enqueue(data_t input) {
 	Node* tail, next, node, tmp;
+	bool done;
 	atomic {
 		node = malloc;
 	}
@@ -26,7 +27,13 @@ void enqueue(data_t input) {
 	atomic {
 		node->next = NULL;
 	}
+	atomic {
+		done = false;
+	}
 	loop {
+		atomic {
+			assume(done == false);
+		}
 		choose {
 			atomic {
 				assert(active(Tail));
@@ -70,8 +77,20 @@ void enqueue(data_t input) {
 					atomic {
 						tmp = tail->next;
 					}
-					atomic {
-						assume(tmp != next);
+					choose {
+						atomic {
+							assert(active(next));
+							assert(tmp == next);
+							assume(tmp == next);
+							tail->next = node;
+						}
+						atomic {
+							done = true;
+						}
+					}{
+						atomic {
+							assume(tmp != next);
+						}
 					}
 				}
 			}
@@ -86,31 +105,6 @@ void enqueue(data_t input) {
 				assume(tail != Tail);
 			}
 		}
-	}
-	atomic {
-		assert(active(Tail));
-		tail = Tail;
-		protect1(tail);
-		assume(tail == Tail);
-	}
-	atomic {
-		next = tail->next;
-	}
-	atomic {
-		assert(active(Tail));
-		assume(tail == Tail);
-		assert(active(next));
-	}
-	atomic {
-		assert(active(next));
-		assume(next == NULL);
-	}
-	atomic {
-		tmp = tail->next;
-		assert(active(next));
-		assert(tmp == next);
-		assume(tmp == next);
-		tail->next = node;
 	}
 	choose {
 		atomic {

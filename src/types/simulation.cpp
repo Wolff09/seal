@@ -296,20 +296,20 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 		}
 	}
 
-	// remove non-simulation pairs until fixed point
-	bool removed;
-	do {
-		removed = false;
-		auto it = result.begin();
-		while (it != result.end()) {
-			if (!simulation_holds(observer, result, *it->first, *it->second)) {
-				removed = true;
-				it = result.erase(it); // progresses it
-			} else {
-				it++;
-			}
-		}
-	} while (removed);
+	// // remove non-simulation pairs until fixed point
+	// bool removed;
+	// do {
+	// 	removed = false;
+	// 	auto it = result.begin();
+	// 	while (it != result.end()) {
+	// 		if (!simulation_holds(observer, result, *it->first, *it->second)) {
+	// 			removed = true;
+	// 			it = result.erase(it); // progresses it
+	// 		} else {
+	// 			it++;
+	// 		}
+	// 	}
+	// } while (removed);
 
 	// store information
 	this->observers.insert(&observer);

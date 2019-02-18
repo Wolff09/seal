@@ -48,7 +48,7 @@ statement : 'choose' scope+                                                     
           | annotation? command ';'                                                   #stmtCom
           ;
 
-annotation : '@invariant' invariant ;
+annotation : '@invariant' '('  invariant ')';
 
 /* Simplifying expression may not yield the desired result.
  * It may not correlate temporary variables of @invariant and subsequent assume.
@@ -62,7 +62,7 @@ annotation : '@invariant' invariant ;
 
 command : 'skip'                               #cmdSkip
         | lhs=expression '=' rhs=expression    #cmdAssign
-        | lhs=Identifier '=' 'malloc'          #cmdMallo
+        | lhs=Identifier '=' 'malloc'          #cmdMalloc
         | 'assume' '(' expr=expression ')'     #cmdAssume
         | 'assert' '(' expr=invariant ')'      #cmdAssert
         | name=Identifier '(' argList ')'      #cmdCall // TODO: support enter/exit
@@ -107,8 +107,8 @@ expression : name=Identifier                        #exprIdentifier
            | cas                                    #exprCas
            ;
 
-invariant : '(' expr=expression ')'           #invExpr
-          | 'active' '(' expr=expression ')'  #invActive 
+invariant : 'active' '(' expr=expression ')'  #invActive 
+          | expr=expression                   #invExpr
           ;
 
 

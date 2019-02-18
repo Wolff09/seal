@@ -17,6 +17,10 @@ namespace cola {
 	std::unique_ptr<Expression> copy(const Expression& expr);
 
 	void print(const Program& program, std::ostream& stream);
+	
+	void print(const Expression& expression, std::ostream& stream);
+	
+	void print(const Command& command, std::ostream& stream);
 
 }
 

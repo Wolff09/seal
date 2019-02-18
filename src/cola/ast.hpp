@@ -187,6 +187,7 @@ namespace cola {
 		const Type& type;
 		bool is_shared = false;
 		VariableDeclaration(std::string name_, const Type& type_, bool shared_) : name(name_), type(type_), is_shared(shared_) {}
+		VariableDeclaration(const VariableDeclaration&) = delete; // cautiously delete copy construction to prevent bad things from happening
 		ACCEPT_COLA_VISITOR
 	};
 

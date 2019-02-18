@@ -38,10 +38,12 @@ bool AstBuilder::isVariableDeclared(std::string variableName) {
 }
 
 const VariableDeclaration& AstBuilder::lookupVariable(std::string variableName) {
+	std::size_t counter = 0;
 	for (auto it = _scope.crbegin(); it != _scope.rend(); it++) {
 		if (it->count(variableName)) {
 			return *it->at(variableName);
 		}
+		counter++;
 	}
 
 	throw std::logic_error("Variable '" + variableName + "' not declared.");
@@ -571,16 +573,16 @@ antlrcpp::Any AstBuilder::visitCmdAssign(cola::CoLaParser::CmdAssignContext* con
 	return as_command(new Assignment(std::move(lhs), std::move(rhs)));
 }
 
-antlrcpp::Any AstBuilder::visitCmdMallo(cola::CoLaParser::CmdMalloContext* context) {
+antlrcpp::Any AstBuilder::visitCmdMalloc(cola::CoLaParser::CmdMallocContext* context) {
 	auto name = context->lhs->getText();
-	auto lhs = lookupVariable(name);
+	auto& lhs = lookupVariable(name);
 	if (lhs.type.sort != Sort::PTR) {
 		throw std::logic_error("Type error: cannot assign to expression of non-pointer type.");
 	}
 	if (lhs.type == Type::void_type()) {
 		throw std::logic_error("Type error: cannot assign to 'null'.");
 	}
-	return as_command(new Malloc(std::move(lhs)));
+	return as_command(new Malloc(lhs));
 }
 
 antlrcpp::Any AstBuilder::visitCmdAssume(cola::CoLaParser::CmdAssumeContext* context) {
@@ -705,19 +707,3 @@ antlrcpp::Any AstBuilder::visitCas(cola::CoLaParser::CasContext* context) {
 
 	return as_command(result);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

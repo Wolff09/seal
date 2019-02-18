@@ -2,16 +2,17 @@
 #include "types/inference.hpp"
 #include "types/error.hpp"
 #include "types/util.hpp"
+#include "cola/util.hpp"
 
 using namespace cola;
 using namespace prtypes;
 
 
-void TypeChecker::check_annotated_statement(const cola::AnnotatedStatement& stmt) {
+void TypeChecker::check_annotated_statement(const AnnotatedStatement& stmt) {
 	conditionally_raise_error<UnsupportedConstructError>(stmt.annotation != nullptr, "annotations are not supported, use 'assume' statements instead");
 }
 
-void TypeChecker::check_command(const cola::Command& command) {
+void TypeChecker::check_command(const Command& command) {
 	this->check_annotated_statement(command);
 	conditionally_raise_error<UnsupportedConstructError>(!this->inside_atomic, "commands must appear inside an atomic block");
 }
@@ -189,8 +190,10 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Ex
 void TypeChecker::check_scope(const Scope& scope) {
 	// populate current_type_environment with empty guarantees for declared pointer variables
 	for (const auto& decl : scope.variables) {
-		auto insertion = current_type_environment.insert({ *decl, GuaranteeSet() });
-		conditionally_raise_error<UnsupportedConstructError>(!insertion.second, "hiding variable declaration of outer scope not supported");
+		if (decl->type.sort == Sort::PTR) {
+			auto insertion = current_type_environment.insert({ *decl, GuaranteeSet() });
+			conditionally_raise_error<UnsupportedConstructError>(!insertion.second, "hiding variable declaration of outer scope not supported");
+		}
 	}
 
 	// type check body
@@ -250,17 +253,53 @@ void TypeChecker::check_choice(const Choice& choice) {
 	this->current_type_environment = std::move(result);
 }
 
-void TypeChecker::check_loop(const Loop& loop) {
-	TypeEnv pre_types = this->current_type_environment;
-	assert(loop.body);
-	loop.body->accept(*this);
+// void debug_type_env(const TypeEnv& env, std::string note="") {
+// 	std::cout << "Type Env " << note << std::endl;
+// 	for (const auto& [decl, guarantees] : env) {
+// 		std::cout << "   - " << decl.get().name << ": ";
+// 		for (const auto& g : guarantees) {
+// 			std::cout << g.get().name << ", ";
+// 		}
+// 		std::cout << std::endl;
+// 	}
+// }
 
-	// compute the largest fixpoint of types that can go into the loop and survive; starting from the pre type environment
-	while (!equals(pre_types, this->current_type_environment)) {
-		pre_types = prtypes::intersection(pre_types, this->current_type_environment);
-		this->current_type_environment = pre_types;
-		loop.body->accept(*this);
+inline bool guaranteeset_equals(const GuaranteeSet& lhs, const GuaranteeSet& rhs) {
+	for (const auto& guarantee : lhs) {
+		if (rhs.count(guarantee) == 0) {
+			return false;
+		}
 	}
+	for (const auto& guarantee : rhs) {
+		if (lhs.count(guarantee) == 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
+inline bool typeenv_equals(const TypeEnv& lhs, const TypeEnv& rhs) {
+	// TODO: write better equals
+	assert(lhs.size() == rhs.size());
+	for (const auto& [decl, guarantees] : lhs) {
+		assert(rhs.count(decl) > 0);
+		if (!guaranteeset_equals(guarantees, rhs.at(decl))) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void TypeChecker::check_loop(const Loop& loop) {
+	assert(loop.body);
+	TypeEnv pre_types;
+
+	do {
+		pre_types = this->current_type_environment;
+		loop.body->accept(*this);
+		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
+
+	} while (!typeenv_equals(pre_types, this->current_type_environment));
 }
 
 void TypeChecker::check_interface_function(const Function& function) {

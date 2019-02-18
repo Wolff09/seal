@@ -450,3 +450,13 @@ struct PrintVisitor final : public Visitor {
 void cola::print(const Program& program, std::ostream& stream) {
 	PrintVisitor(stream).visit(program);
 }
+
+void cola::print(const Expression& expression, std::ostream& stream) {
+	PrintExpressionVisitor visitor(stream);
+	expression.accept(visitor);
+}
+
+void cola::print(const Command& command, std::ostream& stream) {
+	PrintVisitor visitor(stream);
+	command.accept(visitor);
+}

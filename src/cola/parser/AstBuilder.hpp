@@ -81,7 +81,7 @@ namespace cola {
 
 			antlrcpp::Any visitCmdSkip(cola::CoLaParser::CmdSkipContext* context) override;
 			antlrcpp::Any visitCmdAssign(cola::CoLaParser::CmdAssignContext* context) override;
-			antlrcpp::Any visitCmdMallo(cola::CoLaParser::CmdMalloContext* context) override;
+			antlrcpp::Any visitCmdMalloc(cola::CoLaParser::CmdMallocContext* context) override;
 			antlrcpp::Any visitCmdAssume(cola::CoLaParser::CmdAssumeContext* context) override;
 			antlrcpp::Any visitCmdAssert(cola::CoLaParser::CmdAssertContext* context) override;
 			antlrcpp::Any visitCmdCall(cola::CoLaParser::CmdCallContext* context) override;
