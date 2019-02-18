@@ -6,22 +6,6 @@
 using namespace cola;
 
 
-struct Indent {
-	static const std::size_t indention_size = 4;
-	std::size_t current_indent = 0;
-	std::ostream& stream;
-	Indent(std::ostream& stream) : stream(stream) {}
-	Indent& operator++() { current_indent++; return *this; }
-	Indent& operator--() { current_indent--; return *this; }
-	Indent operator++(int) { Indent result(*this); ++(*this); return result; }
-	Indent operator--(int) { Indent result(*this); --(*this); return result; }
-	void print(std::ostream& stream) const { stream << std::string(current_indent*indention_size, ' '); }
-	void operator()() const { print(stream); }
-};
-
-std::ostream& operator<<(std::ostream& stream, const Indent indent) { indent.print(stream); return stream; }
-
-
 struct PrintExpressionVisitor final : public Visitor {
 	std::ostream& stream;
 	std::size_t precedence = 0;
@@ -217,7 +201,7 @@ struct PrintVisitor final : public Visitor {
 			stream << ";" << std::endl;
 		}
 
-		program.initalizer->accept(*this);
+		program.initializer->accept(*this);
 		for (const auto& function :  program.functions) {
 			function->accept(*this);
 		}

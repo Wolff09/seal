@@ -70,12 +70,10 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	}
 
 	// update types
-	debug_type_env(current_type_environment, "Pre enter " + enter.decl.name);
 	TypeEnv result;
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
 		result[decl] = inference.infer_enter(guarantees, enter, decl);
 	}
-	debug_type_env(result, "Post enter " + enter.decl.name);
 	this->current_type_environment = std::move(result);
 }
 
@@ -320,7 +318,7 @@ void TypeChecker::check_interface_function(const Function& function) {
 }
 
 void TypeChecker::check_program(const Program& program) {
-	// TODO: what about program.initalizer?
+	// TODO: what about program.initializer?
 	
 	// populate current_type_environment with empty guarantees for shared pointer variables
 	for (const auto& decl : program.variables) {

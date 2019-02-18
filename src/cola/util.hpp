@@ -16,6 +16,21 @@ namespace cola {
 
 	std::unique_ptr<Expression> copy(const Expression& expr);
 
+	struct Indent {
+		static const std::size_t indention_size = 4;
+		std::size_t current_indent = 0;
+		std::ostream& stream;
+		Indent(std::ostream& stream) : stream(stream) {}
+		Indent& operator++() { current_indent++; return *this; }
+		Indent& operator--() { current_indent--; return *this; }
+		Indent operator++(int) { Indent result(*this); ++(*this); return result; }
+		Indent operator--(int) { Indent result(*this); --(*this); return result; }
+		void print(std::ostream& stream) const { stream << std::string(current_indent*indention_size, ' '); }
+		void operator()() const { print(stream); }
+	};
+
+	inline std::ostream& operator<<(std::ostream& stream, const Indent indent) { indent.print(stream); return stream; }
+
 	void print(const Program& program, std::ostream& stream);
 	
 	void print(const Expression& expression, std::ostream& stream);

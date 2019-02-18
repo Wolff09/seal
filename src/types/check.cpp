@@ -4,6 +4,7 @@
 #include "types/observer.hpp"
 #include "types/factory.hpp"
 #include "types/guarantees.hpp"
+#include "types/cave.hpp"
 #include "cola/ast.hpp"
 #include "cola/observer.hpp"
 #include "cola/parse.hpp"
@@ -93,6 +94,11 @@ void prtypes::test() {
 	std::cout << std::endl << "Checking typing..." << std::endl;
 	bool type_safe = type_check(program, table);
 	std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
+
+	// assertion check
+	std::cout << std::endl << "Checking assertions..." << std::endl;
+	bool assertions_safe = discharge_assertions(program, table.active_guarantee());
+	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
 
 	// // safe predicate
 	// bool safe_valid, safe_invalid;

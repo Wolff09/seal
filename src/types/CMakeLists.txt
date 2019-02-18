@@ -37,6 +37,7 @@ set(SOURCES
 	simulation.cpp
 	observer.cpp
 	factory.cpp
+	cave.cpp
 )
 
 add_library(PRTypes ${SOURCES})

@@ -284,6 +284,7 @@ void dequeue() {
 				Head = next;
 			}
 			atomic {
+				assert(active(head));
 				retire(head);
 			}
 		}

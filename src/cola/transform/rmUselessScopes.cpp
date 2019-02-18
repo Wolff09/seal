@@ -30,7 +30,7 @@ struct RemoveUselessScopeVisitor final : NonConstVisitor {
 	}
 
 	void visit(Program& program) {
-		program.initalizer->accept(*this);
+		program.initializer->accept(*this);
 		for (auto& func : program.functions) {
 			func->accept(*this);
 		}

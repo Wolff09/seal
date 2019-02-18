@@ -11,7 +11,7 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	bool replacementNeeded = false;
 
 	void visit(Program& program) {
-		program.initalizer->accept(*this);
+		program.initializer->accept(*this);
 		for (auto& func : program.functions) {
 			func->accept(*this);
 		}

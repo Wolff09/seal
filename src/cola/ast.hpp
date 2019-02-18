@@ -498,7 +498,7 @@ namespace cola {
 		std::string name;
 		std::vector<std::unique_ptr<Type>> types;
 		std::vector<std::unique_ptr<VariableDeclaration>> variables;
-		std::unique_ptr<Function> initalizer;
+		std::unique_ptr<Function> initializer;
 		std::vector<std::unique_ptr<Function>> functions;
 		ACCEPT_COLA_VISITOR
 	};

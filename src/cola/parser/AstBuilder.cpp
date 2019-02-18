@@ -133,7 +133,7 @@ antlrcpp::Any AstBuilder::visitProgram(cola::CoLaParser::ProgramContext* context
 		functionContext->accept(this);
 	}
 
-	if (!_program->initalizer) {
+	if (!_program->initializer) {
 		throw std::logic_error("Program has no 'init' function.");
 	}
 
@@ -164,10 +164,10 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 
 	if (name == INIT_NAME) {
 		if (kind != Function::INTERFACE) {
-			throw std::logic_error("Initalizer function '" + name + "' must not have modifier.");
+			throw std::logic_error("initializer function '" + name + "' must not have modifier.");
 		}
 		if (returnType != Type::void_type()) {
-			throw std::logic_error("Initalizer function '" + name + "' must have 'void' return type.");
+			throw std::logic_error("initializer function '" + name + "' must have 'void' return type.");
 		}
 	}
 	if (name == "active") {
@@ -216,7 +216,7 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 
 	// transfer ownershp
 	if (name == INIT_NAME) {
-		_program->initalizer = std::move(function);
+		_program->initializer = std::move(function);
 	} else {
 		_program->functions.push_back(std::move(function));
 	}

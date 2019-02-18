@@ -107,7 +107,7 @@ expression : name=Identifier                        #exprIdentifier
            | cas                                    #exprCas
            ;
 
-invariant : 'active' '(' expr=expression ')'  #invActive 
+invariant : 'active' '(' expr=expression ')'  #invActive
           | expr=expression                   #invExpr
           ;
 
