@@ -13,6 +13,7 @@ extern void protect2(Node* ptr);
 void init() {
 	Head = malloc;
 	Head->next = NULL;
+	Tail = Head;
 }
 
 void enqueue(data_t input) {
@@ -105,6 +106,9 @@ void enqueue(data_t input) {
 				assume(tail != Tail);
 			}
 		}
+	}
+	atomic {
+		assume(done == true);
 	}
 	choose {
 		atomic {

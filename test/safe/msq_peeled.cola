@@ -18,7 +18,6 @@ void init() {
 
 void enqueue(data_t input) {
 	Node* tail, next, node, tmp;
-	bool done;
 	atomic {
 		node = malloc;
 	}
@@ -28,13 +27,7 @@ void enqueue(data_t input) {
 	atomic {
 		node->next = NULL;
 	}
-	atomic {
-		done = false;
-	}
 	loop {
-		atomic {
-			assume(done == false);
-		}
 		choose {
 			atomic {
 				assert(active(Tail));
@@ -78,20 +71,8 @@ void enqueue(data_t input) {
 					atomic {
 						tmp = tail->next;
 					}
-					choose {
-						atomic {
-							assert(active(next));
-							assert(tmp == next);
-							assume(tmp == next);
-							tail->next = node;
-						}
-						atomic {
-							done = true;
-						}
-					}{
-						atomic {
-							assume(tmp != next);
-						}
+					atomic {
+						assume(tmp != next);
 					}
 				}
 			}
@@ -108,7 +89,29 @@ void enqueue(data_t input) {
 		}
 	}
 	atomic {
-		assume(done == true);
+		assert(active(Tail));
+		tail = Tail;
+		protect1(tail);
+		assume(tail == Tail);
+	}
+	atomic {
+		next = tail->next;
+	}
+	atomic {
+		assert(active(Tail));
+		assume(tail == Tail);
+		assert(active(next));
+	}
+	atomic {
+		assert(active(next));
+		assume(next == NULL);
+	}
+	atomic {
+		tmp = tail->next;
+		assert(active(next));
+		assert(tmp == next);
+		assume(tmp == next);
+		tail->next = node;
 	}
 	choose {
 		atomic {
@@ -126,15 +129,8 @@ void enqueue(data_t input) {
 
 void dequeue() {
 	Node* head, next, tail, tmp;
-	bool done;
 	data_t result;
-	atomic {
-		done = false;
-	}
 	loop {
-		atomic {
-			assume(done == false);
-		}
 		choose {
 			atomic {
 				assert(active(Head));
@@ -164,30 +160,18 @@ void dequeue() {
 						assume(head == Head);
 						assert(active(next));
 					}
+					atomic {
+						assume(next != NULL);
+					}
 					choose {
 						atomic {
-							assume(next == NULL);
-						}
-						atomic {
-							result = EMPTY;
-						}
-						atomic {
-							done = true;
+							assert(active(Tail));
+							assume(tail == Tail);
+							Tail = next;
 						}
 					}{
 						atomic {
-							assume(next != NULL);
-						}
-						choose {
-							atomic {
-								assert(active(Tail));
-								assume(tail == Tail);
-								Tail = next;
-							}
-						}{
-							atomic {
-								assume(tail != Tail);
-							}
+							assume(tail != Tail);
 						}
 					}
 				}
@@ -212,40 +196,14 @@ void dequeue() {
 						assume(head == Head);
 						assert(active(next));
 					}
-					choose {
-						atomic {
-							assume(next == NULL);
-						}
-						atomic {
-							result = EMPTY;
-						}
-						atomic {
-							done = true;
-						}
-					}{
-						atomic {
-							assume(next != NULL);
-						}
-						atomic {
-							result = next->data;
-						}
-						choose {
-							atomic {
-								assert(active(Head));
-								assume(head == Head);
-								Head = next;
-							}
-							atomic {
-								retire(head);
-							}
-							atomic {
-								done = true;
-							}
-						}{
-							atomic {
-								assume(head != Head);
-							}
-						}
+					atomic {
+						assume(next != NULL);
+					}
+					atomic {
+						result = next->data;
+					}
+					atomic {
+						assume(head != Head);
 					}
 				}
 			}
@@ -262,6 +220,72 @@ void dequeue() {
 		}
 	}
 	atomic {
-		assume(done == true);
+		assert(active(Head));
+		head = Head;
+		protect1(head);
+		assume(head == Head);
+	}
+	choose {
+		atomic {
+			tail = Tail;
+			assert(active(tail));
+			assume(head == tail);
+		}
+		atomic {
+			next = head->next;
+		}
+		atomic {
+			protect2(next);
+		}
+		atomic {
+			assert(active(Head));
+			assume(head == Head);
+			assert(active(next));
+		}
+		atomic {
+			assume(next == NULL);
+		}
+		atomic {
+			result = EMPTY;
+		}
+	}{
+		atomic {
+			tail = Tail;
+			assume(head != tail);
+		}
+		atomic {
+			next = head->next;
+		}
+		atomic {
+			protect2(next);
+		}
+		atomic {
+			assert(active(Head));
+			assume(head == Head);
+			assert(active(next));
+		}
+		choose {
+			atomic {
+				assume(next == NULL);
+			}
+			atomic {
+				result = EMPTY;
+			}
+		}{
+			atomic {
+				assume(next != NULL);
+			}
+			atomic {
+				result = next->data;
+			}
+			atomic {
+				assert(active(Head));
+				assume(head == Head);
+				Head = next;
+			}
+			atomic {
+				retire(head);
+			}
+		}
 	}
 }
