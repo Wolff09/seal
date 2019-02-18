@@ -43,6 +43,7 @@ namespace prtypes {
 	struct UnsafeCallError : public PointerRaceError {
 		const cola::Enter& pc;
 		UnsafeCallError(const cola::Enter& pc_) : PointerRaceError("unsafe call of function " + pc_.decl.name), pc(pc_) {}
+		UnsafeCallError(const cola::Enter& pc_, std::string cause) : PointerRaceError("unsafe call of function " + pc_.decl.name + " (" + cause + ")"), pc(pc_) {}
 	};
 
 

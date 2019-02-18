@@ -8,6 +8,18 @@ using namespace cola;
 using namespace prtypes;
 
 
+// void debug_type_env(const TypeEnv& env, std::string note="") {
+// 	std::cout << "Type Env " << note << std::endl;
+// 	for (const auto& [decl, guarantees] : env) {
+// 		std::cout << "   - " << decl.get().name << ": ";
+// 		for (const auto& g : guarantees) {
+// 			std::cout << g.get().name << ", ";
+// 		}
+// 		std::cout << std::endl;
+// 	}
+// }
+
+
 void TypeChecker::check_annotated_statement(const AnnotatedStatement& stmt) {
 	conditionally_raise_error<UnsupportedConstructError>(stmt.annotation != nullptr, "annotations are not supported, use 'assume' statements instead");
 }
@@ -46,6 +58,12 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	}
 	bool is_safe_call = guarantee_table.observer_store.simulation.is_safe(enter, params, invalid);
 	conditionally_raise_error<UnsafeCallError>(!is_safe_call, enter);
+
+	if (&enter.decl == &guarantee_table.observer_store.retire_function) {
+		assert(params.size() == 1);
+		assert(params.at(0).get().type.sort == Sort::PTR);
+		conditionally_raise_error<UnsafeCallError>(!is_pointer_valid(params.at(0)), enter, "invalid argument");
+	}
 
 	// update types
 	TypeEnv result;
@@ -252,17 +270,6 @@ void TypeChecker::check_choice(const Choice& choice) {
 
 	this->current_type_environment = std::move(result);
 }
-
-// void debug_type_env(const TypeEnv& env, std::string note="") {
-// 	std::cout << "Type Env " << note << std::endl;
-// 	for (const auto& [decl, guarantees] : env) {
-// 		std::cout << "   - " << decl.get().name << ": ";
-// 		for (const auto& g : guarantees) {
-// 			std::cout << g.get().name << ", ";
-// 		}
-// 		std::cout << std::endl;
-// 	}
-// }
 
 inline bool guaranteeset_equals(const GuaranteeSet& lhs, const GuaranteeSet& rhs) {
 	for (const auto& guarantee : lhs) {
