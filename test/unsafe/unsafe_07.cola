@@ -1,0 +1,25 @@
+
+struct Node {
+	data_t data;
+	Node* next;
+}
+
+Node* Head;
+
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
+
+void init() {
+	Head = malloc;
+	Head->next = NULL;
+}
+
+void fobar() {
+	atomic {
+		assert(active(Head));
+		protect1(Head);
+		retire(Head);
+		retire(Head);
+	}
+}

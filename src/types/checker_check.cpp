@@ -8,16 +8,16 @@ using namespace cola;
 using namespace prtypes;
 
 
-// void debug_type_env(const TypeEnv& env, std::string note="") {
-// 	std::cout << "Type Env " << note << std::endl;
-// 	for (const auto& [decl, guarantees] : env) {
-// 		std::cout << "   - " << decl.get().name << ": ";
-// 		for (const auto& g : guarantees) {
-// 			std::cout << g.get().name << ", ";
-// 		}
-// 		std::cout << std::endl;
-// 	}
-// }
+void debug_type_env(const TypeEnv& env, std::string note="") {
+	std::cout << "Type Env " << note << std::endl;
+	for (const auto& [decl, guarantees] : env) {
+		std::cout << "   - " << decl.get().name << ": ";
+		for (const auto& g : guarantees) {
+			std::cout << g.get().name << ", ";
+		}
+		std::cout << std::endl;
+	}
+}
 
 
 void TypeChecker::check_annotated_statement(const AnnotatedStatement& stmt) {
@@ -62,14 +62,20 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	if (&enter.decl == &guarantee_table.observer_store.retire_function) {
 		assert(params.size() == 1);
 		assert(params.at(0).get().type.sort == Sort::PTR);
-		conditionally_raise_error<UnsafeCallError>(!is_pointer_valid(params.at(0)), enter, "invalid argument");
+		assert(prtypes::has_binding(current_type_environment, params.at(0)));
+		bool arg_is_valid = is_pointer_valid(params.at(0));
+		bool arg_is_active = this->current_type_environment.at(params.at(0)).count(guarantee_table.active_guarantee()) > 0;
+		conditionally_raise_error<UnsafeCallError>(!arg_is_valid, enter, "invalid argument");
+		conditionally_raise_error<UnsafeCallError>(!arg_is_active, enter, "argument not active");
 	}
 
 	// update types
+	debug_type_env(current_type_environment, "Pre enter " + enter.decl.name);
 	TypeEnv result;
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
 		result[decl] = inference.infer_enter(guarantees, enter, decl);
 	}
+	debug_type_env(result, "Post enter " + enter.decl.name);
 	this->current_type_environment = std::move(result);
 }
 
