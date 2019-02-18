@@ -36,11 +36,6 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 }
 
 void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
-	std::cout << "Handling enter" << std::endl;
-	std::cout << "  - current env for " << params.at(0).get().name << ": ";
-	for (const auto& g : current_type_environment.at(params.at(0).get())) { std::cout << g.get().name << ", "; }
-	std::cout << std::endl;
-
 	// check safe
 	SimulationEngine::VariableDeclarationSet invalid;
 	for (const auto& variable : params) {
@@ -56,10 +51,6 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
 		result[decl] = inference.infer_enter(guarantees, enter, decl);
 	}
-	std::cout << "  - post env for " << params.at(0).get().name << ": ";
-	for (const auto& g : result.at(params.at(0).get())) { std::cout << g.get().name << ", "; }
-	std::cout << std::endl;
-	// TODO: no interference because the enter observer does not apply; calling enter does not guarantee to be in the second observer state!! one needs to additionaly accept everything "after"!
 	this->current_type_environment = std::move(result);
 }
 
@@ -136,20 +127,10 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 }
 
 void TypeChecker::check_assert_active(const Assert& /*assert*/, const VariableDeclaration& ptr) {
-	std::cout << "Handling assert(active(...))" << std::endl;
-	std::cout << "  - current env for " << ptr.name << ": ";
-	for (const auto& g : current_type_environment.at(ptr)) { std::cout << g.get().name << ", "; }
-	std::cout << std::endl;
 	assert(prtypes::has_binding(current_type_environment, ptr));
 	GuaranteeSet guarantees = std::move(current_type_environment.at(ptr));
 	guarantees.insert(guarantee_table.active_guarantee());
-	std::cout << "  - mid env for " << ptr.name << ": ";
-	for (const auto& g : guarantees) { std::cout << g.get().name << ", "; }
-	std::cout << std::endl;
 	guarantees = inference.infer(guarantees);
-	std::cout << "  - post env for " << ptr.name << ": ";
-	for (const auto& g : guarantees) { std::cout << g.get().name << ", "; }
-	std::cout << std::endl;
 	current_type_environment.at(ptr) = std::move(guarantees);
 }
 

@@ -175,6 +175,7 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(3), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(5), *obs_safe->states.at(6), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(6), *obs_safe->states.at(7), protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(7), *obs_safe->states.at(3), retire_function, *obs_safe->variables.at(1)));
 
 	// 'backward' transitions
 	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(1), *obs_safe->states.at(0), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));

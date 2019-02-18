@@ -547,7 +547,7 @@ VataNfa nfa_intersection_for_guarantees(Translator& translator, const GuaranteeS
 }
 
 bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa& superset) {
-	return is_incl (subset, superset, translator.get_vata_alphabet(), VATA_PARAMS);
+	return Vata2::Nfa::is_incl(subset, superset, translator.get_vata_alphabet(), VATA_PARAMS);
 }
 
 GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
@@ -693,7 +693,6 @@ GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, cons
 	
 	std::vector<GuaranteeSet> sets;
 	for (auto sym : symbols) {
-		std::cout << "Need inference for command, symbol: " << sym.vata_id << std::endl;
 		auto symkey = sym.vata_symbol;
 
 		if (map.count(symkey) == 0) {
