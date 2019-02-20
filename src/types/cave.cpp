@@ -37,6 +37,17 @@ struct CaveOutputVisitor : public Visitor {
 	// ****************************** HELPERS ****************************** //
 	// ********************************************************************* //
 
+	void print_options(const Program& program) {
+		assert(retire.args.at(0)->type.fields.count("next") > 0);
+		std::string option;
+		for (const auto& var : program.variables) {
+			if (&var->type == &retire.args.at(0)->type) {
+				option = "CC_." + var->name + ".next";
+			}
+		}
+		stream << "prover_opts imp_var = \"" << option << "\";" << std::endl << std::endl;
+	}
+
 	std::string type2cave(const Type& type) {
 		if (type.sort == Sort::DATA) {
 			return "int";
@@ -62,12 +73,11 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	std::string var2cave(const VariableDeclaration& decl) {
-		// if (decl.is_shared) {
-		// 	return "C_->" + decl.name;
-		// } else {
-		// 	return decl.name;
-		// }
-		return decl.name;
+		if (decl.is_shared) {
+			return "CC_->" + decl.name;
+		} else {
+			return decl.name;
+		}
 	}
 
 	void print_instrumentation_decls() {
@@ -112,13 +122,14 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "constructor {" << std::endl;
 		indent++;
 		stream << indent << "// initialize container" << std::endl;
+		stream << indent << "CC_ = new();" << std::endl;
 		stream << indent;
 		assert(init.body);
 		init.body->accept(*this);
 		stream << std::endl;
 		stream << indent << "// initialize instrumentation" << std::endl;
-		stream << indent << "INSTRUMENTATION_PTR_ = NULL;" << std::endl;
-		stream << indent << "INSTRUMENTATION_RETIRED_ = false;" << std::endl;
+		stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
+		stream << indent << "CC_->INSTRUMENTATION_RETIRED_ = false;" << std::endl;
 		stream << std::endl;
 		stream << indent << "// initialize bug fixer" << std::endl;
 		stream << indent << "BUG_FIXER_ = new();" << std::endl;
@@ -150,7 +161,7 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
 		stream << indent << "int myRes;" << std::endl;
 		stream << indent << "myNull_assertActive = NULL;" << std::endl;
-		stream << indent << "if (INSTRUMENTATION_RETIRED_ && INSTRUMENTATION_PTR_ != NULL && INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+		stream << indent << "if (CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
 		indent++;
 		stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
 		indent--;
@@ -375,14 +386,14 @@ struct CaveOutputVisitor : public Visitor {
 			stream << " == NULL) { fail(); }" << std::endl;
 
 			// instrumentation: set if not yet set
-			stream << indent << "if (INSTRUMENTATION_PTR_ == NULL) { if (*) { INSTRUMENTATION_PTR_ = ";
+			stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
 			enter.args.at(0)->accept(*this);
 			stream << "; } }" << std::endl;
 
 			// instrumentation: update if needed
-			stream << indent << "if (INSTRUMENTATION_PTR_ == ";
+			stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == ";
 			enter.args.at(0)->accept(*this);
-			stream << ") { INSTRUMENTATION_RETIRED_ = true; }" << std::endl;
+			stream << ") { CC_->INSTRUMENTATION_RETIRED_ = true; }" << std::endl;
 		}
 	}
 
@@ -424,6 +435,7 @@ struct CaveOutputVisitor : public Visitor {
 
 	void visit(const Program& program) {
 		stream << "// generated CAVE program for '" << program.name << "'" << std::endl << std::endl;
+		print_options(program);
 
 		// type defs
 		print_delimiter(stream, "type definitions");
@@ -434,12 +446,16 @@ struct CaveOutputVisitor : public Visitor {
 		// shared variables
 		print_delimiter(stream, "shared variables");
 		stream << indent << "extern int EMPTY;" << std::endl << std::endl;
+		stream << indent << "class Container_ {" << std::endl;
+		indent++;
 		for (const auto& decl : program.variables) {
 			print_var_def(*decl);
 		}
 		stream << std::endl;
 		print_instrumentation_decls();
-		stream << std::endl;
+		indent--;
+		stream << indent << "}" << std::endl << std::endl;
+		stream << indent << "Container_ CC_;" << std::endl << std::endl;
 
 		// fix Cave strangeness
 		print_delimiter(stream, "bug fixer");

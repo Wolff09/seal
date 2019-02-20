@@ -4,7 +4,8 @@ struct Node {
 	Node* next;
 }
 
-Node* Head, Tail;
+Node* Tail;
+Node* Head;
 
 extern void retire(Node* ptr);
 extern void protect1(Node* ptr);
