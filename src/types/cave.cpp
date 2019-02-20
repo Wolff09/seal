@@ -507,7 +507,7 @@ bool discharge_assertions_impl(const Program& program, const Function& retire_fu
 	to_cave_input(program, retire_function, active, whitelist, outfile);
 	outfile.close();
 
-	std::string command = "./cave " + filename;
+	std::string command = "./cave -allow_leaks -lm -por " + filename;
 	std::string result = exec(command.data());
 	if (result.find("\nNOT Valid\n") != std::string::npos) {
 		return false;
