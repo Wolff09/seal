@@ -5,6 +5,8 @@
 using namespace cola;
 using namespace prtypes;
 
+// TODO: prevent pointer expressions from occuring in assignments
+
 struct IsBinaryExpressionVisitor final : public Visitor {
 	bool result = false;
 	void visit(const BinaryExpression& /*node*/) override { result = true; }

@@ -16,94 +16,6 @@ void print_delimiter(std::ostream& stream, std::string text) {
 	stream << "// ----------------------------------------------------------------------" << std::endl;
 }
 
-struct CheckAtomicVisitor : public Visitor {
-	bool contains_malloc = false;
-	bool only_malloc = true;
-	bool only_data = true;
-	void visit(const VariableDeclaration& node) {
-		if (node.type.sort != Sort::DATA && node.type.sort != Sort::BOOL) {
-			only_data = false;
-		}
-	}
-	void visit(const Expression& /*node*/) { throw std::logic_error("Unexpected invocation: CheckAtomicVisitor::visit(const Expression&)"); }
-	void visit(const BooleanValue& /*node*/) { /* do nothing */ }
-	void visit(const NullValue& /*node*/) { only_data = false; }
-	void visit(const EmptyValue& /*node*/) { /* do nothing */ }
-	void visit(const NDetValue& /*node*/) { /* do nothing */ }
-	void visit(const VariableExpression& node) {
-		node.decl.accept(*this);
-	}
-	void visit(const NegatedExpression& node) {
-		node.expr->accept(*this);
-	}
-	void visit(const BinaryExpression& node) {
-		node.lhs->accept(*this);
-		node.rhs->accept(*this);
-	}
-	void visit(const Dereference& /*node*/) { only_data = false; }
-	void visit(const InvariantExpression& /*node*/) { only_data = false; }
-	void visit(const InvariantActive& /*node*/) { only_data = false; }
-	void visit(const Function& /*node*/) { throw std::logic_error("Unexpected invocation: CheckAtomicVisitor::visit(const Function&)"); }
-	void visit(const Program& /*node*/) { throw std::logic_error("Unexpected invocation: CheckAtomicVisitor::visit(const Program&)"); }
-	void visit(const Sequence& node) {
-		only_malloc = false;
-		node.first->accept(*this);
-		node.second->accept(*this);
-	}
-	void visit(const Scope& node) {
-		only_malloc = false;
-		node.body->accept(*this);
-	}
-	void visit(const Atomic& node) {
-		node.body->body->accept(*this);
-	}
-	void visit(const Choice& node) {
-		only_malloc = false;
-		for (const auto& branch : node.branches) {
-			branch->accept(*this);
-		}
-	}
-	void visit(const IfThenElse& node) {
-		only_malloc = false;
-		node.expr->accept(*this);
-		node.ifBranch->accept(*this);
-		node.elseBranch->accept(*this);
-	}
-	void visit(const Loop& node) {
-		only_malloc = false;
-		node.body->accept(*this);
-	}
-	void visit(const While& node) {
-		only_malloc = false;
-		node.body->accept(*this);
-	}
-	void visit(const Skip& /*node*/) { /* do nothing */ }
-	void visit(const Break& /*node*/) { only_malloc = false; }
-	void visit(const Continue& /*node*/) { only_malloc = false; }
-	void visit(const Assume& node) {
-		node.expr->accept(*this);
-		only_malloc = false;
-	}
-	void visit(const Assert& node) {
-		node.inv->accept(*this);
-		only_malloc = false;
-	}
-	void visit(const Return& node) {
-		node.expr->accept(*this);
-		only_malloc = false;
-	}
-	void visit(const Assignment& node) {
-		node.lhs->accept(*this);
-		node.rhs->accept(*this);
-		only_malloc = false;
-	}
-	void visit(const Enter& /*node*/) { only_malloc = false; only_data = false; }
-	void visit(const Exit& /*node*/) { only_malloc = false; only_data = false; }
-	void visit(const Macro& /*node*/) { only_malloc = false; only_data = false; }
-	void visit(const CompareAndSwap& /*node*/) { only_malloc = false; only_data = false; }
-	void visit(const Malloc& /*node*/) { contains_malloc = true; only_data = false; }
-};
-
 // TODO: forbid annotated invariants at commands/statements
 
 struct CaveOutputVisitor : public Visitor {
@@ -111,11 +23,16 @@ struct CaveOutputVisitor : public Visitor {
 	Indent indent;
 	const Function& retire;
 	bool add_fix_me = false;
+	bool needs_parents = false;
 
 	CaveOutputVisitor(std::ostream& stream, const Function& retire_function) : stream(stream), indent(stream), retire(retire_function) {
 		assert(retire.args.size() == 1);
 		assert(retire.args.at(0)->type.sort == Sort::PTR);
 	}
+
+    // ********************************************************************* //
+	// ****************************** HELPERS ****************************** //
+	// ********************************************************************* //
 
 	std::string type2cave(const Type& type) {
 		if (type.sort == Sort::DATA) {
@@ -152,7 +69,7 @@ struct CaveOutputVisitor : public Visitor {
 
 	void print_instrumentation_decls() {
 		stream << indent << type2cave(retire.args.at(0)->type) << " INSTRUMENTATION_PTR_;" << std::endl;
-		stream << indent << type2cave(retire.args.at(0)->type) << " INSTRUMENTATION_RETIRED_;" << std::endl;
+		stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
 	}
 
 	void print_var_def(const VariableDeclaration& decl, bool with_semicolon=true) {
@@ -172,13 +89,14 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "BugFixerHelper_ BUG_FIXER_;" << std::endl << std::endl;
 		stream << indent << "void inline fix_me_() {" << std::endl;
 		indent++;
+		stream << indent << "// calling this avoids strange assertion errors in CAVE" << std::endl;
 		stream << indent << "atomic {" << std::endl;
 		indent++;
 		stream << indent << "BUG_FIXER_->field;" << std::endl;
 		indent--;
-		stream << "}" << std::endl;
+		stream << indent << "}" << std::endl;
 		indent--;
-		stream << "}" << std::endl;
+		stream << indent << "}" << std::endl;
 	}
 
 	void print_bug_fixer_call() {
@@ -198,7 +116,9 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "// initialize instrumentation" << std::endl;
 		stream << indent << "INSTRUMENTATION_PTR_ = NULL;" << std::endl;
 		stream << indent << "INSTRUMENTATION_RETIRED_ = false;" << std::endl;
-		stream << indent << "BUG_FIXER_ = new()" << std::endl;
+		stream << std::endl;
+		stream << indent << "// initialize bug fixer" << std::endl;
+		stream << indent << "BUG_FIXER_ = new();" << std::endl;
 		stream << indent << "BUG_FIXER_->field = 0;" << std::endl;
 		indent--;
 		stream << indent << "}" << std::endl;
@@ -214,27 +134,31 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "}" << std::endl << std::endl;
 		stream << indent << "void inline fail() {" << std::endl;
 		indent++;
-		stream << indent << "DummyFailHelper_ myFailNull;" << std::endl;
+		stream << indent << "DummyFailHelper_ myNull_fail;" << std::endl;
 		stream << indent << "int myRes;" << std::endl;
-		stream << indent << "myFailNull = NULL;" << std::endl;
-		stream << indent << "myRes = myFailNull->field; // force verification failure" << std::endl;
+		stream << indent << "myNull_fail = NULL;" << std::endl;
+		stream << indent << "myRes = myNull_fail->field; // force verification failure" << std::endl;
 		indent--;
 		stream << indent << "}" << std::endl << std::endl;
 
 		std::string typeName = type2cave(retire.args.at(0)->type);
 		stream << indent << "void inline assertActive(" << typeName << " ptr) {" << std::endl;
 		indent++;
-		stream << indent << "DummyFailHelper_ myAssertNull;" << std::endl;
+		stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
 		stream << indent << "int myRes;" << std::endl;
-		stream << indent << "myAssertNull = NULL;" << std::endl;
-		stream << indent << "if (INSTRUMENTATION_RETIRED_ && INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+		stream << indent << "myNull_assertActive = NULL;" << std::endl;
+		stream << indent << "if (INSTRUMENTATION_RETIRED_ && INSTRUMENTATION_PTR_ != NULL && INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
 		indent++;
-		stream << indent << "myRes = myAssertNull->field; // force verification failure" << std::endl;
+		stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
 		indent--;
 		stream << indent << "}" << std::endl;
 		indent--;
 		stream << indent << "}" << std::endl;
 	}
+
+	// ********************************************************************* //
+	// **************************** EXPRESSIONS **************************** //
+	// ********************************************************************* //
 
 	void visit(const Expression& /*expr*/) { throw std::logic_error("Unexpected invocation: CaveOutputVisitor::visit(const Expression&)"); }	
 
@@ -269,6 +193,13 @@ struct CaveOutputVisitor : public Visitor {
 		stream << ")";
 	}
 
+	void visit(const Dereference& expr) {
+		stream << "(";
+		assert(expr.expr);
+		expr.expr->accept(*this);
+		stream << ")->" << expr.fieldname;
+	}
+
 	void visit(const BinaryExpression& expr) {
 		assert(expr.lhs);
 		assert(expr.rhs);
@@ -290,13 +221,10 @@ struct CaveOutputVisitor : public Visitor {
 		stream << ")";
 	}
 
-	void visit(const Dereference& expr) {
-		stream << "(";
-		assert(expr.expr);
-		expr.expr->accept(*this);
-		stream << ")->" << expr.fieldname;
-	}
-	
+	// ********************************************************************* //
+	// ******************************* BLOCKS ****************************** //
+	// ********************************************************************* //
+
 	void visit(const Scope& scope) {
 		stream << "{" << std::endl;
 		indent++;
@@ -317,23 +245,9 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Atomic& atomic) {
-		CheckAtomicVisitor visitor;
-		atomic.accept(visitor);
-		assert(!(visitor.contains_malloc && !visitor.only_malloc));
-
-		// CAVE does not want malloc / new() inside an atomic block
-		// CAVE sometimes (probably only Viktor knows when) does not want data inside an atomic block
-		if (visitor.contains_malloc || visitor.only_data) {
-			assert(visitor.contains_malloc ^ visitor.only_data);
-			conditionally_raise_error<UnsupportedConstructError>(visitor.contains_malloc && !visitor.only_malloc, "'malloc' must appear alone in atomic block for the translation to CAVE");
-			assert(atomic.body);
-			assert(atomic.body->body);
-			atomic.body->body->accept(*this);
-		} else {
-			stream << indent << "atomic ";
-			assert(atomic.body);
-			atomic.body->accept(*this);	
-		}
+		stream << indent << "atomic ";
+		assert(atomic.body);
+		atomic.body->accept(*this);	
 	}
 
 	void visit(const Sequence& seq) {
@@ -371,6 +285,9 @@ struct CaveOutputVisitor : public Visitor {
 		raise_error<UnsupportedConstructError>("'while' not supported in the translation to CAVE");
 	}
 
+	// ********************************************************************* //
+	// ****************************** COMMANDS ***************************** //
+	// ********************************************************************* //
 
 	void visit(const Break& /*node*/) {
 		raise_error<UnsupportedConstructError>("'break' not supported in the translation to CAVE");
@@ -395,6 +312,7 @@ struct CaveOutputVisitor : public Visitor {
 
 	void visit(const Skip& /*node*/) {
 		/* do nothing */
+		stream << indent << "// skip;";
 	}
 
 	void visit(const Assume& assume) {
@@ -411,11 +329,13 @@ struct CaveOutputVisitor : public Visitor {
 		stream << ")) { fail(); }" << std::endl;
 	}
 	void visit(const InvariantActive& invariant) {
-		// TODO: invoke macro only if non null <<<<<<<<---------------------------------------------------------------------------------------|||||||||||||||||||||||||
-		stream << indent << "assertActive(";
+		// macros can only be called with non-null arguments? (doesn't matter, NULL is active always anyways)
+		stream << indent << "if (";
+		invariant.expr->accept(*this);
+		stream << " != NULL) { assertActive(";
 		assert(invariant.expr);
 		invariant.expr->accept(*this);
-		stream << ");" << std::endl;
+		stream << "); }" << std::endl;
 	}
 
 	void visit(const Assert& assrt) {
@@ -438,6 +358,8 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Enter& enter) {
+		stream << indent << "// ";
+		cola::print(enter, stream);
 		if (&enter.decl == &retire) {
 			assert(enter.args.size() == 1);
 			assert(enter.args.at(0)->type().sort == Sort::PTR);
@@ -459,10 +381,15 @@ struct CaveOutputVisitor : public Visitor {
 		}
 	}
 
-	void visit(const Exit& /*node*/) {
+	void visit(const Exit& exit) {
 		/* do nothing */
+		stream << indent << "// ";
+		cola::print(exit, stream);
 	}
 
+	// ********************************************************************* //
+	// ************************ FUNCTIONS / PROGRAMS *********************** //
+	// ********************************************************************* //
 
 	void visit(const Function& function) {
 		if (function.kind == Function::MACRO) {
@@ -491,8 +418,7 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Program& program) {
-		stream << "// generated CAVE output for program '" << program.name << "'" << std::endl << std::endl;
-		// stream << "prover_opts imp_var = \"C_.Head.next\";" << std::endl << std::endl; // TODO: do not hardcode this!
+		stream << "// generated CAVE program for '" << program.name << "'" << std::endl << std::endl;
 
 		// type defs
 		print_delimiter(stream, "type definitions");
