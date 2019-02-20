@@ -9,11 +9,11 @@
 
 namespace prtypes {
 
-	void to_cave_input(const cola::Program& program, const Guarantee& active, std::ostream& stream);
+	void to_cave_input(const cola::Program& program, const cola::Function& retire_function, const Guarantee& active, std::ostream& stream);
 
-	std::string to_cave_input(const cola::Program& program, const Guarantee& active);
+	std::string to_cave_input(const cola::Program& program, const cola::Function& retire_function, const Guarantee& active);
 
-	bool discharge_assertions(const cola::Program& program, const Guarantee& active);
+	bool discharge_assertions(const cola::Program& program, const cola::Function& retire_function, const Guarantee& active);
 
 } // namespace prtypes
 

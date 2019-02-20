@@ -70,8 +70,6 @@ void enqueue(data_t input) {
 					}
 					atomic {
 						tmp = tail->next;
-					}
-					atomic {
 						assume(tmp != next);
 					}
 				}
@@ -109,7 +107,7 @@ void enqueue(data_t input) {
 	atomic {
 		tmp = tail->next;
 		assert(active(next));
-		assert(tmp == next);
+		assert(active(next));
 		assume(tmp == next);
 		tail->next = node;
 	}

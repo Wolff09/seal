@@ -97,7 +97,7 @@ void prtypes::test() {
 
 	// assertion check
 	std::cout << std::endl << "Checking assertions..." << std::endl;
-	bool assertions_safe = discharge_assertions(program, table.active_guarantee());
+	bool assertions_safe = discharge_assertions(program, retire, table.active_guarantee());
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
 
 	// // safe predicate
