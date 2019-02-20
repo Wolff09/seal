@@ -9,6 +9,13 @@
 
 namespace prtypes {
 
+	struct CaveError : public std::exception {
+		const std::string cause;
+		CaveError(std::string cause_) : cause(std::move(cause_)) {}
+		virtual const char* what() const noexcept { return cause.c_str(); }
+	};
+
+
 	struct TypeCheckError : public std::exception {
 		const std::string cause;
 		TypeCheckError(std::string cause_) : cause(std::move(cause_)) {}
@@ -24,7 +31,10 @@ namespace prtypes {
 	};
 
 	struct PointerRaceError : public TypeCheckError {
+		virtual ~PointerRaceError() = default;
+		enum Kind { DEREF, ASSUME, CALL };
 		PointerRaceError(std::string cause) : TypeCheckError("Type check failed due to pointer race: " + cause + ".") {}
+		virtual Kind kind() const = 0;
 	};
 
 	struct UnsafeDereferenceError : public PointerRaceError {
@@ -32,18 +42,25 @@ namespace prtypes {
 		const cola::Dereference& deref;
 		const cola::VariableDeclaration& var;
 		UnsafeDereferenceError(const cola::Assignment& pc_, const cola::Dereference& deref_, const cola::VariableDeclaration& var_) : PointerRaceError("unsafe dereference of potentially invalid variable " + var_.name), pc(pc_), deref(deref_), var(var_) {}
+		virtual Kind kind() const override { return DEREF; }
 	};
 
 	struct UnsafeAssumeError : public PointerRaceError {
-		const cola::Assume & pc;
+		const cola::Assume& pc;
 		const cola::VariableDeclaration& var;
 		UnsafeAssumeError(const cola::Assume& pc_, const cola::VariableDeclaration& var_) : PointerRaceError("unsafe assume using potentially invalid variable " + var_.name), pc(pc_), var(var_) {}
+		virtual Kind kind() const override { return ASSUME; }
 	};
 
 	struct UnsafeCallError : public PointerRaceError {
 		const cola::Enter& pc;
 		UnsafeCallError(const cola::Enter& pc_) : PointerRaceError("unsafe call of function " + pc_.decl.name), pc(pc_) {}
 		UnsafeCallError(const cola::Enter& pc_, std::string cause) : PointerRaceError("unsafe call of function " + pc_.decl.name + " (" + cause + ")"), pc(pc_) {}
+		virtual Kind kind() const override { return CALL; }
+	};
+
+	struct RefinementError : public TypeCheckError {
+		RefinementError(std::string cause) : TypeCheckError("Resolving pointer race failed: " + cause + ".") {}
 	};
 
 

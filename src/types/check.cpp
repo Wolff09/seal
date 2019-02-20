@@ -9,6 +9,7 @@
 #include "cola/observer.hpp"
 #include "cola/parse.hpp"
 #include "cola/util.hpp"
+#include "types/rmraces.hpp"
 
 using namespace cola;
 using namespace prtypes;
@@ -91,13 +92,34 @@ void prtypes::test() {
 	add_guarantees(protect2);
 
 	// type check
-	std::cout << std::endl << "Checking typing..." << std::endl;
-	bool type_safe = type_check(program, table);
+	bool type_safe = false;
+	while (!type_safe) {
+		std::cout << std::endl << "Checking typing..." << std::endl;
+		auto fix = [&](PointerRaceError& err) {
+			std::cout << err.what() << std::endl;
+			std::cout << "Trying to fix pointer race..." << std::endl;
+			switch (err.kind()) {
+				case PointerRaceError::CALL: try_fix_pointer_race(program, table, static_cast<UnsafeCallError&>(err)); break;
+				case PointerRaceError::DEREF: try_fix_pointer_race(program, table, static_cast<UnsafeDereferenceError&>(err)); break;
+				case PointerRaceError::ASSUME: try_fix_pointer_race(program, table, static_cast<UnsafeAssumeError&>(err)); break;
+			}
+		};
+		try {
+			type_safe = type_check(program, table);
+
+		} catch (UnsafeCallError err) {
+			fix(err);
+		} catch (UnsafeDereferenceError err) {
+			fix(err);
+		} catch (UnsafeAssumeError err) {
+			fix(err);
+		}
+	}
 	std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
 
 	// assertion check
 	std::cout << std::endl << "Checking assertions..." << std::endl;
-	bool assertions_safe = discharge_assertions(program, retire, table.active_guarantee());
+	bool assertions_safe = discharge_assertions(program, table);
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
 
 	// // safe predicate

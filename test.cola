@@ -37,7 +37,7 @@ void enqueue(data_t input) {
 		}
 		choose {
 			atomic {
-				assert(active(Tail));
+				// assert(active(Tail));
 				tail = Tail;
 				protect1(tail);
 				assume(tail == Tail);
@@ -51,9 +51,9 @@ void enqueue(data_t input) {
 				}
 			}{
 				atomic {
-					assert(active(Tail));
+					// assert(active(Tail));
 					assume(tail == Tail);
-					assert(active(next));
+					// assert(active(next));
 				}
 				choose {
 					atomic {
@@ -61,7 +61,7 @@ void enqueue(data_t input) {
 					}
 					choose {
 						atomic {
-							assert(active(Tail));
+							// assert(active(Tail));
 							assume(tail == Tail);
 							Tail = next;
 						}
@@ -72,14 +72,14 @@ void enqueue(data_t input) {
 					}
 				}{
 					atomic {
-						assert(active(next));
+						// assert(active(next));
 						assume(next == NULL);
 					}
 					choose {
 						atomic {
 							tmp = tail->next;
-							assert(active(next));
-							assert(active(tmp));
+							// assert(active(next));
+							// assert(active(tmp));
 							assume(tmp == next);
 							tail->next = node;
 						}
@@ -111,8 +111,8 @@ void enqueue(data_t input) {
 	}
 	choose {
 		atomic {
-			assert(active(Tail));
-			assert(active(tail));
+			// assert(active(Tail));
+			// assert(active(tail));
 			assume(tail == Tail);
 			Tail = node;
 		}
@@ -136,7 +136,7 @@ void dequeue() {
 		}
 		choose {
 			atomic {
-				assert(active(Head));
+				// assert(active(Head));
 				head = Head;
 				protect1(head);
 				assume(head == Head);
@@ -144,7 +144,7 @@ void dequeue() {
 			choose {
 				atomic {
 					tail = Tail;
-					assert(active(tail));
+					// assert(active(tail));
 					assume(head == tail);
 				}
 				atomic {
@@ -159,9 +159,9 @@ void dequeue() {
 					}
 				}{
 					atomic {
-						assert(active(Head));
+						// assert(active(Head));
 						assume(head == Head);
-						assert(active(next));
+						// assert(active(next));
 					}
 					choose {
 						atomic {
@@ -179,7 +179,7 @@ void dequeue() {
 						}
 						choose {
 							atomic {
-								assert(active(Tail));
+								// assert(active(Tail));
 								assume(tail == Tail);
 								Tail = next;
 							}
@@ -207,9 +207,9 @@ void dequeue() {
 					}
 				}{
 					atomic {
-						assert(active(Head));
+						// assert(active(Head));
 						assume(head == Head);
-						assert(active(next));
+						// assert(active(next));
 					}
 					choose {
 						atomic {
@@ -230,12 +230,12 @@ void dequeue() {
 						}
 						choose {
 							atomic {
-								assert(active(Head));
+								// assert(active(Head));
 								assume(head == Head);
 								Head = next;
 							}
 							atomic {
-								assert(active(head));
+								// assert(active(head));
 								retire(head);
 							}
 							atomic {

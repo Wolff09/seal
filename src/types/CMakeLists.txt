@@ -14,6 +14,17 @@ include_directories(${VATA2_INCLUDE_DIRS})
 link_directories(${VATA2_LIBS})
 
 
+
+################################
+####### setting up CAVE ########
+################################
+
+set(CAVE_REPO ${CMAKE_CURRENT_SOURCE_DIR}/cave/cave-2.1.zip)
+
+LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cave)
+include(ExternalCave)
+
+
 ################################
 ######## setting up z3 #########
 ################################
@@ -38,6 +49,7 @@ set(SOURCES
 	observer.cpp
 	factory.cpp
 	cave.cpp
+	rmraces.cpp
 )
 
 add_library(PRTypes ${SOURCES})

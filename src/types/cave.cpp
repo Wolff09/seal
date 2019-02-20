@@ -5,6 +5,8 @@
 #include "types/error.hpp"
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <array>
 
 using namespace cola;
 using namespace prtypes;
@@ -22,10 +24,11 @@ struct CaveOutputVisitor : public Visitor {
 	std::ostream& stream;
 	Indent indent;
 	const Function& retire;
+	const std::set<const Assert*>* whitelist;
 	bool add_fix_me = false;
 	bool needs_parents = false;
 
-	CaveOutputVisitor(std::ostream& stream, const Function& retire_function) : stream(stream), indent(stream), retire(retire_function) {
+	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), retire(retire_function), whitelist(whitelist) {
 		assert(retire.args.size() == 1);
 		assert(retire.args.at(0)->type.sort == Sort::PTR);
 	}
@@ -339,8 +342,10 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Assert& assrt) {
-		assert(assrt.inv);
-		assrt.inv->accept(*this);
+		if (!this->whitelist || whitelist->count(&assrt) > 0) {
+			assert(assrt.inv);
+			assrt.inv->accept(*this);
+		}
 	}
 
 	void visit(const Malloc& malloc) {
@@ -384,7 +389,7 @@ struct CaveOutputVisitor : public Visitor {
 	void visit(const Exit& exit) {
 		/* do nothing */
 		stream << indent << "// ";
-		cola::print(exit, stream);
+		print(exit, stream);
 	}
 
 	// ********************************************************************* //
@@ -458,19 +463,67 @@ struct CaveOutputVisitor : public Visitor {
 	}
 };
 
-void prtypes::to_cave_input(const Program& program, const Function& retire_function, const Guarantee& /*active*/, std::ostream& stream) {
-	CaveOutputVisitor visitor(stream, retire_function);
+void to_cave_input(const Program& program, const Function& retire_function, const Guarantee& /*active*/, std::set<const Assert*>* whitelist, std::ostream& stream) {
+	CaveOutputVisitor visitor(stream, retire_function, whitelist);
 	program.accept(visitor);
-	throw std::logic_error("not yet implemented: prtypes::to_cave_input");
 }
 
-std::string prtypes::to_cave_input(const Program& program, const Function& retire_function, const Guarantee& active) {
-	std::stringstream stream;
-	prtypes::to_cave_input(program, retire_function, active, stream);
-	return stream.str();
+/**
+ * See: https://stackoverflow.com/questions/478898/how-do-i-execute-a-command-and-get-output-of-command-within-c-using-posix
+ */
+std::string exec(const char* cmd) {
+	std::array<char, 128> buffer;
+	std::string result;
+	std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+	if (!pipe) {
+		throw std::runtime_error("popen() failed!");
+	}
+	while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+		result += buffer.data();
+	}
+	return result;
+}
+
+
+bool discharge_assertions_impl(const Program& program, const Function& retire_function, const Guarantee& active, std::set<const Assert*>* whitelist) {
+	std::string filename = "tmp.cav";
+	std::ofstream outfile(filename);
+	to_cave_input(program, retire_function, active, whitelist, outfile);
+	outfile.close();
+
+	std::string command = "./cave " + filename;
+	std::string result = exec(command.data());
+	if (result.find("\nNOT Valid\n") != std::string::npos) {
+		return false;
+	} else if (result.find("\nValid\n") != std::string::npos) {
+		return true;
+	} else {
+		throw CaveError("CAVE failed me (unrcognized output)! Cannot recover.");
+	}
 }
 
 bool prtypes::discharge_assertions(const Program& program, const Function& retire_function, const Guarantee& active) {
-	to_cave_input(program, retire_function, active, std::cout);
-	throw std::logic_error("not yet implemented: prtypes::discharge_assertions");
+	return discharge_assertions_impl(program, retire_function, active, nullptr);
 }
+
+
+bool prtypes::discharge_assertions(const Program& program, const Function& retire_function, const Guarantee& active, const std::vector<std::reference_wrapper<const Assert>>& whitelist) {
+	std::set<const Assert*> set;
+	for (const Assert& assert : whitelist) {
+		set.insert(&assert);
+	}
+	return discharge_assertions_impl(program, retire_function, active, &set);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
