@@ -198,12 +198,12 @@ void TypeChecker::check_assign_nonpointer(const Assignment& /*node*/, const Expr
 	// do nothing
 }
 
-void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Dereference& lhs_deref, const VariableDeclaration& lhs_var, const Expression& /*rhs*/) {
+void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Dereference& lhs_deref, const VariableDeclaration& lhs_var, const VariableDeclaration& /*rhs*/) {
 	assert(prtypes::has_binding(current_type_environment, lhs_var));
 	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
 }
 
-void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Expression& /*lhs*/, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
+void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const VariableDeclaration& /*lhs*/, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 }

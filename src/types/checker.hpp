@@ -84,8 +84,8 @@ namespace prtypes {
 			void check_assign_pointer(const cola::Assignment& node, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, const cola::NullValue& rhs);
 			void check_assign_pointer(const cola::Assignment& node, const cola::VariableDeclaration& lhs, const cola::Dereference& rhs_deref, const cola::VariableDeclaration& rhs_var);
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::Expression& lhs, const cola::Expression& rhs);
-			void check_assign_nonpointer(const cola::Assignment& node, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, const cola::Expression& rhs);
-			void check_assign_nonpointer(const cola::Assignment& node, const cola::Expression& lhs, const cola::Dereference& rhs_deref, const cola::VariableDeclaration& rhs_var);
+			void check_assign_nonpointer(const cola::Assignment& node, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, const cola::VariableDeclaration& rhs);
+			void check_assign_nonpointer(const cola::Assignment& node, const cola::VariableDeclaration& lhs, const cola::Dereference& rhs_deref, const cola::VariableDeclaration& rhs_var);
 			void check_scope(const cola::Scope& node);
 			void check_sequence(const cola::Sequence& node);
 			void check_atomic(const cola::Atomic& atomic);

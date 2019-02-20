@@ -5,7 +5,57 @@
 using namespace cola;
 using namespace prtypes;
 
-// TODO: prevent pointer expressions from occuring in assignments
+
+struct ContainsPointerVisitor final : public Visitor {
+	bool result = false;
+	void visit(const VariableDeclaration& decl) override {
+		if (decl.type.sort == Sort::PTR) {
+			result = true;
+		}
+	}
+	void visit(const NullValue& /*node*/) override { result = true; }
+	void visit(const Dereference& /*node*/) override { result = true; }
+	void visit(const BooleanValue& /*node*/) override { /* do nothing */ }
+	void visit(const EmptyValue& /*node*/) override { /* do nothing */ }
+	void visit(const NDetValue& /*node*/) override { /* do nothing */ }
+	void visit(const VariableExpression& expr) override { expr.decl.accept(*this); }
+	void visit(const NegatedExpression& expr) override { expr.expr->accept(*this); }
+	void visit(const BinaryExpression& expr) override {
+		expr.lhs->accept(*this);
+		expr.rhs->accept(*this);
+	}
+
+	void visit(const Expression& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Expression&)"); }
+	void visit(const InvariantExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const InvariantActive&)"); }
+	void visit(const Sequence& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Sequence&)"); }
+	void visit(const Scope& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Scope&)"); }
+	void visit(const Atomic& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Atomic&)"); }
+	void visit(const Choice& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Choice&)"); }
+	void visit(const IfThenElse& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const IfThenElse&)"); }
+	void visit(const Loop& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Loop&)"); }
+	void visit(const While& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const While&)"); }
+	void visit(const Skip& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Skip&)"); }
+	void visit(const Break& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Break&)"); }
+	void visit(const Continue& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Continue&)"); }
+	void visit(const Assume& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Assume&)"); }
+	void visit(const Assert& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Assert&)"); }
+	void visit(const Return& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Return&)"); }
+	void visit(const Malloc& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Malloc&)"); }
+	void visit(const Assignment& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Assignment&)"); }
+	void visit(const Enter& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Enter&)"); }
+	void visit(const Exit& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Exit&)"); }
+	void visit(const Macro& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Macro&)"); }
+	void visit(const CompareAndSwap& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const CompareAndSwap&)"); }
+	void visit(const Function& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Program&)"); }
+};
+
+bool contains_pointer(const Expression& expr) {
+	ContainsPointerVisitor visitor;
+	expr.accept(visitor);
+	return visitor.result;
+}
 
 struct IsBinaryExpressionVisitor final : public Visitor {
 	bool result = false;
@@ -341,7 +391,24 @@ void TypeChecker::visit(const Assignment& assignment) {
 			}
 		}
 	} else {
-		check_assign_nonpointer(assignment, *assignment.lhs, *assignment.rhs);
+		auto lhs = expression_to_variable_or_dereference_or_null(*assignment.lhs);
+		auto rhs = expression_to_variable_or_dereference_or_null(*assignment.rhs);
+
+		if (lhs.deref.has_value()) {
+			auto& deref_var = expression_to_variable(*(*lhs.deref)->expr);
+			conditionally_raise_error<UnsupportedConstructError>(!rhs.var.has_value(), "unrecognized right-hand-side; data selector must be assigned from variable'");
+			check_assign_nonpointer(assignment, **lhs.deref, deref_var, **rhs.var);
+
+		} else if (rhs.deref.has_value()) {
+			auto& deref_var = expression_to_variable(*(*rhs.deref)->expr);
+			conditionally_raise_error<UnsupportedConstructError>(!lhs.var.has_value(), "unrecognized left-hand-side; data selector must be read into variable'");
+			check_assign_nonpointer(assignment, **lhs.var, **rhs.deref, deref_var);
+
+		} else {
+			conditionally_raise_error<UnsupportedConstructError>(contains_pointer(*assignment.lhs), "unrecognized left-hand-side; data expression must not contain pointers'");
+			conditionally_raise_error<UnsupportedConstructError>(contains_pointer(*assignment.rhs), "unrecognized right-hand-side; data expression must not contain pointers'");
+			check_assign_nonpointer(assignment, *assignment.lhs, *assignment.rhs);
+		}
 	}
 }
 
