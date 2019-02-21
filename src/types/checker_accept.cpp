@@ -161,6 +161,10 @@ struct BinaryExpressionVisitor final : public TypeCheckBaseVisitor {
 const VariableDeclaration& TypeChecker::expression_to_variable(const Expression& expression) {
 	VariableExpressionVisitor visitor;
 	expression.accept(visitor);
+	if (!visitor.decl) {
+		std::cout << "FAILING WITH EXPR: ";
+		cola::print(expression, std::cout);
+	}
 	conditionally_raise_error<UnsupportedConstructError>(!visitor.decl, "unsupported expression; expected a variable");
 	assert(visitor.decl);
 	return *visitor.decl;

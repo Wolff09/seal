@@ -7,8 +7,17 @@ using namespace cola;
 using namespace prtypes;
 
 
-std::unique_ptr<Expression> make_true_guard() {
-	return std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, std::make_unique<BooleanValue>(true), std::make_unique<BooleanValue>(true));
+std::unique_ptr<BinaryExpression> make_negated_expression(std::unique_ptr<Expression> expr) {
+	// TODO: properly add this functionality to cola/util.hpp
+	Expression* expr_ptr = expr.release();
+	std::unique_ptr<BinaryExpression> bineary_expression;
+	bineary_expression.reset(static_cast<BinaryExpression*>(expr_ptr));
+	switch (bineary_expression->op) {
+		case BinaryExpression::Operator::EQ: bineary_expression->op = BinaryExpression::Operator::NEQ; break;
+		case BinaryExpression::Operator::NEQ: bineary_expression->op = BinaryExpression::Operator::EQ; break;
+		default: raise_error<UnsupportedConstructError>("unsupported binary operator");
+	}
+	return bineary_expression;
 }
 
 struct NameCollectorVisitor final : public Visitor {
@@ -136,6 +145,8 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 	Function* found_function;
 	Statement* inserted;
 	Statement* found;
+	std::unique_ptr<Statement>* owner_found;
+	std::unique_ptr<Statement>* owner_inserted;
 	AssertionInsertionVisitor(const Command& to_find, std::unique_ptr<Statement> to_insert, bool insert_after) : to_find(to_find), to_insert(std::move(to_insert)), insert_after(insert_after) {}
 
 	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(VariableDeclaration&)"); }
@@ -175,9 +186,13 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 		if (this->insert_after) {
 			// insert: to_find - to_insert
 			result = std::make_unique<Sequence>(std::move(found), std::move(this->to_insert));
+			this->owner_found = &result->first;
+			this->owner_inserted = &result->second;
 		} else {
 			// insert: to_insert - to_find
 			result = std::make_unique<Sequence>(std::move(this->to_insert), std::move(found));
+			this->owner_found = &result->second;
+			this->owner_inserted = &result->first;
 		}
 		assert(result);
 		this->insertion_parent = result.get();
@@ -185,6 +200,8 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 		assert(!this->to_insert);
 		assert(this->insertion_parent);
 		assert(this->found_function);
+		assert(this->owner_found);
+		assert(this->owner_inserted);
 		return result;
 	}
 	void visit(Sequence& seq) {
@@ -267,7 +284,7 @@ AssertionInsertionVisitor insert_active_assertion(Program& program, const Guaran
 	bool is_inserted_assertion_valid = prtypes::discharge_assertions(program, guarantee_table, { inserted_assertion });
 	if (!is_inserted_assertion_valid) {
 		// roll back insertion, then fail
-		inserted_assertion.inv = std::make_unique<InvariantExpression>(make_true_guard());
+		*visitor.owner_inserted = std::make_unique<Skip>();
 		raise_error<RefinementError>("could not infer valid assertion to fix pointer race");
 	}
 	return visitor;
@@ -483,37 +500,17 @@ const VariableDeclaration& make_tmp_variable(Function& function) {
 
 
 void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
-	// TODO: check if can move; if so, move and return
-	// TODO: find a list of previous assume/assert statements, try to add an assert(active(...)) there, if possible then do the check there and store the result in a variable (also propagate this check to other assertions)
-	
 	std::cout << "Trying to fix local unsafe assume..." << std::endl;
-	cola::print(error.pc, std::cout);
 
-	InsertionLocationFinderVisitor visitor(error.var, error.pc); // TODO: the path must be valid for all variables occuring in the assume expr
+	InsertionLocationFinderVisitor visitor(error.var, error.pc); // TODO: the path must be valid for all variables occuring in the assume expr  <<<<<<<<<<<<<<<<<-------------------------------------------------------------|||||||||||||||||||||||||||
 	auto path_opt = visitor.get_path(program);
 	conditionally_raise_error<RefinementError>(!path_opt.has_value(), "could not find an insertion path for unsafe assume");
 	auto path = *path_opt;
 
-	std::cout << "Extracted insertion path: " << std::endl;
-	for (const auto& cmd : path) {
-		std::cout << "   - ";
-		cola::print(*cmd, std::cout);
-	}
-
 	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
-		std::cout << "Handling: ";
-		cola::print(**it, std::cout);
 		try {
 			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */);
-			std::cout << "** Found move destination! **" << std::endl;
-			std::cout << "  to_find: "; cola::print(visitor.to_find, std::cout);
-			std::cout << "  insert_after: " << visitor.insert_after << std::endl;
-			// std::cout << "  insertion_parent: "; cola::print(*visitor.insertion_parent, std::cout);
-			std::cout << "  inserted: "; cola::print(*static_cast<Command*>(visitor.inserted), std::cout);
-			std::cout << "  found: "; cola::print(*static_cast<Command*>(visitor.found), std::cout);
-			std::cout << "  found_function: " << visitor.found_function->name << std::endl;
-			std::cout << "  problematic assume: "; cola::print(error.pc, std::cout);
 
 			// create tmp var of type bool
 			assert(visitor.found_function);
@@ -521,7 +518,7 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 
 			// create update to insert
 			auto true_assume = std::make_unique<Assume>(cola::copy(*error.pc.expr));
-			auto false_assume = std::make_unique<Assume>(std::make_unique<NegatedExpression>(cola::copy(*error.pc.expr)));
+			auto false_assume = std::make_unique<Assume>(make_negated_expression(cola::copy(*error.pc.expr)));
 			auto true_assign = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(true));
 			auto false_assign = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(false));
 			auto true_branch = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(true_assume), std::move(true_assign)));
@@ -536,20 +533,14 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 			// add new assume, replace old assume condition with a tautology
 			AssertionInsertionVisitor insert_assume_visitor(error.pc, std::move(assume), true);
 			program.accept(insert_assume_visitor);
-			static_cast<Assume*>(insert_assume_visitor.found)->expr = make_true_guard();
+			assert(insert_assume_visitor.owner_found);
+			*insert_assume_visitor.owner_found = std::make_unique<Skip>();
 
 			// insert update of tmp
 			AssertionInsertionVisitor insert_update_visitor(*static_cast<Command*>(visitor.inserted), std::move(choice), true);
 			program.accept(insert_update_visitor);
 
-			std::cout << std::endl << std::endl << std::endl << std::endl;
-			std::cout << "###############################################" << std::endl;
-			std::cout << "################### updated ###################" << std::endl;
-			std::cout << "###############################################" << std::endl;
-			cola::print(program, std::cout);
-
-			// TODO: check if all (added) assertions hold now?
-			throw std::logic_error("not yet implemented: moving local assume");
+			// done
 			return;
 
 		} catch (RefinementError err) {
@@ -557,6 +548,8 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 		}
 	}
 	
+	std::cout << std::endl << std::endl << "*********************************************" << std::endl;
+	cola::print(program, std::cout);
 	raise_error<RefinementError>("could not infer valid move to fix pointer race");
 }
 

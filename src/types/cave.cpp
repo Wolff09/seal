@@ -340,7 +340,7 @@ struct CaveOutputVisitor : public Visitor {
 
 	void visit(const Skip& /*node*/) {
 		/* do nothing */
-		stream << indent << "// skip;";
+		stream << indent << "// skip;" << std::endl;
 	}
 
 	void visit(const Assume& assume) {
