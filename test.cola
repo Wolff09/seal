@@ -38,9 +38,10 @@ void enqueue(data_t input) {
 		}
 		choose {
 			atomic {
-				// assert(active(Tail));
 				tail = Tail;
 				protect1(tail);
+				assert(active(tail)); // inferred
+				assert(active(Tail)); // inferred
 				assume(tail == Tail);
 			}
 			atomic {
@@ -52,7 +53,7 @@ void enqueue(data_t input) {
 				}
 			}{
 				atomic {
-					// assert(active(Tail));
+					assert(active(Tail)); // inferred
 					assume(tail == Tail);
 					// assert(active(next));
 				}
@@ -62,7 +63,7 @@ void enqueue(data_t input) {
 					}
 					choose {
 						atomic {
-							// assert(active(Tail));
+							assert(active(Tail)); // inferred
 							assume(tail == Tail);
 							Tail = next;
 						}
