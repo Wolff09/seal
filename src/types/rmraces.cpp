@@ -500,18 +500,12 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 		cola::print(*cmd, std::cout);
 	}
 
-	for (auto it = path.begin(); it != path.end(); ++it) {
+	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
 		std::cout << "Handling: ";
 		cola::print(**it, std::cout);
 		try {
 			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */);
-			// TODO: move error.pc to after insertion
-			//        - add bool flag to function
-			//        - set bool flag after insertion using choose&assume constructs
-			//        - replace error.pc condition with flag
-			// cola::print(program, std::cout);
-
 			std::cout << "** Found move destination! **" << std::endl;
 			std::cout << "  to_find: "; cola::print(visitor.to_find, std::cout);
 			std::cout << "  insert_after: " << visitor.insert_after << std::endl;
