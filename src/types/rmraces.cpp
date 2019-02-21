@@ -197,11 +197,13 @@ void insert_active_assertion(Program& program, const GuaranteeTable& guarantee_t
 void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
 	// TODO: local moverness
 	// try to move the offending command
-	// assert(error.pc.expr);
-	// if (is_expression_local(*error.pc.expr)) {
-	// 	// TODO: check if can move; if so, move and return
-	// 	throw std::logic_error("not yet implemented: prtypes::try_fix_pointer_race (local moverness)");
-	// }
+	assert(error.pc.expr);
+	if (is_expression_local(*error.pc.expr)) {
+		// TODO: check if can move; if so, move and return
+		// TODO: find a list of previous assume/assert statements, try to add an assert(active(...)) there, if possible then do the check there and store the result in a variable (also propagate this check to other assertions)
+		// throw std::logic_error("not yet implemented: prtypes::try_fix_pointer_race (local moverness)");
+		std::cout << "(Ignoring the fact that the assume statement is purely local" << std::endl;
+	}
 
 	// insert assertion for offending command
 	insert_active_assertion(program, guarantee_table, error.pc, error.var);

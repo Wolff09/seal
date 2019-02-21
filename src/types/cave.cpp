@@ -18,19 +18,25 @@ void print_delimiter(std::ostream& stream, std::string text) {
 	stream << "// ----------------------------------------------------------------------" << std::endl;
 }
 
+const Type& get_retire_type(const Function& retire_function) {
+	assert(retire_function.args.size() == 1);
+	assert(retire_function.args.at(0)->type.sort == Sort::PTR);
+	return retire_function.args.at(0)->type;
+
+}
+
 // TODO: forbid annotated invariants at commands/statements
 
 struct CaveOutputVisitor : public Visitor {
 	std::ostream& stream;
 	Indent indent;
 	const Function& retire;
+	const Type& retire_type;
 	const std::set<const Assert*>* whitelist;
 	bool add_fix_me = false;
 	bool needs_parents = false;
 
-	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), retire(retire_function), whitelist(whitelist) {
-		assert(retire.args.size() == 1);
-		assert(retire.args.at(0)->type.sort == Sort::PTR);
+	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), retire(retire_function), retire_type(get_retire_type(retire_function)), whitelist(whitelist) {
 	}
 
     // ********************************************************************* //
@@ -38,10 +44,10 @@ struct CaveOutputVisitor : public Visitor {
 	// ********************************************************************* //
 
 	void print_options(const Program& program) {
-		assert(retire.args.at(0)->type.fields.count("next") > 0);
+		assert(retire_type.fields.count("next") > 0);
 		std::string option;
 		for (const auto& var : program.variables) {
-			if (&var->type == &retire.args.at(0)->type) {
+			if (&var->type == &retire_type) {
 				option = "CC_." + var->name + ".next";
 			}
 		}
@@ -68,6 +74,12 @@ struct CaveOutputVisitor : public Visitor {
 		for (const auto& [fiedl_name, type] : type.fields) {
 			stream << indent << type2cave(type) << " " << fiedl_name << ";" << std::endl;
 		}
+		if (&type == &retire_type) {
+			// instrument retire flag
+			stream << std::endl;
+			stream << indent << "// instrumented retire flag" << std::endl;
+			stream << indent << "bool RETIRED_;" << std::endl;
+		}
 		indent--;
 		stream << "}" << std::endl << std::endl;
 	}
@@ -81,8 +93,9 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void print_instrumentation_decls() {
-		stream << indent << type2cave(retire.args.at(0)->type) << " INSTRUMENTATION_PTR_;" << std::endl;
-		stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
+		// stream << std::endl;
+		// stream << indent << type2cave(retire_type) << " INSTRUMENTATION_PTR_;" << std::endl;
+		// stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
 	}
 
 	void print_var_def(const VariableDeclaration& decl, bool with_semicolon=true) {
@@ -127,10 +140,10 @@ struct CaveOutputVisitor : public Visitor {
 		assert(init.body);
 		init.body->accept(*this);
 		stream << std::endl;
-		stream << indent << "// initialize instrumentation" << std::endl;
-		stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
-		stream << indent << "CC_->INSTRUMENTATION_RETIRED_ = false;" << std::endl;
-		stream << std::endl;
+		// stream << indent << "// initialize instrumentation" << std::endl;
+		// stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
+		// stream << indent << "CC_->INSTRUMENTATION_RETIRED_ = false;" << std::endl;
+		// stream << std::endl;
 		stream << indent << "// initialize bug fixer" << std::endl;
 		stream << indent << "BUG_FIXER_ = new();" << std::endl;
 		stream << indent << "BUG_FIXER_->field = 0;" << std::endl;
@@ -155,13 +168,14 @@ struct CaveOutputVisitor : public Visitor {
 		indent--;
 		stream << indent << "}" << std::endl << std::endl;
 
-		std::string typeName = type2cave(retire.args.at(0)->type);
+		std::string typeName = type2cave(retire_type);
 		stream << indent << "void inline assertActive(" << typeName << " ptr) {" << std::endl;
 		indent++;
 		stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
 		stream << indent << "int myRes;" << std::endl;
 		stream << indent << "myNull_assertActive = NULL;" << std::endl;
-		stream << indent << "if (CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+		// stream << indent << "if (CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+		stream << indent << "if (ptr->RETIRED_) {" << std::endl;
 		indent++;
 		stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
 		indent--;
@@ -361,6 +375,9 @@ struct CaveOutputVisitor : public Visitor {
 
 	void visit(const Malloc& malloc) {
 		stream << indent << var2cave(malloc.lhs) << " = new();" << std::endl;
+		if (&malloc.lhs.type == &retire_type) {
+			stream << indent << var2cave(malloc.lhs) << "->RETIRED_ = false;" << std::endl;
+		}
 	}
 
 	void visit(const Assignment& assign) {
@@ -385,15 +402,20 @@ struct CaveOutputVisitor : public Visitor {
 			enter.args.at(0)->accept(*this);
 			stream << " == NULL) { fail(); }" << std::endl;
 
-			// instrumentation: set if not yet set
-			stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
+			// instrumentation: set retired flag
+			stream << indent << "(";
 			enter.args.at(0)->accept(*this);
-			stream << "; } }" << std::endl;
+			stream << ")->RETIRED_ = true;" << std::endl;
 
-			// instrumentation: update if needed
-			stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == ";
-			enter.args.at(0)->accept(*this);
-			stream << ") { CC_->INSTRUMENTATION_RETIRED_ = true; }" << std::endl;
+			// // instrumentation: set if not yet set
+			// stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
+			// enter.args.at(0)->accept(*this);
+			// stream << "; } }" << std::endl;
+
+			// // instrumentation: update if needed
+			// stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == ";
+			// enter.args.at(0)->accept(*this);
+			// stream << ") { CC_->INSTRUMENTATION_RETIRED_ = true; }" << std::endl;
 		}
 	}
 
@@ -451,7 +473,6 @@ struct CaveOutputVisitor : public Visitor {
 		for (const auto& decl : program.variables) {
 			print_var_def(*decl);
 		}
-		stream << std::endl;
 		print_instrumentation_decls();
 		indent--;
 		stream << indent << "}" << std::endl << std::endl;
@@ -507,7 +528,8 @@ bool discharge_assertions_impl(const Program& program, const Function& retire_fu
 	to_cave_input(program, retire_function, active, whitelist, outfile);
 	outfile.close();
 
-	std::string command = "./cave -allow_leaks -lm -por " + filename;
+	// std::string command = "./cave -allow_leaks -lm -por " + filename;
+	std::string command = "./cave -allow_leaks " + filename;
 	std::string result = exec(command.data());
 	if (result.find("\nNOT Valid\n") != std::string::npos) {
 		return false;
