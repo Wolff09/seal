@@ -64,17 +64,20 @@ namespace prtypes {
 			void visit(const cola::CompareAndSwap& node) override;
 			void visit(const cola::Function& node) override;
 			void visit(const cola::Program& node) override;
+			void visit_command_begin();
+			void visit_command_end();
 
 		private: // type check interface (called from visitor interface)
 			void check_annotated_statement(const cola::AnnotatedStatement& stmt);
-			void check_command(const cola::Command& command);
 			void check_skip(const cola::Skip& skip);
 			void check_malloc(const cola::Malloc& malloc, const cola::VariableDeclaration& ptr);
 			void check_enter(const cola::Enter& enter, std::vector<std::reference_wrapper<const cola::VariableDeclaration>> params);
 			void check_exit(const cola::Exit& exit);
+			void check_return(const cola::Return& retrn, const cola::VariableDeclaration& var);
 			void check_assume_nonpointer(const cola::Assume& assume, const cola::Expression& expr);
 			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::VariableDeclaration& rhs);
 			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::NullValue& rhs);
+			void check_assert_nonpointer(const cola::Assert& assert, const cola::Expression& expr);
 			void check_assert_pointer(const cola::Assert& assert, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::VariableDeclaration& rhs);
 			void check_assert_pointer(const cola::Assert& assert, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::NullValue& rhs);
 			void check_assert_active(const cola::Assert& assert, const cola::VariableDeclaration& ptr);
@@ -86,11 +89,14 @@ namespace prtypes {
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::Expression& lhs, const cola::Expression& rhs);
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, const cola::VariableDeclaration& rhs);
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::VariableDeclaration& lhs, const cola::Dereference& rhs_deref, const cola::VariableDeclaration& rhs_var);
+			void check_atomic_begin();
+			void check_atomic_end();
 			void check_scope(const cola::Scope& node);
 			void check_sequence(const cola::Sequence& node);
-			void check_atomic(const cola::Atomic& atomic);
 			void check_choice(const cola::Choice& choice);
+			void check_ite(const cola::IfThenElse& ite);
 			void check_loop(const cola::Loop& loop);
+			void check_while(const cola::While& whl);
 			void check_interface_function(const cola::Function& function);
 			void check_program(const cola::Program& program);
 

@@ -91,6 +91,11 @@ void prtypes::test() {
 	add_guarantees(protect1);
 	add_guarantees(protect2);
 
+	// assertion check (initial ones given by programmer)
+	// std::cout << std::endl << "Checking initial assertions..." << std::endl;
+	// bool initial_assertions_safe = discharge_assertions(program, table);
+	// std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
+
 	// type check
 	bool type_safe = false;
 	while (!type_safe) {
@@ -98,6 +103,7 @@ void prtypes::test() {
 		auto fix = [&](PointerRaceError& err) {
 			std::cout << err.what() << std::endl;
 			std::cout << "Trying to fix pointer race..." << std::endl;
+			throw std::logic_error("not fixing at the moment!");
 			switch (err.kind()) {
 				case PointerRaceError::CALL: try_fix_pointer_race(program, table, static_cast<UnsafeCallError&>(err)); break;
 				case PointerRaceError::DEREF: try_fix_pointer_race(program, table, static_cast<UnsafeDereferenceError&>(err)); break;

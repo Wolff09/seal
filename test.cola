@@ -20,250 +20,122 @@ void init() {
 void enqueue(data_t input) {
 	Node* tail, next, node, tmp;
 	bool done;
-	atomic {
-		node = malloc;
-	}
-	atomic {
-		node->data = input;
-	}
-	atomic {
-		node->next = NULL;
-	}
-	atomic {
-		done = false;
-	}
-	loop {
-		atomic {
-			assume(done == false);
-		}
+	bool b1;
+
+	node = malloc;
+	node->data = input;
+	node->next = NULL;
+
+	done = false;
+	while (!done) {
+		tail = Tail;
+		protect1(tail);
 		choose {
 			atomic {
 				tail = Tail;
 				protect1(tail);
-				assert(active(tail)); // inferred
-				assert(active(Tail)); // inferred
-				assume(tail == Tail);
+				assert(active(tail)); /* TO INFER */
 			}
-			atomic {
-				next = tail->next;
-			}
-			choose {
-				atomic {
-					assume(tail != Tail);
-				}
-			}{
-				atomic {
-					assert(active(Tail)); // inferred
-					assume(tail == Tail);
-					// assert(active(next));
-				}
-				choose {
+
+			next = tail->next;
+			@invariant(active(Tail)) /* TO INFER */
+			if (tail == Tail) {
+
+				if (next != NULL) {
+					// CAS(Tail, tail, next)
 					atomic {
-						assume(next != NULL);
-					}
-					choose {
-						atomic {
-							assert(active(Tail)); // inferred
-							assume(tail == Tail);
+						@invariant(active(Tail)) /* TO INFER */
+						if (Tail == tail) {
 							Tail = next;
 						}
-					}{
-						atomic {
-							assume(tail != Tail);
-						}
 					}
-				}{
+
+				} else {
+					// if (CAS(tail->next, next, node))
 					atomic {
-						// assert(active(next));
-						assume(next == NULL);
-					}
-					choose {
-						atomic {
-							tmp = tail->next;
-							// assert(active(next));
-							// assert(active(tmp));
-							assume(tmp == next);
+						tmp = tail->next;
+						if (tmp == NULL) {
 							tail->next = node;
+							b1 = true;
+						} else {
+							b1 = false;
 						}
+					}
+					if (b1) {
+						// CAS(Tail, tail, node)
 						atomic {
-							done = true;
+							@invariant(active(Tail)) /* TO INFER */
+							if (Tail == tail) {
+								Tail = node;
+							}
 						}
-					}{
-						atomic {
-							tmp = tail->next;
-							assume(tmp != next);
-						}
+						done = true;
 					}
 				}
 			}
+
 		}{
-			atomic {
-				tail = Tail;
-			}
-			atomic {
-				protect1(tail);
-			}
-			atomic {
-				assume(tail != Tail);
-			}
-		}
-	}
-	atomic {
-		assume(done == true);
-	}
-	choose {
-		atomic {
-			// assert(active(Tail));
-			// assert(active(tail));
-			assume(tail == Tail);
-			Tail = node;
-		}
-	}{
-		atomic {
 			assume(tail != Tail);
 		}
 	}
 }
 
-void dequeue() {
+data_t dequeue() {
 	Node* head, next, tail, tmp;
-	bool done;
 	data_t result;
-	atomic {
-		done = false;
-	}
-	loop {
-		atomic {
-			assume(done == false);
-		}
+	bool done;
+	bool b1;
+
+	done = false;
+	while (!done) {
+		head = Head;
+		protect1(head);
 		choose {
 			atomic {
-				// assert(active(Head));
 				head = Head;
 				protect1(head);
-				assume(head == Head);
 			}
-			choose {
-				atomic {
-					tail = Tail;
-					// assert(active(tail));
-					assume(head == tail);
-				}
-				atomic {
-					next = head->next;
-				}
-				atomic {
-					protect2(next);
-				}
-				choose {
-					atomic {
-						assume(head != Head);
-					}
-				}{
-					atomic {
-						// assert(active(Head));
-						assume(head == Head);
-						// assert(active(next));
-					}
-					choose {
+
+			tail = Tail;
+			next = head->next;
+			protect2(next);
+			if (head == Head) {
+				if (next == NULL) {
+					result = EMPTY;
+					done = true;
+
+				} else {
+					if (head == tail) {
+						// CAS(Tail, tail, next)
 						atomic {
-							assume(next == NULL);
-						}
-						atomic {
-							result = EMPTY;
-						}
-						atomic {
-							done = true;
-						}
-					}{
-						atomic {
-							assume(next != NULL);
-						}
-						choose {
-							atomic {
-								// assert(active(Tail));
-								assume(tail == Tail);
+							if (Tail == tail) {
 								Tail = next;
 							}
-						}{
-							atomic {
-								assume(tail != Tail);
-							}
 						}
-					}
-				}
-			}{
-				atomic {
-					tail = Tail;
-					assume(head != tail);
-				}
-				atomic {
-					next = head->next;
-				}
-				atomic {
-					protect2(next);
-				}
-				choose {
-					atomic {
-						assume(head != Head);
-					}
-				}{
-					atomic {
-						// assert(active(Head));
-						assume(head == Head);
-						// assert(active(next));
-					}
-					choose {
+
+					} else {
+						result = next->data;
+						// if (CAS(Head, head, next))
 						atomic {
-							assume(next == NULL);
-						}
-						atomic {
-							result = EMPTY;
-						}
-						atomic {
-							done = true;
-						}
-					}{
-						atomic {
-							assume(next != NULL);
-						}
-						atomic {
-							result = next->data;
-						}
-						choose {
-							atomic {
-								// assert(active(Head));
-								assume(head == Head);
+							if (Head == head) {
 								Head = next;
-							}
-							atomic {
-								// assert(active(head));
+								b1 = true;
 								retire(head);
+							} else {
+								b1 = false;
 							}
-							atomic {
+							if (b1) {
+								// retire(head); // move left to avoid CAVE imprecision
 								done = true;
 							}
-						}{
-							atomic {
-								assume(head != Head);
-							}
 						}
 					}
 				}
 			}
+
 		}{
-			atomic {
-				head = Head;
-			}
-			atomic {
-				protect1(head);
-			}
-			atomic {
-				assume(head != Head);
-			}
+			assume(head != Head);
 		}
 	}
-	atomic {
-		assume(done == true);
-	}
+	return result;
 }

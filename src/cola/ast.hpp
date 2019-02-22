@@ -128,6 +128,13 @@ namespace cola {
 	/*--------------- base ---------------*/
 
 	struct AstNode {
+		static std::size_t make_id() {
+			static std::size_t MAX_ID = 0;
+			return MAX_ID++;
+		}
+		const std::size_t id;
+		AstNode() : id(make_id()) {}
+		AstNode(const AstNode& other) = delete;
 		virtual ~AstNode() = default;
 		virtual void accept(NonConstVisitor& visitor) = 0;
 		virtual void accept(Visitor& visitor) const = 0;

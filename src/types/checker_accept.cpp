@@ -255,87 +255,120 @@ void TypeChecker::visit(const Scope& scope) {
 
 void TypeChecker::visit(const Atomic& atomic) {
 	this->check_annotated_statement(atomic);
-	conditionally_raise_error<UnsupportedConstructError>(inside_atomic, "nested atomic blocks are not supported");
+	bool previously_inside_atomic = this->inside_atomic;
+	if (!previously_inside_atomic) {
+		this->check_atomic_begin();
+	}
 	inside_atomic = true;
-	this->check_atomic(atomic);
-	inside_atomic = false;
+	assert(atomic.body);
+	atomic.body->accept(*this);
+	this->inside_atomic = previously_inside_atomic;
+	if (!previously_inside_atomic) {
+		this->check_atomic_end();
+	}
 }
 
 void TypeChecker::visit(const Choice& choice) {
 	this->check_choice(choice);
 }
 
-void TypeChecker::visit(const IfThenElse& /*node*/) {
-	raise_error<UnsupportedConstructError>("'if' statements are not supported");
-	// this->check_annotated_statement(node);
+void TypeChecker::visit(const IfThenElse& ite) {
+	this->check_annotated_statement(ite);
+	this->check_ite(ite);
 }
 
 void TypeChecker::visit(const Loop& loop) {
 	this->check_loop(loop);
 }
 
-void TypeChecker::visit(const While& /*node*/) {
-	raise_error<UnsupportedConstructError>("'while' statements are not supported");
-	// this->check_annotated_statement(node);
+void TypeChecker::visit(const While& whl) {
+	this->check_annotated_statement(whl);
+	this->check_while(whl);
 }
 
-void TypeChecker::visit(const Skip& skip) {
-	this->check_command(skip);
-	this->check_skip(skip);
-}
-
-void TypeChecker::visit(const Break& /*node*/) {
-	raise_error<UnsupportedConstructError>("'break' statements are not supported");
-	// this->check_command(node);
-}
-
-void TypeChecker::visit(const Continue& /*node*/) {
-	raise_error<UnsupportedConstructError>("'continue' statements are not supported");
-	// this->check_command(node);
-}
-
-void TypeChecker::visit(const Assume& assume) {
-	this->check_command(assume);
-	assert(assume.expr);
-	auto flat = expression_to_flat_binary_expression(*assume.expr);
-	if (flat.lhs->type.sort == Sort::PTR) {
-		conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
-		conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assume'; was expecting a variable or 'NULL'");
-		// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
-		if (flat.rhs.var.has_value()) {
-			this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.var);
-		} else {
-			this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.null);
-		}
-
-	} else {
-		this->check_assume_nonpointer(assume, *assume.expr);
+void TypeChecker::visit_command_begin() {
+	if (!this->inside_atomic) {
+		this->check_atomic_begin();
 	}
 }
 
+void TypeChecker::visit_command_end() {
+	if (!this->inside_atomic) {
+		this->check_atomic_end();
+	}
+}
+
+void TypeChecker::visit(const Skip& skip) {
+	this->visit_command_begin();
+	this->check_skip(skip);
+	this->visit_command_end();
+}
+
+void TypeChecker::visit(const Break& /*node*/) {
+	this->visit_command_begin();
+	raise_error<UnsupportedConstructError>("'break' statements are not supported");
+	this->visit_command_end();
+}
+
+void TypeChecker::visit(const Continue& /*node*/) {
+	this->visit_command_begin();
+	raise_error<UnsupportedConstructError>("'continue' statements are not supported");
+	this->visit_command_end();
+}
+
+void TypeChecker::visit(const Assume& assume) {
+	this->visit_command_begin();
+	assert(assume.expr);
+	if (!contains_pointer(*assume.expr)) {
+		this->check_assume_nonpointer(assume, *assume.expr);
+
+	} else {
+		auto flat = expression_to_flat_binary_expression(*assume.expr);
+		if (flat.lhs->type.sort == Sort::PTR) {
+			conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
+			conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assume'; was expecting a variable or 'NULL'");
+			// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
+			if (flat.rhs.var.has_value()) {
+				this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.var);
+			} else {
+				this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.null);
+			}
+
+		} else {
+			this->check_assume_nonpointer(assume, *assume.expr);
+		}
+	}
+	this->visit_command_end();
+}
+
 void TypeChecker::visit(const Assert& assrt) {
-	this->check_command(assrt);
+	this->visit_command_begin();
 	this->current_assert = &assrt;
 	assert(assrt.inv);
 	assrt.inv->accept(*this);
 	this->current_assert = nullptr;
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const InvariantExpression& invariant) {
 	assert(invariant.expr);
-	auto flat = expression_to_flat_binary_expression(*invariant.expr);
-	if (flat.lhs->type.sort == Sort::PTR) {
-		conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
-		conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assert'; was expecting a variable or 'NULL'");
-		// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
-		if (flat.rhs.var.has_value()) {
-			this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.var);
-		} else {
-			this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.null);
-		}
-	
+	if (!contains_pointer(*invariant.expr)) {
+		this->check_assert_nonpointer(*this->current_assert, *invariant.expr);
 	} else {
-		raise_error<UnsupportedConstructError>("assertions with data expressions are not supported");
+		auto flat = expression_to_flat_binary_expression(*invariant.expr);
+		if (flat.lhs->type.sort == Sort::PTR) {
+			conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
+			conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assert'; was expecting a variable or 'NULL'");
+			// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
+			if (flat.rhs.var.has_value()) {
+				this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.var);
+			} else {
+				this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.null);
+			}
+		
+		} else {
+			this->check_assert_nonpointer(*this->current_assert, *invariant.expr);
+		}
 	}
 }
 
@@ -345,18 +378,20 @@ void TypeChecker::visit(const InvariantActive& invariant) {
 }
 
 void TypeChecker::visit(const Return& retrn) {
-	this->check_command(retrn);
+	this->visit_command_begin();
 	assert(retrn.expr);
-	expression_to_variable(*retrn.expr);
+	this->check_return(retrn, expression_to_variable(*retrn.expr));
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const Malloc& malloc) {
-	this->check_command(malloc);
+	this->visit_command_begin();
 	this->check_malloc(malloc, malloc.lhs);
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const Assignment& assignment) {
-	this->check_command(assignment);
+	this->visit_command_begin();
 	assert(assignment.lhs);
 	assert(assignment.rhs);
 	assert(assignment.lhs->type().sort == assignment.rhs->type().sort);
@@ -414,10 +449,11 @@ void TypeChecker::visit(const Assignment& assignment) {
 			check_assign_nonpointer(assignment, *assignment.lhs, *assignment.rhs);
 		}
 	}
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const Enter& enter) {
-	this->check_command(enter);
+	this->visit_command_begin();
 	std::vector<std::reference_wrapper<const VariableDeclaration>> params;
 	for (const auto& arg : enter.args) {
 		assert(arg);
@@ -425,21 +461,25 @@ void TypeChecker::visit(const Enter& enter) {
 	}
 
 	this->check_enter(enter, std::move(params));
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const Exit& exit) {
-	this->check_command(exit);
+	this->visit_command_begin();
 	this->check_exit(exit);
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const Macro& /*node*/) {
+	this->visit_command_begin();
 	raise_error<UnsupportedConstructError>("calls to 'MACRO' functions are not supported");
-	// this->check_command(node);
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const CompareAndSwap& /*node*/) {
+	this->visit_command_begin();
 	raise_error<UnsupportedConstructError>("CAS statements are not supported");
-	// this->check_command(node);
+	this->visit_command_end();
 }
 
 void TypeChecker::visit(const Function& function) {

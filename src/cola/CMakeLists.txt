@@ -71,6 +71,7 @@ set(SOURCES
 
 	# util
 	util/cpExpr.cpp
+	util/negExpr.cpp
 	util/print.cpp
 )
 

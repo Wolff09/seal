@@ -277,8 +277,8 @@ struct PrintVisitor final : public Visitor {
 	void print_annotation(const AnnotatedStatement& stmt) {
 		if (stmt.annotation) {
 			stream << indent << "@invariant(";
-			stmt.annotation->accept(*this);
-			stream << ")";
+			stmt.annotation->accept(exprinter);
+			stream << ")" << std::endl;
 		}
 	}
 
@@ -320,7 +320,7 @@ struct PrintVisitor final : public Visitor {
 		print_annotation(whl);
 		stream << indent << "while (";
 		whl.expr->accept(exprinter);
-		stream << ") " << std::endl;
+		stream << ") ";
 		print_scope(*whl.body);
 		stream << std::endl;
 	}
@@ -344,7 +344,9 @@ struct PrintVisitor final : public Visitor {
 		print_annotation(com);
 		stream << indent << "assume(";
 		com.expr->accept(exprinter);
-		stream << ");" << std::endl;
+		stream << ");";
+		stream << " // " << com.id;
+		stream << std::endl;
 	}
 
 	void visit(const Assert& com) {

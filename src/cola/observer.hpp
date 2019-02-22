@@ -131,14 +131,14 @@ namespace cola {
 		virtual ~Observer() = default;
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
 		static const Function& free_function() {
-			static auto mkfreefun = [](const Type& ptrtype) -> Function {
-				Function freefun("free", Type::void_type(), Function::SMR);
-				freefun.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
+			static auto mkfreefun = [](const Type& ptrtype) -> std::unique_ptr<Function> {
+				auto freefun = std::make_unique<Function>("free", Type::void_type(), Function::SMR);
+				freefun->args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
 				return freefun;
 			};
 			static Type ptrtype("$PTR$", Sort::PTR);
-			static Function freefun = mkfreefun(ptrtype);
-			return freefun;
+			static std::unique_ptr<Function> freefun = mkfreefun(ptrtype);
+			return *freefun;
 		}
 	};
 

@@ -547,13 +547,12 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 			// TODO: do nothing, continue with next element on path
 		}
 	}
-	
-	std::cout << std::endl << std::endl << "*********************************************" << std::endl;
-	cola::print(program, std::cout);
+
 	raise_error<RefinementError>("could not infer valid move to fix pointer race");
 }
 
 void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
+	std::cout << "Fixing: "; cola::print(error.pc, std::cout);
 	try {
 		// insert assertion for offending command
 		insert_active_assertion(program, guarantee_table, error.pc, error.var);

@@ -20,13 +20,21 @@ void debug_type_env(const TypeEnv& env, std::string note="") {
 }
 
 
-void TypeChecker::check_annotated_statement(const AnnotatedStatement& stmt) {
-	conditionally_raise_error<UnsupportedConstructError>(stmt.annotation != nullptr, "annotations are not supported, use 'assume' statements instead");
+std::unique_ptr<Assert> make_assert_from_invariant(const Invariant* inv) {
+	if (inv) {
+		return std::make_unique<Assert>(cola::copy(*inv));
+	} else {
+		return std::make_unique<Assert>(std::make_unique<InvariantExpression>(std::make_unique<BooleanValue>(true)));
+	}
 }
 
-void TypeChecker::check_command(const Command& command) {
-	this->check_annotated_statement(command);
-	conditionally_raise_error<UnsupportedConstructError>(!this->inside_atomic, "commands must appear inside an atomic block");
+void TypeChecker::check_annotated_statement(const AnnotatedStatement& stmt) {
+	if (typeid(stmt) == typeid(IfThenElse)) {
+		// allow IfThenElse to have annotations
+		// TODO: implement a less hacky way
+		return;
+	}
+	conditionally_raise_error<UnsupportedConstructError>(stmt.annotation != nullptr, "annotations are not supported, use 'assert' statements instead");
 }
 
 
@@ -85,6 +93,10 @@ void TypeChecker::check_exit(const Exit& exit) {
 	this->current_type_environment = std::move(result);
 }
 
+void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& /*var*/) {
+	throw std::logic_error("not yet implemented: TypeChecker::check_return");
+}
+
 
 void TypeChecker::check_assume_nonpointer(const Assume& /*assume*/, const Expression& /*expr*/) {
 	// do nothing
@@ -110,17 +122,23 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 	}
 }
 
-void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
-	assert(assume.expr);
-	if (lhs.type.sort == Sort::PTR && op == BinaryExpression::Operator::EQ) {
-		// NULL is always valid
-		assert(prtypes::has_binding(current_type_environment, lhs));
-		conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs), assume, lhs);
-		current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
+void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableDeclaration& /*lhs*/, BinaryExpression::Operator /*op*/, const NullValue& /*rhs*/) {
+	// do nothing
 
-	} else {
-		// do nothing
-	}
+	// assert(assume.expr);
+	// if (lhs.type.sort == Sort::PTR && op == BinaryExpression::Operator::EQ) {
+	// 	// NULL is always valid
+	// 	assert(prtypes::has_binding(current_type_environment, lhs));
+	// 	conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs), assume, lhs);
+	// 	current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
+
+	// } else {
+	// 	// do nothing
+	// }
+}
+
+void TypeChecker::check_assert_nonpointer(const cola::Assert& /*assert*/, const cola::Expression& /*expr*/) {
+	// do nothing
 }
 
 void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableDeclaration& lhs, BinaryExpression::Operator op, const VariableDeclaration& rhs) {
@@ -237,10 +255,11 @@ void TypeChecker::check_sequence(const Sequence& sequence) {
 	// widening is applied directly at the commands
 }
 
-void TypeChecker::check_atomic(const Atomic& atomic) {
-	assert(atomic.body);
-	atomic.body->accept(*this);
+void TypeChecker::check_atomic_begin() {
+	// do nothing
+}
 
+void TypeChecker::check_atomic_end() {
 	// remove transient guarantees from local pointers, remove all guarantees from shared pointers
 	for (auto& [decl, guarantees] : current_type_environment) {
 		if (decl.get().is_shared) {
@@ -273,6 +292,41 @@ void TypeChecker::check_choice(const Choice& choice) {
 	}
 
 	this->current_type_environment = std::move(result);
+}
+
+void TypeChecker::check_ite(const IfThenElse& ite) {
+	// on-the-fly:
+	// handle '@invariant(<inv>) if (<cond>) { <if> } else { <else> }'
+	// as     'choose { atomic { assert(<inv>); assume(<cond>); }; <if> }{ atomic { assert(<inv>); assume(!<cond>); }; <else> }'
+	assert(ite.expr);
+	auto prolog_positive = std::make_unique<Atomic>(std::make_unique<Scope>(std::make_unique<Sequence>(make_assert_from_invariant(ite.annotation.get()), std::make_unique<Assume>(cola::copy(*ite.expr)))));
+	auto prolog_negative = std::make_unique<Atomic>(std::make_unique<Scope>(std::make_unique<Sequence>(make_assert_from_invariant(ite.annotation.get()), std::make_unique<Assume>(cola::negate(*ite.expr)))));
+	TypeEnv pre_types = this->current_type_environment;
+
+	// compute typing of true branch
+	try {
+		prolog_positive->accept(*this);
+	} catch (UnsafeAssumeError err) {
+		std::cout << "ITE FAILED: " << err.what() << std::endl;
+		throw std::logic_error("not yet implemented: TypeChecker::check_ite(const IfThenElse&), translation from UnsafeAssumeError to UnsafeIteConditionError");
+	}
+	assert(ite.ifBranch);
+	ite.ifBranch->accept(*this);
+	TypeEnv post_true = std::move(this->current_type_environment);
+
+	// compute typing of false branch
+	this->current_type_environment = pre_types;
+	try {
+		prolog_negative->accept(*this);
+	} catch (UnsafeAssumeError err) {
+		std::cout << "ITE FAILED: " << err.what() << std::endl;
+		throw std::logic_error("not yet implemented: TypeChecker::check_ite(const IfThenElse&), translation from UnsafeAssumeError to UnsafeIteConditionError");
+	}
+	assert(ite.elseBranch);
+	ite.elseBranch->accept(*this);
+	TypeEnv post_false = std::move(this->current_type_environment);
+
+	this->current_type_environment = intersection(post_true, post_false);
 }
 
 inline bool guaranteeset_equals(const GuaranteeSet& lhs, const GuaranteeSet& rhs) {
@@ -311,6 +365,36 @@ void TypeChecker::check_loop(const Loop& loop) {
 		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
 
 	} while (!typeenv_equals(pre_types, this->current_type_environment));
+}
+
+void TypeChecker::check_while(const While& whl) {
+	// on-the-fly handle 'while (<cond>) { <body> }' as 'loop { assume(<cond>); <body> }; assume(!<cond>);'
+	auto assume_positive = std::make_unique<Assume>(cola::copy(*whl.expr));
+	auto assume_negative = std::make_unique<Assume>(cola::negate(*whl.expr));
+
+	// apply loop rule
+	assert(whl.body);
+	TypeEnv pre_types;
+
+	do {
+		pre_types = this->current_type_environment;
+		try {
+			assume_positive->accept(*this);
+		} catch (UnsafeAssumeError err) {
+			std::cout << "WHILE FAILED: " << err.what() << std::endl;
+			throw std::logic_error("not yet implemented: TypeChecker::check_while(const While&), translation from UnsafeAssumeError to UnsafeWhileConditionError");
+		}
+		whl.body->accept(*this);
+		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
+
+	} while (!typeenv_equals(pre_types, this->current_type_environment));
+
+	try {
+		assume_negative->accept(*this);
+	} catch (UnsafeAssumeError err) {
+		std::cout << "WHILE FAILED: " << err.what() << std::endl;
+		throw std::logic_error("not yet implemented: TypeChecker::check_while(const While&), translation from UnsafeAssumeError to UnsafeWhileConditionError");
+	}
 }
 
 void TypeChecker::check_interface_function(const Function& function) {
