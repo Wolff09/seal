@@ -50,7 +50,7 @@ void prtypes::test() {
 	std::cout << std::endl << std::endl << "Testing..." << std::endl;
 	// const Type& ptrtype = Observer::free_function().args.at(0)->type;
 
-	std::string filename = "/Users/wolff/Tools/PointerRaceTypes/test.cola";
+	std::string filename = "/Users/wolff/Desktop/PointerRaceTypes/test.cola";
 	auto program_ptr = cola::parse(filename);
 	Program& program = *program_ptr;
 	program.name = "TestProgram";
@@ -103,7 +103,6 @@ void prtypes::test() {
 		auto fix = [&](PointerRaceError& err) {
 			std::cout << err.what() << std::endl;
 			std::cout << "Trying to fix pointer race..." << std::endl;
-			throw std::logic_error("not fixing at the moment!");
 			switch (err.kind()) {
 				case PointerRaceError::CALL: try_fix_pointer_race(program, table, static_cast<UnsafeCallError&>(err)); break;
 				case PointerRaceError::DEREF: try_fix_pointer_race(program, table, static_cast<UnsafeDereferenceError&>(err)); break;
@@ -123,6 +122,7 @@ void prtypes::test() {
 	}
 	std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
 
+	throw std::logic_error("temporary breakpoint");
 	// assertion check
 	std::cout << std::endl << "Checking assertions..." << std::endl;
 	bool assertions_safe = discharge_assertions(program, table);

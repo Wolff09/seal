@@ -48,7 +48,7 @@ namespace prtypes {
 	struct UnsafeAssumeError : public PointerRaceError {
 		const cola::Assume& pc;
 		const cola::VariableDeclaration& var;
-		UnsafeAssumeError(const cola::Assume& pc_, const cola::VariableDeclaration& var_) : PointerRaceError("unsafe assume using potentially invalid variable " + var_.name), pc(pc_), var(var_) {}
+		UnsafeAssumeError(const cola::Assume& pc_, const cola::VariableDeclaration& var_) : PointerRaceError("unsafe assume (" + std::to_string(pc_.id) + ") using potentially invalid variable " + var_.name), pc(pc_), var(var_) {}
 		virtual Kind kind() const override { return ASSUME; }
 	};
 

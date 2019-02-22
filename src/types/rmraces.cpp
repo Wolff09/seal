@@ -507,6 +507,12 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 	conditionally_raise_error<RefinementError>(!path_opt.has_value(), "could not find an insertion path for unsafe assume");
 	auto path = *path_opt;
 
+	std::cout << "Found path: " << std::endl;
+	for (const auto& elem : path) {
+		std::cout << "   - ";
+		cola::print(*elem, std::cout);
+	}
+
 	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
 		try {
@@ -530,11 +536,11 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 			// create new assume to insert
 			auto assume = std::make_unique<Assume>(std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(true)));
 
-			// add new assume, replace old assume condition with a tautology
-			AssertionInsertionVisitor insert_assume_visitor(error.pc, std::move(assume), true);
+			// add new assume, replace old assume with an assertion with the same condition (to maintain type information gained by assume)
+			AssertionInsertionVisitor insert_assume_visitor(error.pc, std::move(assume), false /* insert before */);
 			program.accept(insert_assume_visitor);
 			assert(insert_assume_visitor.owner_found);
-			*insert_assume_visitor.owner_found = std::make_unique<Skip>();
+			*insert_assume_visitor.owner_found = std::make_unique<Assert>(std::make_unique<InvariantExpression>(cola::copy(*error.pc.expr)));
 
 			// insert update of tmp
 			AssertionInsertionVisitor insert_update_visitor(*static_cast<Command*>(visitor.inserted), std::move(choice), true);
@@ -552,7 +558,8 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 }
 
 void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
-	std::cout << "Fixing: "; cola::print(error.pc, std::cout);
+	std::cout << "Fixing '" << error.var.name << "' in: "; cola::print(error.pc, std::cout);
+
 	try {
 		// insert assertion for offending command
 		insert_active_assertion(program, guarantee_table, error.pc, error.var);

@@ -7,6 +7,7 @@
 using namespace cola;
 using namespace prtypes;
 
+// TODO: remove if/while (for expressions containing pointers)
 
 void debug_type_env(const TypeEnv& env, std::string note="") {
 	std::cout << "Type Env " << note << std::endl;
