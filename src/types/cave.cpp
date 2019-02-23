@@ -14,6 +14,7 @@ using namespace prtypes;
 static const bool INSTRUMENT_OBJECTS = false;
 
 // TODO: guard assertActive with != NULL??
+// TODO: remove imp var option
 
 void print_delimiter(std::ostream& stream, std::string text) {
 	stream << "// ----------------------------------------------------------------------" << std::endl;

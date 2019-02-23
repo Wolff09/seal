@@ -136,6 +136,12 @@ bool is_expression_local(const Expression& expr) {
 	return visitor.result;
 }
 
+std::set<const VariableDeclaration*> collect_variables(const Expression& expr) {
+	LocalExpressionVisitor visitor;
+	expr.accept(visitor);
+	return std::move(visitor.decls);
+}
+
 struct AssertionInsertionVisitor : public NonConstVisitor {
 	const Command& to_find;
 	std::unique_ptr<Statement> to_insert;
@@ -291,12 +297,12 @@ AssertionInsertionVisitor insert_active_assertion(Program& program, const Guaran
 }
 
 struct AssignmentExpressionVisitor final : public Visitor {
-	const VariableDeclaration& search;
+	std::set<const VariableDeclaration*> search;
 	bool result = false;
-	AssignmentExpressionVisitor(const VariableDeclaration& search) : search(search) {}
+	AssignmentExpressionVisitor(std::set<const VariableDeclaration*> search_) : search(std::move(search_)) {}
 
 	void visit(const VariableDeclaration& decl) override {
-		if (&decl == &search) {
+		if (search.count(&decl) > 0) {
 			result = true;
 		}
 	}
@@ -338,12 +344,15 @@ struct AssignmentExpressionVisitor final : public Visitor {
 };
 
 struct InsertionLocationFinderVisitor final : public Visitor {
-	const VariableDeclaration& variable;
+	std::set<const VariableDeclaration*> variables;
 	const Command& end;
 	bool on_path = false;
+	bool path_reset = false;
 	std::vector<const Command*> path;
-	InsertionLocationFinderVisitor(const VariableDeclaration& variable, const Command& end) : variable(variable), end(end) {
-		assert(!variable.is_shared);
+	InsertionLocationFinderVisitor(std::set<const VariableDeclaration*> vars, const Command& end) : variables(std::move(vars)), end(end) {
+		for (const VariableDeclaration* var : variables) {
+			assert(!var->is_shared);
+		}
 	}
 
 	struct Heureka : public std::exception {
@@ -387,14 +396,15 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	void visit(const CompareAndSwap& /*node*/) override { /* do nothing */ }
 	void visit(const Assert& /*node*/) override { /* do nothing */ }
 	void visit(const Malloc& malloc) override {
-		if (&malloc.lhs == &variable) {
+		if (variables.count(&malloc.lhs) > 0) {
 			on_path = true;
 			path.clear();
+			path_reset = true;
 			path.push_back(&malloc);
 		}
 	}
 	void visit(const Assignment& assign) override {
-		AssignmentExpressionVisitor visitor(variable);
+		AssignmentExpressionVisitor visitor(variables);
 		assert(assign.lhs);
 		assign.lhs->accept(visitor);
 
@@ -402,13 +412,14 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 			// assignment to this->variable
 			on_path = true;
 			path.clear();
+			path_reset = true;
 			path.push_back(&assign);
 		} 
 	}
-	void visit(const Assume& node) override {
-		assert(node.expr);
-		if (on_path && !is_expression_local(*node.expr)) {
-			path.push_back(&node);
+	void visit(const Assume& assume) override {
+		assert(assume.expr);
+		if (on_path && !is_expression_local(*assume.expr)) {
+			path.push_back(&assume);
 		}
 	}
 
@@ -443,12 +454,17 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	void visit(const Choice& node) override {
 		std::vector<const Command*> copy_path = path;
 		bool copy_on = on_path;
+		path_reset = false;
 		for (const auto& branch : node.branches) {
 			assert(branch);
 			branch->accept(*this);
 
-			path = std::move(copy_path);
+			path = copy_path;
 			on_path = copy_on;
+		}
+		if (path_reset) {
+			on_path = false;
+			path.clear();
 		}
 	}
 	void visit(const Loop& node) override {
@@ -502,7 +518,7 @@ const VariableDeclaration& make_tmp_variable(Function& function) {
 void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
 	std::cout << "Trying to fix local unsafe assume..." << std::endl;
 
-	InsertionLocationFinderVisitor visitor(error.var, error.pc); // TODO: the path must be valid for all variables occuring in the assume expr  <<<<<<<<<<<<<<<<<-------------------------------------------------------------|||||||||||||||||||||||||||
+	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
 	auto path_opt = visitor.get_path(program);
 	conditionally_raise_error<RefinementError>(!path_opt.has_value(), "could not find an insertion path for unsafe assume");
 	auto path = *path_opt;
@@ -550,12 +566,41 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 			return;
 
 		} catch (RefinementError err) {
-			// TODO: do nothing, continue with next element on path
+			// do nothing, continue with next element on path
 		}
 	}
 
 	raise_error<RefinementError>("could not infer valid move to fix pointer race");
 }
+
+void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
+	std::cout << "Trying to fix local unsafe dereference..." << std::endl;
+
+	InsertionLocationFinderVisitor visitor({ &error.var }, error.pc);
+	auto path_opt = visitor.get_path(program);
+	conditionally_raise_error<RefinementError>(!path_opt.has_value(), "could not find an insertion path for unsafe dereference");
+	auto path = *path_opt;
+
+	std::cout << "Found path: " << std::endl;
+	for (const auto& elem : path) {
+		std::cout << "   - ";
+		cola::print(*elem, std::cout);
+	}
+
+	for (auto it = path.rbegin(); it != path.rend(); ++it) {
+		// try to insert assertion in path; move assume if possible
+		try {
+			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */);
+			return;
+
+		} catch (RefinementError err) {
+			// do nothing, continue with next element on path
+		}
+	}
+
+	raise_error<RefinementError>("could not infer valid move to fix pointer race");
+}
+
 
 void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
 	std::cout << "Fixing '" << error.var.name << "' in: "; cola::print(error.pc, std::cout);
@@ -589,19 +634,19 @@ void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable&
 }
 
 void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
-	insert_active_assertion(program, guarantee_table, error.pc, error.var);
-	// std::cout << "in: ";
-	// cola::print(error.pc, std::cout);
-	// std::cout << std::endl;
-	// std::cout << std::endl;
-	// cola::print(program, std::cout);
-	// std::cout << std::endl;
-	// throw std::logic_error("not yet implemented: try_fix_pointer_race for UnsafeDereferenceError");
+	std::cout << "Fixing '" << error.var.name << "' in: "; cola::print(error.pc, std::cout);
+
+	try {
+		// insert assertion for offending command
+		insert_active_assertion(program, guarantee_table, error.pc, error.var);
+
+	} catch (RefinementError err) {
+		if (!error.var.is_shared) {
+			// dereferences of local pointers should be guarded by SMR; try find earlier point where it is safe
+			try_fix_local_unsafe_dereference(program, guarantee_table, error);
+		} else {
+			throw err;
+		}
+
+	}
 }
-
-
-
-
-
-
-

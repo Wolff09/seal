@@ -91,7 +91,7 @@ void prtypes::test() {
 	add_guarantees(protect1);
 	add_guarantees(protect2);
 
-	// assertion check (initial ones given by programmer)
+	// // assertion check (initial ones given by programmer)
 	// std::cout << std::endl << "Checking initial assertions..." << std::endl;
 	// bool initial_assertions_safe = discharge_assertions(program, table);
 	// std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
@@ -122,7 +122,6 @@ void prtypes::test() {
 	}
 	std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
 
-	throw std::logic_error("temporary breakpoint");
 	// assertion check
 	std::cout << std::endl << "Checking assertions..." << std::endl;
 	bool assertions_safe = discharge_assertions(program, table);
