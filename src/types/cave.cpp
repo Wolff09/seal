@@ -11,7 +11,8 @@
 using namespace cola;
 using namespace prtypes;
 
-static const bool INSTRUMENT_OBJECTS = false;
+static const bool INSTRUMENT_OBJECTS = false; // does not work
+static const bool INSTRUMENT_FLAG = false; // does not work
 
 // TODO: guard assertActive with != NULL??
 // TODO: remove imp var option
@@ -102,6 +103,9 @@ struct CaveOutputVisitor : public Visitor {
 		if (!INSTRUMENT_OBJECTS) {
 			stream << std::endl;
 			stream << indent << type2cave(retire_type) << " INSTRUMENTATION_PTR_;" << std::endl;
+			if (INSTRUMENT_FLAG) {
+				stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
+			}
 		}
 	}
 
@@ -150,6 +154,9 @@ struct CaveOutputVisitor : public Visitor {
 		if (!INSTRUMENT_OBJECTS) {
 			stream << indent << "// initialize instrumentation" << std::endl;
 			stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
+			if (INSTRUMENT_FLAG) {
+				stream << indent << "CC_->INSTRUMENTATION_RETIRED_ = false;" << std::endl;
+			}
 			stream << std::endl;
 		}
 		stream << indent << "// initialize bug fixer" << std::endl;
@@ -182,8 +189,15 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
 		stream << indent << "int myRes;" << std::endl;
 		stream << indent << "myNull_assertActive = NULL;" << std::endl;
-		stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
-		// stream << indent << "if (ptr->RETIRED_) {" << std::endl;
+		if (INSTRUMENT_OBJECTS) {
+			stream << indent << "if (ptr->RETIRED_) {" << std::endl;
+		} else {
+			if (INSTRUMENT_FLAG) {
+				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+			} else {
+				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+			}
+		}
 		indent++;
 		stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
 		indent--;
@@ -383,9 +397,11 @@ struct CaveOutputVisitor : public Visitor {
 
 	void visit(const Malloc& malloc) {
 		stream << indent << var2cave(malloc.lhs) << " = new();" << std::endl;
-		if (INSTRUMENT_OBJECTS) {
-			if (&malloc.lhs.type == &retire_type) {
+		if (&malloc.lhs.type == &retire_type) {
+			if (INSTRUMENT_OBJECTS) {
 				stream << indent << var2cave(malloc.lhs) << "->RETIRED_ = false;" << std::endl;
+			} else if (INSTRUMENT_FLAG) {
+				stream << indent << "atomic { if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = " << var2cave(malloc.lhs) << "; } } }" << std::endl;
 			}
 		}
 	}
@@ -418,7 +434,7 @@ struct CaveOutputVisitor : public Visitor {
 				enter.args.at(0)->accept(*this);
 				stream << ")->RETIRED_ = true;" << std::endl;
 
-			} else {
+			} else if (!INSTRUMENT_FLAG) {
 				// instrumentation: set if not yet set
 				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
 				enter.args.at(0)->accept(*this);
