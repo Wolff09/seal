@@ -657,12 +657,12 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 		cola::print(*elem, std::cout);
 	}
 
-	const bool no_check = path.size() <= 1 && !CHECK_SINGLETON_PATH;
-	if (no_check) {
-		std::cout << "Will not check path; have no choice anyways." << std::endl;
-	}
+	for (auto it = path.begin(); it != path.end(); ++it) {
+		const bool no_check = (it+1 == path.end()) && !CHECK_SINGLETON_PATH;
+		if (no_check) {
+			std::cout << "Will not check path; have no choice anyways." << std::endl;
+		}
 
-	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
 		try {
 			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
@@ -768,12 +768,12 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 		cola::print(*elem, std::cout);
 	}
 
-	const bool no_check = path.size() <= 1 && !CHECK_SINGLETON_PATH;
-	if (no_check) {
-		std::cout << "Will not check path; have no choice anyways." << std::endl;
-	}
+	for (auto it = path.begin(); it != path.end(); ++it) {
+		const bool no_check = (it+1 == path.end()) && !CHECK_SINGLETON_PATH;
+		if (no_check) {
+			std::cout << "Will not check path; have no choice anyways." << std::endl;
+		}
 
-	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
 		try {
 			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
