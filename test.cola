@@ -113,6 +113,5 @@ void dequeue() {
 			}
 		}
 	}
-	assume(done);
 	// return result;
 }
