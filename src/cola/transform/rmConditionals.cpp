@@ -18,7 +18,9 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	}
 
 	void visit(Function& function) {
-		function.body->accept(*this);
+		if (function.body) {
+			function.body->accept(*this);
+		}
 	}
 
 	void visit(Atomic& atomic) {
@@ -43,7 +45,7 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	void visit(IfThenElse& ite) {
 		if (ite.elseBranch) {
 			ite.elseBranch->accept(*this);
-			auto expr = std::make_unique<NegatedExpression>(cola::copy(*ite.expr));
+			auto expr = cola::negate(*ite.expr);
 			prependAssumption(*ite.elseBranch, std::move(expr));
 		}
 
@@ -62,7 +64,8 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	void visit(While& whl) {
 		whl.body->accept(*this);
 
-		auto expr = std::make_unique<NegatedExpression>(cola::copy(*whl.expr));
+		// TODO: check if whl.expr is 'true', if so fail
+		auto expr = cola::negate(*whl.expr);
 		prependAssumption(*whl.body, std::move(whl.expr));
 		auto loop = std::make_unique<Loop>(std::move(whl.body));
 		auto assume = std::make_unique<Assume>(std::move(expr));

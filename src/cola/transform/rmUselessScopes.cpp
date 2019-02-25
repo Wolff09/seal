@@ -37,7 +37,9 @@ struct RemoveUselessScopeVisitor final : NonConstVisitor {
 	}
 
 	void visit(Function& function) {
-		handle_scope(*function.body, false);
+		if (function.body) {
+			handle_scope(*function.body, false);
+		}
 	}
 
 	void visit(Scope& scope) {

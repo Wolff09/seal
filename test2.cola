@@ -1,41 +1,190 @@
 
-struct Bar {
-	bool b1, b2, b3;
-	data_t d;
-	Bar* bbb;
-	Foobar* fff;
+struct Node {
+	data_t data;
+	Node* next;
 }
 
-struct Foobar {
-	bool b;
-	Bar* bbb;
-	Foobar* fff;
-}
+Node* Tail;
+Node* Head;
 
-bool Test1, Test2, Test3;
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
 
 void init() {
-	skip;
+	Head = malloc;
+	Head->next = NULL;
+	Tail = Head;
 }
 
-inline void bar(bool b) {
-	skip;
+void enqueue(data_t input) {
+	Node* tail, next, node, tmp;
+	bool done;
+	bool b1;
+
+	node = malloc;
+	node->data = input;
+	node->next = NULL;
+
+	done = false;
+	loop {
+		assume(!done);
+		atomic { tail = Tail; }
+		protect1(tail);
+		choose {
+//			// INFERRED
+//			atomic {
+//				tail = Tail;
+//				protect1(tail);
+////				assert(active(tail)); /* INFERRED */
+//			}
+			atomic { assume(tail == Tail); }
+
+			atomic { next = tail->next; }
+			choose {
+				atomic {
+//					assert(active(Tail)); /* INFERRED */
+					assume(tail == Tail);
+				}
+				choose {
+					atomic { assume(next != NULL); }
+					// CAS(Tail, tail, next)
+					atomic {
+						choose {
+//							assert(active(Tail)); /* INFERRED */
+							assume(Tail == tail);
+							Tail = next;
+						}{
+							assume(Tail != tail);
+						}
+					}
+
+				}{
+					assume(next == NULL);
+					// if (CAS(tail->next, next, node))
+					atomic {
+						tmp = tail->next;
+						choose {
+							assume(tmp == NULL);
+							tail->next = node;
+							b1 = true;
+						}{
+							assume(tmp != NULL);
+							b1 = false;
+						}
+					}
+					choose {
+						assume(b1);
+						// CAS(Tail, tail, node)
+						atomic {
+							choose {
+//								assert(active(Tail)); /* INFERRED */
+								assume(Tail == tail);
+								Tail = node;
+							}{
+								assume(Tail != tail);
+							}
+						}
+						done = true;
+					}{
+						assume(!b1);
+					}
+				}
+			}{
+				atomic { assume(tail != Tail); }
+			}
+
+		}{
+			atomic { assume(tail != Tail); }
+		}
+	}
+	assume(done);
 }
 
-inline void foo(bool b, data_t x, Bar* s, Foobar* l) {
-	Foobar* fff;
-	Bar* bbb;
-	skip;
-	if (b) {
-		bool test;
-		s = s->bbb->bbb;
-		skip;
-	} else {
-		bool test;
+void dequeue() {
+	Node* head, next, tail, tmp;
+	data_t result;
+	bool done;
+	bool b1;
+
+	done = false;
+	loop {
+		assume(!done);
+		atomic { head = Head; }
+		protect1(head);
+		choose {
+//			// INFERRED
+// 			atomic {
+// 				atomic { head = Head; }
+// 				protect1(head);
+// //				assert(active(head)); /* INFERRED */
+// 			}
+			atomic { assume(head == Head); }
+
+			atomic { tail = Tail; }
+			atomic { next = head->next; }
+			protect2(next);
+			choose {
+				atomic {
+//					assert(active(Head)); /* INFERRED */
+					assume(head == Head);
+//					assert(active(next)); /* INFERRED */
+				}
+				choose {
+					assume(next == NULL);
+					result = EMPTY;
+					done = true;
+
+				}{
+					assume(next != NULL);
+					choose {
+						atomic {
+//							assert(active(tail)); /* MOVED (note: this assertion does not hold here) */
+							assume(head == tail);
+						}
+						// CAS(Tail, tail, next)
+						atomic {
+							choose {
+//								assert(active(Tail)); /* INFERRED */
+								assume(Tail == tail);
+								Tail = next;
+							}{
+								assume(Tail != tail);
+							}
+						}
+
+					}{
+						assume(head != tail);
+						atomic { result = next->data; }
+						// if (CAS(Head, head, next))
+						atomic {
+							choose {
+//								assert(active(Head)); /* INFERRED */
+								assume(Head == head);
+								Head = next;
+								b1 = true;
+								retire(head);
+							}{
+								assume(Head != head);
+							}
+						}
+						choose {
+							assume(b1);
+							// retire(head); // move left to avoid CAVE imprecision
+							done = true;
+						}{
+							assume(!b1);
+						}
+					}
+				}
+			}{
+				atomic { assume(head != Head); }
+			}
+
+		}{
+			atomic { assume(head != Head); }
+		}
 	}
-	if (b) {
-		bool test;
-	} else {
-		bool test;
-	}
+	assume(done);
+	// return result;
 }

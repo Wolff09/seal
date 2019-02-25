@@ -51,7 +51,9 @@ struct MoveVariablesVisitor final : NonConstVisitor {
 
 	void visit(Function& function) {
 		currentFunction = &function;
-		function.body->body->accept(*this); // do not visit top level scope
+		if (function.body) {
+			function.body->body->accept(*this); // do not visit top level scope
+		}
 	}
 
 	void visit(Sequence& sequence) {

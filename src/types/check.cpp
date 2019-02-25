@@ -10,6 +10,7 @@
 #include "cola/parse.hpp"
 #include "cola/util.hpp"
 #include "types/rmraces.hpp"
+#include "types/preprocess.hpp"
 
 using namespace cola;
 using namespace prtypes;
@@ -56,6 +57,11 @@ void prtypes::test() {
 	program.name = "TestProgram";
 	
 	std::cout << "Parsed program: " << std::endl;
+	cola::print(program, std::cout);
+	
+	prtypes::preprocess(program);
+	program.name += " (preprocessed)";
+	std::cout << "Preprocessed program: " << std::endl;
 	cola::print(program, std::cout);
 
 	// query retire
