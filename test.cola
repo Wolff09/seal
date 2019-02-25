@@ -32,11 +32,12 @@ void enqueue(data_t input) {
 		atomic { tail = Tail; }
 		protect1(tail);
 		choose {
-			atomic {
-				tail = Tail;
-				protect1(tail);
-//				assert(active(tail)); /* INFERRED */
-			}
+//			atomic {
+//				tail = Tail;
+//				protect1(tail);
+////				assert(active(tail)); /* INFERRED */
+//			}
+			atomic { assume(tail == Tail); }
 
 			atomic { next = tail->next; }
 			choose {

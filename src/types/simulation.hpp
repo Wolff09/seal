@@ -29,6 +29,7 @@ namespace prtypes {
 			void compute_simulation(const cola::Observer& observer);
 			bool is_in_simulation_relation(const cola::State& state, const cola::State& other) const;
 			bool is_safe(const cola::Enter& enter, const std::vector<std::reference_wrapper<const cola::VariableDeclaration>>& params, const VariableDeclarationSet& invalid_params) const;
+			bool is_repeated_execution_simulating(const std::vector<std::reference_wrapper<const cola::Command>>& events) const;
 	};
 
 } // namespace prtypes

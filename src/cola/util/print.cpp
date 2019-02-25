@@ -446,3 +446,8 @@ void cola::print(const Command& command, std::ostream& stream) {
 	PrintVisitor visitor(stream);
 	command.accept(visitor);
 }
+
+void cola::print(const Statement& statement, std::ostream& stream) {
+	PrintVisitor visitor(stream);
+	statement.accept(visitor);
+}

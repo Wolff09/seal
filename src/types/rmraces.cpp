@@ -1,6 +1,7 @@
 #include "types/rmraces.hpp"
 #include "types/cave.hpp"
 #include "cola/util.hpp"
+#include "types/inference.hpp"
 #include <iostream>
 
 using namespace cola;
@@ -349,11 +350,8 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	bool on_path = false;
 	bool path_reset = false;
 	std::vector<const Command*> path;
-	InsertionLocationFinderVisitor(std::set<const VariableDeclaration*> vars, const Command& end) : variables(std::move(vars)), end(end) {
-		for (const VariableDeclaration* var : variables) {
-			assert(!var->is_shared);
-		}
-	}
+	std::vector<const Statement*> full_path;
+	InsertionLocationFinderVisitor(std::set<const VariableDeclaration*> vars, const Command& end) : variables(std::move(vars)), end(end) {}
 
 	struct Heureka : public std::exception {
 		virtual const char* what() const noexcept { return "HEUREKA"; }
@@ -366,6 +364,20 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 			return this->path;
 		}
 		return std::nullopt;
+	}
+
+	std::vector<const Command*> get_path_or_raise(const Program& program) {
+		auto path_opt = get_path(program);
+		if (path_opt.has_value()) {
+			return *path_opt;
+		} else {
+			throw RefinementError("could not find an insertion path");
+		}
+	}
+
+	std::vector<const Statement*> get_full_path_or_raise(const Program& program) {
+		get_path_or_raise(program);
+		return full_path;
 	}
 
 	void abort() {
@@ -387,20 +399,23 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 
 	// assignment to variable => on_path = true, path.clear()
 	void visit(const Skip& /*node*/) override { /* do nothing */ }
-	void visit(const Break& /*node*/) override { /* do nothing */ }
-	void visit(const Continue& /*node*/) override { /* do nothing */ }
-	void visit(const Return& /*node*/) override { /* do nothing */ }
-	void visit(const Enter& /*node*/) override { /* do nothing */ }
-	void visit(const Exit& /*node*/) override { /* do nothing */ }
-	void visit(const Macro& /*node*/) override { /* do nothing */ }
-	void visit(const CompareAndSwap& /*node*/) override { /* do nothing */ }
-	void visit(const Assert& /*node*/) override { /* do nothing */ }
+	void visit(const Break& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const Continue& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const Return& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const Enter& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const Exit& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const Macro& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const CompareAndSwap& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const Assert& node) override { if (on_path) { full_path.push_back(&node); } }
 	void visit(const Malloc& malloc) override {
 		if (variables.count(&malloc.lhs) > 0) {
 			on_path = true;
 			path.clear();
 			path_reset = true;
 			path.push_back(&malloc);
+		}
+		if (on_path) {
+			full_path.push_back(&malloc);
 		}
 	}
 	void visit(const Assignment& assign) override {
@@ -412,14 +427,21 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 			// assignment to this->variable
 			on_path = true;
 			path.clear();
+			full_path.clear();
 			path_reset = true;
 			path.push_back(&assign);
-		} 
+		}
+		if (on_path) {
+			full_path.push_back(&assign);
+		}
 	}
 	void visit(const Assume& assume) override {
 		assert(assume.expr);
 		if (on_path && !is_expression_local(*assume.expr)) {
 			path.push_back(&assume);
+		}
+		if (on_path) {
+			full_path.push_back(&assume);
 		}
 	}
 
@@ -453,6 +475,7 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	}
 	void visit(const Choice& node) override {
 		std::vector<const Command*> copy_path = path;
+		std::vector<const Statement*> copy_full_path = full_path;
 		bool copy_on = on_path;
 		path_reset = false;
 		for (const auto& branch : node.branches) {
@@ -460,15 +483,20 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 			branch->accept(*this);
 
 			path = copy_path;
+			full_path = copy_full_path;
 			on_path = copy_on;
 		}
 		if (path_reset) {
 			on_path = false;
 			path.clear();
+			full_path.clear();
+		} else {
+			full_path.push_back(&node);
 		}
 	}
 	void visit(const Loop& node) override {
 		std::vector<const Command*> copy_path = path;
+		std::vector<const Statement*> copy_full_path = full_path;
 		bool copy_on = on_path;
 		
 		assert(node.body);
@@ -476,6 +504,9 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 
 		path = std::move(copy_path);
 		on_path = copy_on;
+
+		full_path = std::move(copy_full_path);
+		full_path.push_back(&node);
 	}
 	void visit(const IfThenElse& /*node*/) override {
 		raise_error<UnsupportedConstructError>("'if' not supported");
@@ -501,6 +532,78 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	}
 };
 
+struct RightMovernessVisitor final : public Visitor {
+	private:
+	bool moves = true;
+	const Function& retire_function;
+	std::vector<std::reference_wrapper<const Command>> events;
+
+	public:
+	RightMovernessVisitor(const Function& retire) : retire_function(retire) {}
+
+	bool right_moves(const SimulationEngine& engine) {
+		if (!engine.is_repeated_execution_simulating(this->events)) {
+			this->moves = false;
+		}
+		return this->moves;
+	}
+
+	void visit(const VariableDeclaration& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const VariableDeclaration&)"); }
+	void visit(const Expression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Expression&)"); }
+	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const BooleanValue&)"); }
+	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const NullValue&)"); }
+	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const EmptyValue&)"); }
+	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const NDetValue&)"); }
+	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const VariableExpression&)"); }
+	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const NegatedExpression&)"); }
+	void visit(const BinaryExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const BinaryExpression&)"); }
+	void visit(const Dereference& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Dereference&)"); }
+	void visit(const InvariantExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const InvariantActive&)"); }
+	void visit(const Sequence& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Sequence&)"); }
+	void visit(const Scope& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Scope&)"); }
+	void visit(const Atomic& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Atomic&)"); }
+	void visit(const IfThenElse& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const IfThenElse&)"); }
+	void visit(const While& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const While&)"); }
+	void visit(const Skip& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Skip&)"); }
+	void visit(const Break& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Break&)"); }
+	void visit(const Continue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Continue&)"); }
+	void visit(const Macro& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Macro&)"); }
+	void visit(const CompareAndSwap& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const CompareAndSwap&)"); }
+	void visit(const Function& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const Program&)"); }
+	void visit(const Choice& /*node*/) override { throw RefinementError("Unsupported construct: choice"); }
+	void visit(const Loop& /*node*/) override { throw RefinementError("Unsupported construct: loop"); }
+
+	void visit(const Assume& node) override {
+		if (!is_expression_local(*node.expr)) {
+			this->moves = false;
+		}
+	}
+	void visit(const Assert& /*node*/) override { /* do nothing */ }
+	void visit(const Return& /*node*/) override {
+		this->moves = false;
+	}
+	void visit(const Malloc& node) override {
+		if (!node.lhs.is_shared) {
+			this->moves = false;
+		}
+	}
+	void visit(const Assignment& node) override {
+		if (!is_expression_local(*node.lhs) || !is_expression_local(*node.rhs)) {
+			this->moves = false;
+		}
+	}
+	void visit(const Enter& node) override {
+		conditionally_raise_error<RefinementError>(&node.decl == &this->retire_function, "Unsupported function: " + retire_function.name);
+		events.push_back(node);
+	}
+	void visit(const Exit& node) override {
+		conditionally_raise_error<RefinementError>(&node.decl == &this->retire_function, "Unsupported function: " + retire_function.name);
+		events.push_back(node);
+	}
+};
+
 const VariableDeclaration& make_tmp_variable(Function& function) {
 	NameCollectorVisitor visitor;
 	function.accept(visitor);
@@ -519,9 +622,7 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 	std::cout << "Trying to fix local unsafe assume..." << std::endl;
 
 	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
-	auto path_opt = visitor.get_path(program);
-	conditionally_raise_error<RefinementError>(!path_opt.has_value(), "could not find an insertion path for unsafe assume");
-	auto path = *path_opt;
+	auto path = visitor.get_path_or_raise(program);
 
 	std::cout << "Found path: " << std::endl;
 	for (const auto& elem : path) {
@@ -573,13 +674,45 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 	raise_error<RefinementError>("could not infer valid move to fix pointer race");
 }
 
+void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
+	std::cout << "Trying to remove local unsafe assume..." << std::endl;
+
+	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
+	auto full_path = visitor.get_full_path_or_raise(program);
+	conditionally_raise_error<RefinementError>(full_path.size() == 0, "found full path to be empty; cannot recover");
+
+	std::cout << "Found full path: " << std::endl;
+	for (const auto& elem : full_path) {
+		std::cout << "   - ";
+		cola::print(*elem, std::cout);
+	}
+
+	auto it = full_path.begin();
+	assert(it != full_path.end());
+
+	// check first path element to be an assignment corresponding to the assumption to be replaced
+	// TODO: implement check
+	// conditionally_raise_error<RefinementError>(???, "malformed full path");
+	++it;
+
+	// check remaining path elements to be heap-local or right movers
+	RightMovernessVisitor move_checker(guarantee_table.observer_store.retire_function);
+	for (; it != full_path.end(); ++it) {
+		(*it)->accept(move_checker);
+	}
+	conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "full path does not move");
+
+	// TODO: ensure that first statement is an assignment corresponding to error.pc.expr
+	// TODO: ensure that remaining statements are purely local or left movers (add assertion for non-local assignments?)
+
+	throw std::logic_error(" --- not yet implemented --- ");
+}
+
 void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
 	std::cout << "Trying to fix local unsafe dereference..." << std::endl;
 
 	InsertionLocationFinderVisitor visitor({ &error.var }, error.pc);
-	auto path_opt = visitor.get_path(program);
-	conditionally_raise_error<RefinementError>(!path_opt.has_value(), "could not find an insertion path for unsafe dereference");
-	auto path = *path_opt;
+	auto path = visitor.get_path_or_raise(program);
 
 	std::cout << "Found path: " << std::endl;
 	for (const auto& elem : path) {
@@ -615,6 +748,7 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 		if (is_expression_local(*error.pc.expr)) {
 			try_fix_local_unsafe_assume(program, guarantee_table, error);
 		} else {
+			try_remove_unsafe_assume(program, guarantee_table, error);
 			throw err;
 		}
 

@@ -320,3 +320,150 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 bool SimulationEngine::is_in_simulation_relation(const State& state, const State& other) const {
 	return all_simulations.count({ &state, &other }) > 0;
 }
+
+
+struct CallVisitor final : Visitor {
+	void visit(const VariableDeclaration& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const VariableDeclaration&)"); }
+	void visit(const Expression& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Expression&)"); }
+	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const BooleanValue&)"); }
+	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const NullValue&)"); }
+	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const EmptyValue&)"); }
+	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const NDetValue&)"); }
+	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const VariableExpression&)"); }
+	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const NegatedExpression&)"); }
+	void visit(const BinaryExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const BinaryExpression&)"); }
+	void visit(const Dereference& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Dereference&)"); }
+	void visit(const InvariantExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const InvariantActive&)"); }
+	void visit(const Sequence& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Sequence&)"); }
+	void visit(const Scope& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Scope&)"); }
+	void visit(const Atomic& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Atomic&)"); }
+	void visit(const Choice& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Choice&)"); }
+	void visit(const IfThenElse& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const IfThenElse&)"); }
+	void visit(const Loop& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Loop&)"); }
+	void visit(const While& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const While&)"); }
+	void visit(const Skip& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Skip&)"); }
+	void visit(const Break& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Break&)"); }
+	void visit(const Continue& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Continue&)"); }
+	void visit(const Assume& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Assume&)"); }
+	void visit(const Assert& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Assert&)"); }
+	void visit(const Return& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Return&)"); }
+	void visit(const Malloc& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Malloc&)"); }
+	void visit(const Assignment& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Assignment&)"); }
+	void visit(const Macro& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Macro&)"); }
+	void visit(const CompareAndSwap& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const CompareAndSwap&)"); }
+	void visit(const Function& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Program&)"); }
+
+	const Function* label = nullptr;
+	Transition::Kind kind = Transition::INVOCATION;
+
+	std::pair<const Function&, Transition::Kind> convert(const AstNode& node) {
+		node.accept(*this);
+		assert(label);
+		return { *label, kind };
+	}
+
+	void visit(const Enter& node) override {
+		this->label = &node.decl;
+		this->kind = Transition::INVOCATION;
+	}
+	void visit(const Exit& node) override {
+		this->label = &node.decl;
+		this->kind = Transition::RESPONSE;
+	}
+};
+
+struct GuardMakerVisitor final : public ObserverVisitor {
+	std::vector<std::unique_ptr<Guard>> guards;
+	bool is_thread_observed;
+	bool is_address_observed;
+	const VariableDeclaration* decl;
+	GuardMakerVisitor(bool is_thread_observed, bool is_address_observed, const VariableDeclaration* decl) : is_thread_observed(is_thread_observed), is_address_observed(is_address_observed), decl(decl) {}
+
+	void visit(const SelfGuardVariable& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const SelfGuardVariable&)"); }
+	void visit(const ArgumentGuardVariable& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const ArgumentGuardVariable&)"); }
+	void visit(const TrueGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const TrueGuard&)"); }
+	void visit(const ConjunctionGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const ConjunctionGuard&)"); }
+	void visit(const EqGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const EqGuard&)"); }
+	void visit(const NeqGuard& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const NeqGuard&)"); }
+	void visit(const State& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const State&)"); }
+	void visit(const Transition& /*obj*/) { throw std::logic_error("Unexpected invocation: GuardMakerVisitor::visit(const Transition&)"); }
+	void visit(const Observer& observer) {
+		for (const auto& var : observer.variables) {
+			var->accept(*this);
+		}
+	}
+	void visit(const ThreadObserverVariable& var) {
+		if (is_thread_observed) {
+			guards.push_back(std::make_unique<EqGuard>(var, std::make_unique<SelfGuardVariable>()));
+		} else {
+			guards.push_back(std::make_unique<NeqGuard>(var, std::make_unique<SelfGuardVariable>()));
+		}
+	}
+	void visit(const ProgramObserverVariable& var) {
+		assert(decl);
+		if (is_address_observed) {
+			guards.push_back(std::make_unique<EqGuard>(var, std::make_unique<ArgumentGuardVariable>(*decl)));
+		} else {
+			guards.push_back(std::make_unique<NeqGuard>(var, std::make_unique<ArgumentGuardVariable>(*decl)));
+		}
+	}
+};
+
+bool SimulationEngine::is_repeated_execution_simulating(const std::vector<std::reference_wrapper<const Command>>& events) const {
+	auto make_guard = [](const Observer& observer, const Function& label, bool is_address_observed, bool is_thread_observed) -> std::unique_ptr<Guard> {
+		const VariableDeclaration* decl = nullptr;
+		if (label.args.size() > 0) {
+			assert(label.args.size() <= 1);
+			assert(label.args.at(0)->type.sort == Sort::PTR);
+			decl = label.args.at(0).get();
+		}
+		GuardMakerVisitor visitor(is_thread_observed, is_address_observed, decl);
+		observer.accept(visitor);
+		return std::make_unique<ConjunctionGuard>(std::move(visitor.guards));
+	};
+
+	auto post_for_sequence = [&](const Observer& observer, std::set<const State*> reach, bool is_address_observed, bool is_thread_observed) -> std::set<const State*> {
+		assert(reach.size() > 0);
+		const State& dummy_state = **reach.begin();
+		for (const Command& cmd : events) {
+			auto [label, kind] = CallVisitor().convert(cmd);
+			std::set<const State*> post;
+			Transition dummy_transition(dummy_state, dummy_state, label, kind, make_guard(observer, label, is_address_observed, is_thread_observed));
+			for (const State* state : reach) {
+				auto state_post = abstract_post(observer, *state, dummy_transition);
+				post.insert(state_post.begin(), state_post.end());
+			}
+			reach = std::move(post);
+		}
+		return reach;
+	};
+
+	for (const Observer* observer : this->observers) {
+		for (const auto& source : observer->states) {
+			for (bool is_address_observed : { true, false }) {
+				for (bool is_thread_observed : { true, false }) {
+					std::set<const State*> reach_once = post_for_sequence(*observer, { source.get() }, is_address_observed, is_thread_observed);
+					std::set<const State*> reach_twice = post_for_sequence(*observer, reach_once, is_address_observed, is_thread_observed);
+					for (const State* lhs : reach_once) {
+						bool simulated = false;
+						for (const State* rhs : reach_twice) {
+							if (this->is_in_simulation_relation(*lhs, *rhs)) {
+								simulated = true;
+								break;
+							}
+						}
+						if (!simulated) {
+							return false;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	std::cout << "computer says repeated execution is simulating" << std::endl;
+	throw std::logic_error("not yet implemented: SimulationEngine::is_repeated_execution_simulating");
+	return true;
+}

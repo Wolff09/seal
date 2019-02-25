@@ -40,6 +40,8 @@ namespace cola {
 	void print(const Expression& expression, std::ostream& stream);
 	
 	void print(const Command& command, std::ostream& stream);
+	
+	void print(const Statement& statement, std::ostream& stream);
 
 }
 
