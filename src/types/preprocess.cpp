@@ -3,10 +3,144 @@
 #include "cola/transform.hpp"
 #include "types/error.hpp"
 #include <iostream>
+#include <set>
 
 using namespace cola;
 using namespace prtypes;
 
+struct LocalExpressionVisitor final : public Visitor {
+	bool result = true;
+	std::set<const VariableDeclaration*> decls;
+	void visit(const VariableDeclaration& decl) {
+		if (decl.is_shared) {
+			result = false;
+		}
+		decls.insert(&decl);
+	}
+	void visit(const Dereference& deref) {
+		// memory access may not be local
+		assert(deref.expr);
+		deref.expr->accept(*this);
+		result = false;
+	}
+	void visit(const BooleanValue& /*node*/) { /* do nothing */ }
+	void visit(const NullValue& /*node*/) { /* do nothing */ }
+	void visit(const EmptyValue& /*node*/) { /* do nothing */ }
+	void visit(const NDetValue& /*node*/) { /* do nothing */ }
+	void visit(const VariableExpression& expr) {
+		expr.decl.accept(*this);
+	}
+	void visit(const NegatedExpression& expr) {
+		assert(expr.expr);
+		expr.expr->accept(*this);
+	}
+	void visit(const BinaryExpression& expr) {
+		assert(expr.lhs);
+		assert(expr.rhs);
+		expr.lhs->accept(*this);
+		expr.rhs->accept(*this);
+	}
+	
+	void visit(const Expression& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Expression&)"); }
+	void visit(const InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const InvariantActive&)"); }
+	void visit(const Sequence& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Sequence&)"); }
+	void visit(const Scope& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Scope&)"); }
+	void visit(const Atomic& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Atomic&)"); }
+	void visit(const Choice& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Choice&)"); }
+	void visit(const IfThenElse& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const IfThenElse&)"); }
+	void visit(const Loop& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Loop&)"); }
+	void visit(const While& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const While&)"); }
+	void visit(const Skip& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Skip&)"); }
+	void visit(const Break& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Break&)"); }
+	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Continue&)"); }
+	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assume&)"); }
+	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assert&)"); }
+	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Return&)"); }
+	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Malloc&)"); }
+	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assignment&)"); }
+	void visit(const Enter& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Enter&)"); }
+	void visit(const Exit& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Exit&)"); }
+	void visit(const Macro& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Macro&)"); }
+	void visit(const CompareAndSwap& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const CompareAndSwap&)"); }
+	void visit(const Function& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Program&)"); }
+};
+
+inline bool is_expression_local(const Expression& expr) {
+	LocalExpressionVisitor visitor;
+	expr.accept(visitor);
+	return visitor.result;
+}
+
+struct NeedsAtomicVisitor final : public Visitor {
+	bool result = true;
+
+	void visit(const VariableDeclaration& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const VariableDeclaration&)"); }
+	void visit(const Expression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const Expression&)"); }
+	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const BooleanValue&)"); }
+	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const NullValue&)"); }
+	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const EmptyValue&)"); }
+	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const NDetValue&)"); }
+	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const VariableExpression&)"); }
+	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const NegatedExpression&)"); }
+	void visit(const BinaryExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const BinaryExpression&)"); }
+	void visit(const Dereference& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const Dereference&)"); }
+	void visit(const InvariantExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const InvariantActive&)"); }
+	void visit(const Function& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const Program&)"); }
+
+	void visit(const Sequence& /*node*/) override { /* do nothing */ }
+	void visit(const Scope& /*node*/) override { /* do nothing */ }
+	void visit(const Choice& /*node*/) override { /* do nothing */ }
+	void visit(const IfThenElse& /*node*/) override { /* do nothing */ }
+	void visit(const Loop& /*node*/) override { /* do nothing */ }
+	void visit(const While& /*node*/) override { /* do nothing */ }
+	void visit(const Return& /*node*/) override { /* do nothing */ }
+	void visit(const Macro& /*node*/) override { /* do nothing */ }
+	void visit(const CompareAndSwap& /*node*/) override { /* do nothing */ }
+
+	void visit(const Atomic& /*node*/) override { this->result = false; }
+	void visit(const Skip& /*node*/) override { this->result = false; }
+	void visit(const Break& /*node*/) override { this->result = false; }
+	void visit(const Continue& /*node*/) override { this->result = false; }
+	void visit(const Assume& node) override {
+		if (is_expression_local(*node.expr)) {
+			this->result = false;
+		}
+	}
+	void visit(const Assert& node) override {
+		if (is_expression_local(*node.inv->expr)) {
+			this->result = false;
+		}
+	}
+	void visit(const Malloc& node) override {
+		if (!node.lhs.is_shared) {
+			this->result = false;
+		}
+	}
+	void visit(const Assignment& node) override {
+		if (is_expression_local(*node.lhs) && is_expression_local(*node.rhs)) {
+			this->result = false;
+		}
+	}
+	void visit(const Enter& node) override {
+		for (const auto& arg : node.args) {
+			if (!is_expression_local(*arg)) {
+				return;
+			}
+		}
+		this->result = false;
+	}
+	void visit(const Exit& /*node*/) override { this->result = false; }
+};
+
+bool needs_atomic(const Statement& stmt) {
+	NeedsAtomicVisitor visitor;
+	stmt.accept(visitor);
+	return visitor.result;
+}
 
 struct PreprocessingVisitor final : public NonConstVisitor {
 	bool in_atomic = false;
@@ -36,7 +170,8 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void handle_statement(std::unique_ptr<Statement>& stmt) {
 		found_cmd = false;
 		stmt->accept(*this);
-		if (found_cmd && !in_atomic) {
+		assert(stmt);
+		if (found_cmd && !in_atomic && needs_atomic(*stmt)) {
 			stmt = std::make_unique<Atomic>(std::make_unique<Scope>(std::move(stmt)));
 		}
 		found_cmd = false;

@@ -46,7 +46,12 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 		if (ite.elseBranch) {
 			ite.elseBranch->accept(*this);
 			auto expr = cola::negate(*ite.expr);
-			prependAssumption(*ite.elseBranch, std::move(expr));
+			auto cast = dynamic_cast<const Skip*>(ite.elseBranch->body.get()); // TODO: less hacky way
+			if (cast) {
+				ite.elseBranch->body = std::make_unique<Assume>(std::move(expr));
+			} else {
+				prependAssumption(*ite.elseBranch, std::move(expr));
+			}
 		}
 
 		ite.ifBranch->accept(*this);
