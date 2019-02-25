@@ -7,6 +7,9 @@
 using namespace cola;
 using namespace prtypes;
 
+const bool ASSUME_SHARED_ACTIVE = true;
+const bool CHECK_SINGLETON_PATH = false;
+
 
 std::unique_ptr<BinaryExpression> make_negated_expression(std::unique_ptr<Expression> expr) {
 	// TODO: properly add this functionality to cola/util.hpp
@@ -277,7 +280,7 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 	}
 };
 
-AssertionInsertionVisitor insert_active_assertion(Program& program, const GuaranteeTable& guarantee_table, const Command& cmd, const VariableDeclaration& var, bool insert_after_cmd=false) {
+AssertionInsertionVisitor insert_active_assertion(Program& program, const GuaranteeTable& guarantee_table, const Command& cmd, const VariableDeclaration& var, bool insert_after_cmd=false, bool no_check=false) {
 	// make insertion to insert
 	auto assertion = std::make_unique<Assert>(std::make_unique<InvariantActive>(std::make_unique<VariableExpression>(var)));
 	Assert& inserted_assertion = *assertion.get();
@@ -286,6 +289,10 @@ AssertionInsertionVisitor insert_active_assertion(Program& program, const Guaran
 	AssertionInsertionVisitor visitor(cmd, std::move(assertion), insert_after_cmd);
 	program.accept(visitor);
 	assert(!visitor.to_insert);
+
+	if (no_check || (ASSUME_SHARED_ACTIVE && var.is_shared)) {
+		return visitor;
+	}
 
 	// check added assertion for validity
 	bool is_inserted_assertion_valid = prtypes::discharge_assertions(program, guarantee_table, { inserted_assertion });
@@ -650,10 +657,15 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 		cola::print(*elem, std::cout);
 	}
 
+	const bool no_check = path.size() <= 1 && !CHECK_SINGLETON_PATH;
+	if (no_check) {
+		std::cout << "Will not check path; have no choice anyways." << std::endl;
+	}
+
 	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
 		try {
-			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */);
+			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
 
 			// create tmp var of type bool
 			assert(visitor.found_function);
@@ -756,10 +768,15 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 		cola::print(*elem, std::cout);
 	}
 
+	const bool no_check = path.size() <= 1 && !CHECK_SINGLETON_PATH;
+	if (no_check) {
+		std::cout << "Will not check path; have no choice anyways." << std::endl;
+	}
+
 	for (auto it = path.rbegin(); it != path.rend(); ++it) {
 		// try to insert assertion in path; move assume if possible
 		try {
-			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */);
+			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
 			return;
 
 		} catch (RefinementError err) {

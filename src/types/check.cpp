@@ -51,7 +51,7 @@ void prtypes::test() {
 	std::cout << std::endl << std::endl << "Testing..." << std::endl;
 	// const Type& ptrtype = Observer::free_function().args.at(0)->type;
 
-	std::string filename = "/Users/wolff/Tools/PointerRaceTypes/test.cola";
+	std::string filename = "/Users/wolff/Desktop/PointerRaceTypes/test.cola";
 	auto program_ptr = cola::parse(filename);
 	Program& program = *program_ptr;
 	program.name = "TestProgram";
@@ -98,9 +98,10 @@ void prtypes::test() {
 	add_guarantees(protect2);
 
 	// assertion check (initial ones given by programmer)
-	std::cout << std::endl << "Checking initial assertions..." << std::endl;
-	bool initial_assertions_safe = discharge_assertions(program, table);
-	std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
+	std::cout << std::endl << "Not checking initial assertions!" << std::endl;
+	// std::cout << std::endl << "Checking initial assertions..." << std::endl;
+	// bool initial_assertions_safe = discharge_assertions(program, table);
+	// std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
 
 	// type check
 	bool type_safe = false;
