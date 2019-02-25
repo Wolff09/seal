@@ -617,6 +617,26 @@ const VariableDeclaration& make_tmp_variable(Function& function) {
 	throw std::logic_error("This is bad.");
 }
 
+std::unique_ptr<Statement> make_sequence_from_path(std::vector<const Statement*> path) {
+	assert(path.size() > 0);
+	std::deque<std::unique_ptr<Statement>> copy;
+	for (auto stmt : path) {
+		const Command* cmd = dynamic_cast<const Command*>(stmt); // TODO: less hacky way
+		conditionally_raise_error<RefinementError>(!cmd, "Casting full path to commands failed.");
+		copy.push_back(cola::copy(*cmd));
+	}
+	assert(path.size() == copy.size());
+	
+	std::unique_ptr<Statement> result = std::move(copy.front());
+	copy.pop_front();
+	while (!copy.empty()) {
+		result = std::make_unique<Sequence>(std::move(result), std::move(copy.front()));
+		copy.pop_front();
+	}
+
+	return result;
+}
+
 
 void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
 	std::cout << "Trying to fix local unsafe assume..." << std::endl;
@@ -691,8 +711,21 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	assert(it != full_path.end());
 
 	// check first path element to be an assignment corresponding to the assumption to be replaced
-	// TODO: implement check
-	// conditionally_raise_error<RefinementError>(???, "malformed full path");
+	auto assignment = dynamic_cast<const Assignment*>(*it);
+	conditionally_raise_error<RefinementError>(!assignment, "full path malformed (first entry); cannot recover");
+	auto assignment_lhs = dynamic_cast<const VariableExpression*>(assignment->lhs.get());
+	auto assignment_rhs = dynamic_cast<const VariableExpression*>(assignment->rhs.get());
+	conditionally_raise_error<RefinementError>(!assignment_lhs, "full path malformed (assignment lhs); cannot recover");
+	conditionally_raise_error<RefinementError>(!assignment_rhs, "full path malformed (assignment rhs); cannot recover");
+	auto assumption = dynamic_cast<const BinaryExpression*>(error.pc.expr.get());
+	conditionally_raise_error<RefinementError>(!assumption, "full path malformed (assume); cannot recover");
+	auto assumption_lhs = dynamic_cast<const VariableExpression*>(assumption->lhs.get());
+	auto assumption_rhs = dynamic_cast<const VariableExpression*>(assumption->rhs.get());
+	conditionally_raise_error<RefinementError>(!assumption_lhs, "full path malformed (assume lhs); cannot recover");
+	conditionally_raise_error<RefinementError>(!assumption_rhs, "full path malformed (assume rhs); cannot recover");
+	bool well_formed = &assignment_lhs->decl == &assumption_lhs->decl && &assignment_rhs->decl == &assumption_rhs->decl;
+	well_formed |= &assignment_rhs->decl == &assumption_lhs->decl && &assignment_lhs->decl == &assumption_rhs->decl;
+	conditionally_raise_error<RefinementError>(!well_formed, "full path malformed; cannot recover");
 	++it;
 
 	// check remaining path elements to be heap-local or right movers
@@ -702,10 +735,13 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	}
 	conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "full path does not move");
 
-	// TODO: ensure that first statement is an assignment corresponding to error.pc.expr
-	// TODO: ensure that remaining statements are purely local or left movers (add assertion for non-local assignments?)
+	// copy full path and add after offending assume, add active assertion for offending variable
+	auto new_code = make_sequence_from_path(full_path);
+	AssertionInsertionVisitor insertion(error.pc, std::move(new_code), true /* insert after */);
+	program.accept(insertion);
 
-	throw std::logic_error(" --- not yet implemented --- ");
+	// delete offending assume
+	*insertion.owner_found = std::make_unique<Skip>();
 }
 
 void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
@@ -749,7 +785,6 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 			try_fix_local_unsafe_assume(program, guarantee_table, error);
 		} else {
 			try_remove_unsafe_assume(program, guarantee_table, error);
-			throw err;
 		}
 
 	}

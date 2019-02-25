@@ -17,6 +17,8 @@ namespace cola {
 	std::unique_ptr<Expression> copy(const Expression& expr);
 
 	std::unique_ptr<Invariant> copy(const Invariant& expr);
+
+	std::unique_ptr<Command> copy(const Command& cmd);
 	
 	std::unique_ptr<Expression> negate(const Expression& expr);
 

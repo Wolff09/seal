@@ -463,7 +463,5 @@ bool SimulationEngine::is_repeated_execution_simulating(const std::vector<std::r
 		}
 	}
 
-	std::cout << "computer says repeated execution is simulating" << std::endl;
-	throw std::logic_error("not yet implemented: SimulationEngine::is_repeated_execution_simulating");
 	return true;
 }
