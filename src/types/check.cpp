@@ -91,10 +91,10 @@ void prtypes::test() {
 	add_guarantees(protect1);
 	add_guarantees(protect2);
 
-	// // assertion check (initial ones given by programmer)
-	// std::cout << std::endl << "Checking initial assertions..." << std::endl;
-	// bool initial_assertions_safe = discharge_assertions(program, table);
-	// std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
+	// assertion check (initial ones given by programmer)
+	std::cout << std::endl << "Checking initial assertions..." << std::endl;
+	bool initial_assertions_safe = discharge_assertions(program, table);
+	std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
 
 	// type check
 	bool type_safe = false;
