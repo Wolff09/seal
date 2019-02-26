@@ -491,12 +491,15 @@ antlrcpp::Any AstBuilder::visitStmtIf(cola::CoLaParser::StmtIfContext* context) 
 }
 
 antlrcpp::Any AstBuilder::visitStmtWhile(cola::CoLaParser::StmtWhileContext* context) {
+	bool was_in_loop = _inside_loop;
+	_inside_loop = true;
 	auto expr = std::unique_ptr<Expression>(context->expr->accept(this).as<Expression*>());
 	auto scope = std::unique_ptr<Scope>(context->body->accept(this).as<Scope*>());
 	auto result = new While(std::move(expr), std::move(scope));
 	if (context->annotation()) {
 		result->annotation = std::unique_ptr<Invariant>(context->annotation()->accept(this).as<Invariant*>());
 	}
+	_inside_loop = was_in_loop;
 	return as_statement(result);
 }
 
@@ -514,7 +517,10 @@ antlrcpp::Any AstBuilder::visitStmtChoose(cola::CoLaParser::StmtChooseContext* c
 }
 
 antlrcpp::Any AstBuilder::visitStmtLoop(cola::CoLaParser::StmtLoopContext* context) {
+	bool was_in_loop = _inside_loop;
+	_inside_loop = true;
 	auto scope = std::unique_ptr<Scope>(context->scope()->accept(this).as<Scope*>());
+	_inside_loop = was_in_loop;
 	return as_statement(new Loop(std::move(scope)));
 }
 

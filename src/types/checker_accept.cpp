@@ -304,9 +304,10 @@ void TypeChecker::visit(const Skip& skip) {
 	this->visit_command_end();
 }
 
-void TypeChecker::visit(const Break& /*node*/) {
+void TypeChecker::visit(const Break& brk) {
 	this->visit_command_begin();
-	raise_error<UnsupportedConstructError>("'break' statements are not supported");
+	this->check_break(brk);
+	// raise_error<UnsupportedConstructError>("'break' statements are not supported");
 	this->visit_command_end();
 }
 

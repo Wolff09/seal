@@ -21,7 +21,7 @@ struct NegateExpressionVisitor final : public Visitor {
 
 	void visit(const BooleanValue& expr) {
 		assert(!result);
-		result = std::make_unique<BooleanValue>(expr.value);
+		result = std::make_unique<BooleanValue>(!expr.value);
 	}
 
 	void visit(const NegatedExpression& expr) {

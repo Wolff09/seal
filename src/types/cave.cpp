@@ -13,6 +13,7 @@ using namespace prtypes;
 
 static const bool INSTRUMENT_OBJECTS = false; // does not work
 static const bool INSTRUMENT_FLAG = false; // does not work
+static const bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false; // does not work
 
 // TODO: guard assertActive with != NULL??
 // TODO: remove imp var option
@@ -340,7 +341,8 @@ struct CaveOutputVisitor : public Visitor {
 	// ********************************************************************* //
 
 	void visit(const Break& /*node*/) {
-		raise_error<UnsupportedConstructError>("'break' not supported in the translation to CAVE");
+		stream << indent << "break;" << std::endl;
+		// raise_error<UnsupportedConstructError>("'break' not supported in the translation to CAVE");
 	}
 	
 	void visit(const Continue& /*node*/) {
@@ -379,13 +381,21 @@ struct CaveOutputVisitor : public Visitor {
 		stream << ")) { fail(); }" << std::endl;
 	}
 	void visit(const InvariantActive& invariant) {
-		// macros can only be called with non-null arguments? (doesn't matter, NULL is active always anyways)
-		stream << indent << "if (";
-		invariant.expr->accept(*this);
-		stream << " != NULL) { assertActive(";
+		if (INSTRUMENT_WRAP_ASSERT_ACTIVE) {
+			stream << indent << "if (";
+			invariant.expr->accept(*this);
+			stream << " != NULL) { ";
+		} else {
+			stream << indent;
+		}
+		stream << "assertActive(";
 		assert(invariant.expr);
 		invariant.expr->accept(*this);
-		stream << "); }" << std::endl;
+		stream << ");";
+		if (INSTRUMENT_WRAP_ASSERT_ACTIVE) {
+			stream << " }";
+		}
+		stream << std::endl;
 	}
 
 	void visit(const Assert& assrt) {

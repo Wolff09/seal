@@ -51,7 +51,7 @@ void prtypes::test() {
 	std::cout << std::endl << std::endl << "Testing..." << std::endl;
 	// const Type& ptrtype = Observer::free_function().args.at(0)->type;
 
-	std::string filename = "/Users/wolff/Desktop/PointerRaceTypes/test.cola";
+	std::string filename = "/Users/wolff/Tools/PointerRaceTypes/test.cola";
 	auto program_ptr = cola::parse(filename);
 	Program& program = *program_ptr;
 	program.name = "TestProgram";

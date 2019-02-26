@@ -98,6 +98,13 @@ void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaratio
 	throw std::logic_error("not yet implemented: TypeChecker::check_return");
 }
 
+void TypeChecker::check_break(const Break& /*brk*/) {
+	for (auto& [decl, guarantees] : this->current_type_environment) {
+		guarantees.clear();
+	}
+	// throw std::logic_error("not yet implemented: TypeChecker::check_break");
+}
+
 
 void TypeChecker::check_assume_nonpointer(const Assume& /*assume*/, const Expression& /*expr*/) {
 	// do nothing

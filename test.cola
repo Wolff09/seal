@@ -19,15 +19,13 @@ void init() {
 
 void enqueue(data_t input) {
 	Node* tail, next, node, tmp;
-	bool done;
 	bool b1;
 
 	node = malloc;
 	node->data = input;
 	node->next = NULL;
 
-	done = false;
-	while (!done) {
+	while (true) {
 		tail = Tail;
 		protect1(tail);
 
@@ -60,7 +58,7 @@ void enqueue(data_t input) {
 								Tail = node;
 							}
 						}
-						done = true;
+						break;
 					}
 				}
 			}
@@ -71,10 +69,8 @@ void enqueue(data_t input) {
 void dequeue() {
 	Node* head, next, tail, tmp;
 	data_t result;
-	bool done;
 
-	done = false;
-	while (!done) {
+	while (true) {
 		head = Head;
 		protect1(head);
 
@@ -86,7 +82,7 @@ void dequeue() {
 			if (head == Head) {
 				if (next == NULL) {
 					result = EMPTY;
-					done = true;
+					break;
 
 				} else {
 					if (head == tail) {
@@ -104,7 +100,7 @@ void dequeue() {
 							if (Head == head) {
 								Head = next;
 								retire(head);
-								done = true;
+								break;
 							}
 						}
 						// if (CAS successful) retire(head); // move left to avoid CAVE imprecision

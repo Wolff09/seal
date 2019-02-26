@@ -73,6 +73,7 @@ namespace prtypes {
 			void check_malloc(const cola::Malloc& malloc, const cola::VariableDeclaration& ptr);
 			void check_enter(const cola::Enter& enter, std::vector<std::reference_wrapper<const cola::VariableDeclaration>> params);
 			void check_exit(const cola::Exit& exit);
+			void check_break(const cola::Break& brk);
 			void check_return(const cola::Return& retrn, const cola::VariableDeclaration& var);
 			void check_assume_nonpointer(const cola::Assume& assume, const cola::Expression& expr);
 			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::VariableDeclaration& rhs);

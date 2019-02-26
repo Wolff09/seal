@@ -163,7 +163,6 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void visit(IfThenElse& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(IfThenElse&)"); }
 	void visit(While& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(While&)"); }
 	void visit(CompareAndSwap& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(CompareAndSwap&)"); }
-	void visit(Break& /*node*/) { raise_error<UnsupportedConstructError>("'break' not supported"); }
 	void visit(Continue& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
 	void visit(Macro& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
 
@@ -209,6 +208,7 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 		conditionally_raise_error<UnsupportedConstructError>(found_return, "'return' must not occur inside a loop");
 	}
 
+	void visit(Break& /*node*/) { found_cmd = true; }
 	void visit(Skip& /*node*/) { found_cmd = true; }
 	void visit(Assume& /*node*/) { found_cmd = true; }
 	void visit(Assert& /*node*/) { found_cmd = true; }
