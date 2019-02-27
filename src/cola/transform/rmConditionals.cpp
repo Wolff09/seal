@@ -6,6 +6,43 @@
 using namespace cola;
 
 
+struct IsTrueConditionVisitor final : public Visitor {
+	bool result = false;
+	void visit(const VariableDeclaration& /*node*/) override {}
+	void visit(const Expression& /*node*/) override {}
+	void visit(const BooleanValue& node) override { if (node.value) { result = true; } }
+	void visit(const NullValue& /*node*/) override {}
+	void visit(const EmptyValue& /*node*/) override {}
+	void visit(const NDetValue& /*node*/) override {}
+	void visit(const VariableExpression& /*node*/) override {}
+	void visit(const NegatedExpression& /*node*/) override {}
+	void visit(const BinaryExpression& /*node*/) override {}
+	void visit(const Dereference& /*node*/) override {}
+	void visit(const InvariantExpression& /*node*/) override {}
+	void visit(const InvariantActive& /*node*/) override {}
+	void visit(const Sequence& /*node*/) override {}
+	void visit(const Scope& /*node*/) override {}
+	void visit(const Atomic& /*node*/) override {}
+	void visit(const Choice& /*node*/) override {}
+	void visit(const IfThenElse& /*node*/) override {}
+	void visit(const Loop& /*node*/) override {}
+	void visit(const While& /*node*/) override {}
+	void visit(const Skip& /*node*/) override {}
+	void visit(const Break& /*node*/) override {}
+	void visit(const Continue& /*node*/) override {}
+	void visit(const Assume& /*node*/) override {}
+	void visit(const Assert& /*node*/) override {}
+	void visit(const Return& /*node*/) override {}
+	void visit(const Malloc& /*node*/) override {}
+	void visit(const Assignment& /*node*/) override {}
+	void visit(const Enter& /*node*/) override {}
+	void visit(const Exit& /*node*/) override {}
+	void visit(const Macro& /*node*/) override {}
+	void visit(const CompareAndSwap& /*node*/) override {}
+	void visit(const Function& /*node*/) override {}
+	void visit(const Program& /*node*/) override {}
+};
+
 struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	std::unique_ptr<Statement> replacement;
 	bool replacementNeeded = false;
@@ -69,15 +106,19 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	void visit(While& whl) {
 		whl.body->accept(*this);
 
-		// TODO: check if whl.expr is 'true', if so fail
-		auto expr = cola::negate(*whl.expr);
-		prependAssumption(*whl.body, std::move(whl.expr));
-		auto loop = std::make_unique<Loop>(std::move(whl.body));
-		auto assume = std::make_unique<Assume>(std::move(expr));
-		auto seq = std::make_unique<Sequence>(std::move(loop), std::move(assume));
-		
-		replacement = std::move(seq);
-		replacementNeeded = true;
+		IsTrueConditionVisitor visitor;
+		whl.expr->accept(visitor);
+		if (!visitor.result) {
+			// rewrite if whl.expr is not 'true'
+			auto expr = cola::negate(*whl.expr);
+			prependAssumption(*whl.body, std::move(whl.expr));
+			auto loop = std::make_unique<Loop>(std::move(whl.body));
+			auto assume = std::make_unique<Assume>(std::move(expr));
+			auto seq = std::make_unique<Sequence>(std::move(loop), std::move(assume));
+
+			replacement = std::move(seq);
+			replacementNeeded = true;
+		}
 	}
 
 	void acceptAndReplaceIfNeeded(std::unique_ptr<Statement>& uptr) {

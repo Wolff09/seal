@@ -161,7 +161,11 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void visit(InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(InvariantActive&)"); }
 	
 	void visit(IfThenElse& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(IfThenElse&)"); }
-	void visit(While& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(While&)"); }
+	void visit(While& node) {
+		auto& expr = *node.expr;
+		assert(typeid(expr) == typeid(BooleanValue));
+		node.body->accept(*this);
+	}
 	void visit(CompareAndSwap& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(CompareAndSwap&)"); }
 	void visit(Continue& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
 	void visit(Macro& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }

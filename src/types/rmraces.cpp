@@ -518,8 +518,22 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	void visit(const IfThenElse& /*node*/) override {
 		raise_error<UnsupportedConstructError>("'if' not supported");
 	}
-	void visit(const While& /*node*/) override {
-		raise_error<UnsupportedConstructError>("'while' not supported");
+	void visit(const While& node) override {
+		auto& expr = *node.expr;
+		assert(typeid(expr) == typeid(BooleanValue));
+
+		std::vector<const Command*> copy_path = path;
+		std::vector<const Statement*> copy_full_path = full_path;
+		bool copy_on = on_path;
+		
+		assert(node.body);
+		node.body->accept(*this);
+
+		path = std::move(copy_path);
+		on_path = copy_on;
+
+		full_path = std::move(copy_full_path);
+		full_path.push_back(&node);
 	}
 	void visit(const Function& function) override {
 		on_path = false;

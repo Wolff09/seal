@@ -14,6 +14,7 @@ using namespace prtypes;
 static const bool INSTRUMENT_OBJECTS = false; // does not work
 static const bool INSTRUMENT_FLAG = false; // does not work
 static const bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false; // does not work
+static const bool INSTRUMENT_INSERT_OPTS = false; // does not work
 
 // TODO: guard assertActive with != NULL??
 // TODO: remove imp var option
@@ -50,14 +51,16 @@ struct CaveOutputVisitor : public Visitor {
 	// ********************************************************************* //
 
 	void print_options(const Program& program) {
-		assert(retire_type.fields.count("next") > 0);
-		std::string option;
-		for (const auto& var : program.variables) {
-			if (&var->type == &retire_type) {
-				option = "CC_." + var->name + ".next";
+		if (INSTRUMENT_INSERT_OPTS) {
+			assert(retire_type.fields.count("next") > 0);
+			std::string option;
+			for (const auto& var : program.variables) {
+				if (&var->type == &retire_type) {
+					option = "CC_." + var->name + ".next";
+				}
 			}
+			stream << "prover_opts imp_var = \"" << option << "\";" << std::endl << std::endl;
 		}
-		stream << "prover_opts imp_var = \"" << option << "\";" << std::endl << std::endl;
 	}
 
 	std::string type2cave(const Type& type) {
@@ -332,8 +335,13 @@ struct CaveOutputVisitor : public Visitor {
 	void visit(const IfThenElse& /*node*/) {
 		raise_error<UnsupportedConstructError>("'if' not supported in the translation to CAVE");
 	}
-	void visit(const While& /*node*/) {
-		raise_error<UnsupportedConstructError>("'while' not supported in the translation to CAVE");
+	void visit(const While& node) {
+		stream << indent << "while (";
+		assert(node.expr);
+		node.expr->accept(*this);
+		stream << ") ";
+		assert(node.body);
+		node.body->accept(*this);
 	}
 
 	// ********************************************************************* //
