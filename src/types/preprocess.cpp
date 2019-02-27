@@ -233,7 +233,7 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 };
 
 void prtypes::preprocess(Program& program) {
-	// // cola::remove_cas(program); // TODO: activate
+	cola::remove_cas(program);
 	cola::remove_scoped_variables(program);
 	cola::remove_conditionals(program);
 	cola::remove_useless_scopes(program);

@@ -34,30 +34,11 @@ void enqueue(data_t input) {
 
 			if (tail == Tail) {
 				if (next != NULL) {
-					// CAS(Tail, tail, next)
-					atomic {
-						if (Tail == tail) {
-							Tail = next;
-						}
-					}
+					CAS(Tail, tail, next);
 
 				} else {
-					// if (CAS(tail->next, next, node))
-					atomic {
-						tmp = tail->next;
-						if (tmp == NULL) {
-							tail->next = node;
-							b1 = true;
-						} else {
-							b1 = false;
-						}
-					}
-					if (b1) {
-						atomic {
-							if (Tail == tail) {
-								Tail = node;
-							}
-						}
+					if (CAS(tail->next, next, node)) {
+						CAS(Tail, tail, node);
 						break;
 					}
 				}

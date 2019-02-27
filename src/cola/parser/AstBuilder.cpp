@@ -711,5 +711,5 @@ antlrcpp::Any AstBuilder::visitCas(cola::CoLaParser::CasContext* context) {
 		result->elems.push_back(CompareAndSwap::Triple(std::move(dst), std::move(cmp), std::move(src)));
 	}
 
-	return as_command(result);
+	return result;
 }
