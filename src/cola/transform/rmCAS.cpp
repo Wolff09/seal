@@ -1,6 +1,7 @@
 #include "cola/transform.hpp"
 #include "cola/util.hpp"
 #include <set>
+#include <iostream>
 
 using namespace cola;
 
@@ -79,16 +80,54 @@ bool contains_cas(const Expression& expr) {
 	return visitor.found != nullptr;
 }
 
-VariableDeclaration& make_tmp_var(Function& function) {
+struct CasConditionNeesTransformationVisitor : public Visitor {
+	bool result = false;
+	void visit(const VariableExpression& /*node*/) { result = false; }
+	void visit(const Dereference& /*node*/) { result = true; }
+	void visit(const VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const VariableDeclaration&)"); }
+	void visit(const Expression& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Expression&)"); }
+	void visit(const BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const BooleanValue&)"); }
+	void visit(const NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const NullValue&)"); }
+	void visit(const EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const EmptyValue&)"); }
+	void visit(const NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const NDetValue&)"); }
+	void visit(const NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const NegatedExpression&)"); }
+	void visit(const BinaryExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const BinaryExpression&)"); }
+	void visit(const InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const InvariantActive&)"); }
+	void visit(const Sequence& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Sequence&)"); }
+	void visit(const Scope& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Scope&)"); }
+	void visit(const Atomic& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Atomic&)"); }
+	void visit(const Choice& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Choice&)"); }
+	void visit(const IfThenElse& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const IfThenElse&)"); }
+	void visit(const Loop& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Loop&)"); }
+	void visit(const While& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const While&)"); }
+	void visit(const Skip& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Skip&)"); }
+	void visit(const Break& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Break&)"); }
+	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Continue&)"); }
+	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Assume&)"); }
+	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Assert&)"); }
+	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Return&)"); }
+	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Malloc&)"); }
+	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Assignment&)"); }
+	void visit(const Enter& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Enter&)"); }
+	void visit(const Exit& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Exit&)"); }
+	void visit(const Macro& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Macro&)"); }
+	void visit(const CompareAndSwap& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const CompareAndSwap&)"); }
+	void visit(const Function& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Program&)"); }
+};
+
+VariableDeclaration& make_tmp_var(Function& function, const Type& type=Type::bool_type()) {
 	std::set<std::string> names;
 	for (const auto& var : function.body->variables) {
 		names.insert(var->name);
 	}
 	std::size_t counter = 0;
+	std::string fix = (&type == &Type::bool_type()) ? "FLAG_" : "";
 	while (true) {
-		std::string var_name = "TMP_CAS_" + std::to_string(counter) + "_";
+		std::string var_name = "TMP_CAS_" + fix + std::to_string(counter) + "_";
 		if (names.count(var_name) == 0) {
-			function.body->variables.push_back(std::make_unique<VariableDeclaration>(var_name, Type::bool_type(), false));
+			function.body->variables.push_back(std::make_unique<VariableDeclaration>(var_name, type, false));
 			return *function.body->variables.back();
 		} else {
 			++counter;
@@ -100,6 +139,7 @@ VariableDeclaration& make_tmp_var(Function& function) {
 struct CasRemovalVisitor : public NonConstVisitor {
 	std::unique_ptr<Statement>* current_owner = nullptr;
 	Function* current_function = nullptr;
+	bool in_atomic = false;
 
 	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: visit(VariableDeclaration&)"); }
 	void visit(Expression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(Expression&)"); }
@@ -113,6 +153,36 @@ struct CasRemovalVisitor : public NonConstVisitor {
 	void visit(Dereference& /*node*/) { throw std::logic_error("Unexpected invocation: visit(Dereference&)"); }
 	void visit(InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(InvariantExpression&)"); }
 	void visit(InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: visit(InvariantActive&)"); }
+
+	std::pair<std::unique_ptr<Statement>, std::unique_ptr<Expression>> convert_cas_dst(const Expression& dst) {
+		std::pair<std::unique_ptr<Statement>, std::unique_ptr<Expression>> result;
+		CasConditionNeesTransformationVisitor visitor;
+		dst.accept(visitor);
+		if (visitor.result) {
+			assert(this->current_function);
+			assert(dst.type().sort == Sort::PTR);
+			VariableDeclaration& tmp = make_tmp_var(*this->current_function, dst.type());
+			result.first = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), cola::copy(dst));
+			result.second = std::make_unique<VariableExpression>(tmp);
+		} else {
+			result.second = cola::copy(dst);
+		}
+		return result;
+	}
+
+	std::unique_ptr<Statement> combine_cas_preamble_and_ite(std::unique_ptr<Statement> preamble, std::unique_ptr<Statement> ite) {
+		std::unique_ptr<Statement> stmt;
+		if (preamble) {
+			stmt = std::make_unique<Sequence>(std::move(preamble), std::move(ite));
+		} else {
+			stmt = std::move(ite);
+		}
+		if (in_atomic) {
+			return stmt;
+		} else {
+			return std::make_unique<Atomic>(std::make_unique<Scope>(std::move(stmt)));
+		}
+	}
 	
 	void handle_statement(std::unique_ptr<Statement>& stmt) {
 		this->current_owner = &stmt;
@@ -126,7 +196,10 @@ struct CasRemovalVisitor : public NonConstVisitor {
 		handle_statement(node.body);
 	}
 	void visit(Atomic& node) {
+		bool was_in_atomic = this->in_atomic;
+		this->in_atomic = true;
 		node.body->accept(*this);
+		this->in_atomic = was_in_atomic;
 	}
 	void visit(Choice& node) {
 		for (auto& branch : node.branches) {
@@ -154,16 +227,24 @@ struct CasRemovalVisitor : public NonConstVisitor {
 				auto& cmp = *cas.elems.at(0).cmp;
 				auto& src = *cas.elems.at(0).src;
 				// replace cas with: if (dst == cmp) { dst = src; } else { skip; }
-				auto condition = std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, cola::copy(dst), cola::copy(cmp));
+				auto [preamble, dstexpr] = convert_cas_dst(dst);
+				auto condition = std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, std::move(dstexpr), cola::copy(cmp));
 				auto assignment = std::make_unique<Assignment>(cola::copy(dst), cola::copy(src));
-				auto flag_true = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(true));
-				auto flag_false = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(false));
-				auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(assignment), std::move(flag_true)));
-				auto branch_false = std::make_unique<Scope>(std::move(flag_false));
-				auto ite = std::make_unique<Atomic>(std::make_unique<Scope>(std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false))));
-				node.expr = std::make_unique<VariableExpression>(tmp);
-				auto replacement = std::make_unique<Sequence>(std::move(ite), std::move(*current_owner));
-				*current_owner = std::move(replacement);
+				if (in_atomic) {
+					auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(assignment), std::move(node.ifBranch)));
+					auto branch_false = std::move(node.elseBranch);
+					auto ite = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false)));
+					*current_owner = std::move(ite);
+				} else {
+					auto flag_true = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(true));
+					auto flag_false = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(false));
+					auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(assignment), std::move(flag_true)));
+					auto branch_false = std::make_unique<Scope>(std::move(flag_false));
+					auto ite = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false)));
+					node.expr = std::make_unique<VariableExpression>(tmp);
+					auto replacement = std::make_unique<Sequence>(std::move(ite), std::move(*current_owner));
+					*current_owner = std::move(replacement);
+				}
 
 			} else {
 				throw std::logic_error("not yet implemented: desugaring of kCAS with k!=1");
@@ -200,9 +281,11 @@ struct CasRemovalVisitor : public NonConstVisitor {
 			auto& cmp = *cas.elems.at(0).cmp;
 			auto& src = *cas.elems.at(0).src;
 			// replace cas with: if (dst == cmp) { dst = src; } else { skip; }
+			std::cout << std::endl;
+			auto [preamble, dstexpr] = convert_cas_dst(dst);
 			auto condition = std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, cola::copy(dst), cola::copy(cmp));
 			auto assignment = std::make_unique<Assignment>(cola::copy(dst), cola::copy(src));
-			auto replacement = std::make_unique<Atomic>(std::make_unique<Scope>(std::make_unique<IfThenElse>(std::move(condition), std::make_unique<Scope>(std::move(assignment)), std::make_unique<Scope>(std::make_unique<Skip>()))));
+			auto replacement = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::make_unique<Scope>(std::move(assignment)), std::make_unique<Scope>(std::make_unique<Skip>())));
 			*current_owner = std::move(replacement);
 
 		} else {

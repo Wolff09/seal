@@ -6,6 +6,7 @@ using namespace cola;
 struct RemoveUselessScopeVisitor final : NonConstVisitor {
 	bool is_scope = false;
 	Scope* sub_scope;
+	bool in_atomic = false;
 
 	void flatten(std::unique_ptr<Statement>& dst) {
 		dst->accept(*this);
@@ -53,7 +54,9 @@ struct RemoveUselessScopeVisitor final : NonConstVisitor {
 	}
 
 	void visit(Atomic& atomic) {
-		handle_scope(*atomic.body, false);
+		bool was_in_atomic = in_atomic;
+		handle_scope(*atomic.body, in_atomic);
+		in_atomic = was_in_atomic;
 	}
 
 	void visit(Choice& choice) {
