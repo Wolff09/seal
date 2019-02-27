@@ -129,14 +129,14 @@ void prtypes::test() {
 	}
 	std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
 
+	// print program after modifications
+	program.name += " (transformed)";
+	cola::print(program, std::cout);
+
 	// assertion check
 	std::cout << std::endl << "Checking assertions..." << std::endl;
 	bool assertions_safe = discharge_assertions(program, table);
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
-
-	// print program after modifications
-	program.name += " (transformed)";
-	cola::print(program, std::cout);
 
 	// // safe predicate
 	// bool safe_valid, safe_invalid;

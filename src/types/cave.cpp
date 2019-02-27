@@ -349,9 +349,10 @@ struct CaveOutputVisitor : public Visitor {
 		raise_error<UnsupportedConstructError>("'continue' not supported in the translation to CAVE");
 	}
 	
-	void visit(const Return& /*node*/) {
-		// TODO: implement, needed for linearizability checks
-		raise_error<UnsupportedConstructError>("'return' not supported in the translation to CAVE");
+	void visit(const Return& node) {
+		stream << indent << "return ";
+		node.expr->accept(*this);
+		stream << ";" << std::endl;
 	}
 	
 	void visit(const Macro& /*node*/) { 

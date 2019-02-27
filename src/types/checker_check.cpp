@@ -94,8 +94,12 @@ void TypeChecker::check_exit(const Exit& exit) {
 	this->current_type_environment = std::move(result);
 }
 
-void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& /*var*/) {
-	throw std::logic_error("not yet implemented: TypeChecker::check_return");
+void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& var) {
+	conditionally_raise_error<UnsupportedConstructError>(var.type.sort == Sort::PTR, "returning pointers is not supported");
+	for (auto& [decl, guarantees] : this->current_type_environment) {
+		guarantees.clear();
+	}
+	// throw std::logic_error("not yet implemented: TypeChecker::check_return");
 }
 
 void TypeChecker::check_break(const Break& /*brk*/) {

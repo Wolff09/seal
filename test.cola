@@ -37,7 +37,7 @@ void enqueue(data_t input) {
 					CAS(Tail, tail, next);
 
 				} else {
-					if (CAS(tail->next, next, node)) {
+					if (CAS(tail->next, NULL, node)) {
 						CAS(Tail, tail, node);
 						break;
 					}
@@ -47,7 +47,7 @@ void enqueue(data_t input) {
 	}
 }
 
-void dequeue() {
+data_t dequeue() {
 	Node* head, next, tail, tmp;
 	data_t result;
 
@@ -82,5 +82,5 @@ void dequeue() {
 			}
 		}
 	}
-	// return result;
+	return result;
 }
