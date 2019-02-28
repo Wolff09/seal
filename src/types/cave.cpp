@@ -13,8 +13,8 @@ using namespace prtypes;
 
 static const bool INSTRUMENT_OBJECTS = false; // does not work
 static const bool INSTRUMENT_FLAG = false; // does not work
-static const bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false; // does not work
-static const bool INSTRUMENT_INSERT_OPTS = false; // does not work
+static const bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false;
+static const bool INSTRUMENT_INSERT_OPTS = true;
 
 // TODO: guard assertActive with != NULL??
 // TODO: remove imp var option
@@ -37,13 +37,18 @@ const Type& get_retire_type(const Function& retire_function) {
 struct CaveOutputVisitor : public Visitor {
 	std::ostream& stream;
 	Indent indent;
-	const Function& retire;
-	const Type& retire_type;
+	const bool instrument;
+	const Function* retire;
+	const Type* retire_type;
 	const std::set<const Assert*>* whitelist;
 	bool add_fix_me = false;
 	bool needs_parents = false;
+	std::set<std::string> opt_keys = { "cave" };
 
-	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), retire(retire_function), retire_type(get_retire_type(retire_function)), whitelist(whitelist) {
+	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), instrument(true), retire(&retire_function), retire_type(&get_retire_type(retire_function)), whitelist(whitelist) {
+	}
+
+	CaveOutputVisitor(std::ostream& stream) : stream(stream), indent(stream), instrument(false), retire(nullptr), retire_type(nullptr), whitelist(nullptr) {
 	}
 
     // ********************************************************************* //
@@ -52,14 +57,12 @@ struct CaveOutputVisitor : public Visitor {
 
 	void print_options(const Program& program) {
 		if (INSTRUMENT_INSERT_OPTS) {
-			assert(retire_type.fields.count("next") > 0);
-			std::string option;
-			for (const auto& var : program.variables) {
-				if (&var->type == &retire_type) {
-					option = "CC_." + var->name + ".next";
+			for (std::string key : opt_keys) {
+				auto search = program.options.find(key);
+				if (search != program.options.end()) {
+					stream << indent << search->second << std::endl;
 				}
 			}
-			stream << "prover_opts imp_var = \"" << option << "\";" << std::endl << std::endl;
 		}
 	}
 
@@ -83,8 +86,8 @@ struct CaveOutputVisitor : public Visitor {
 		for (const auto& [fiedl_name, type] : type.fields) {
 			stream << indent << type2cave(type) << " " << fiedl_name << ";" << std::endl;
 		}
-		if (INSTRUMENT_OBJECTS) {
-			if (&type == &retire_type) {
+		if (this->instrument && INSTRUMENT_OBJECTS) {
+			if (&type == retire_type) {
 				// instrument retire flag
 				stream << std::endl;
 				stream << indent << "// instrumented retire flag" << std::endl;
@@ -104,9 +107,9 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void print_instrumentation_decls() {
-		if (!INSTRUMENT_OBJECTS) {
+		if (this->instrument && !INSTRUMENT_OBJECTS) {
 			stream << std::endl;
-			stream << indent << type2cave(retire_type) << " INSTRUMENTATION_PTR_;" << std::endl;
+			stream << indent << type2cave(*retire_type) << " INSTRUMENTATION_PTR_;" << std::endl;
 			if (INSTRUMENT_FLAG) {
 				stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
 			}
@@ -155,7 +158,7 @@ struct CaveOutputVisitor : public Visitor {
 		assert(init.body);
 		init.body->accept(*this);
 		stream << std::endl;
-		if (!INSTRUMENT_OBJECTS) {
+		if (this->instrument && !INSTRUMENT_OBJECTS) {
 			stream << indent << "// initialize instrumentation" << std::endl;
 			stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
 			if (INSTRUMENT_FLAG) {
@@ -173,41 +176,43 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void print_assert_macros() {
-		stream << indent << "class DummyFailHelper_ {" << std::endl;
-		indent++;
-		stream << indent << "int field;" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl << std::endl;
-		stream << indent << "void inline fail() {" << std::endl;
-		indent++;
-		stream << indent << "DummyFailHelper_ myNull_fail;" << std::endl;
-		stream << indent << "int myRes;" << std::endl;
-		stream << indent << "myNull_fail = NULL;" << std::endl;
-		stream << indent << "myRes = myNull_fail->field; // force verification failure" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl << std::endl;
+		if (this->instrument) {
+			stream << indent << "class DummyFailHelper_ {" << std::endl;
+			indent++;
+			stream << indent << "int field;" << std::endl;
+			indent--;
+			stream << indent << "}" << std::endl << std::endl;
+			stream << indent << "void inline fail() {" << std::endl;
+			indent++;
+			stream << indent << "DummyFailHelper_ myNull_fail;" << std::endl;
+			stream << indent << "int myRes;" << std::endl;
+			stream << indent << "myNull_fail = NULL;" << std::endl;
+			stream << indent << "myRes = myNull_fail->field; // force verification failure" << std::endl;
+			indent--;
+			stream << indent << "}" << std::endl << std::endl;
 
-		std::string typeName = type2cave(retire_type);
-		stream << indent << "void inline assertActive(" << typeName << " ptr) {" << std::endl;
-		indent++;
-		stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
-		stream << indent << "int myRes;" << std::endl;
-		stream << indent << "myNull_assertActive = NULL;" << std::endl;
-		if (INSTRUMENT_OBJECTS) {
-			stream << indent << "if (ptr->RETIRED_) {" << std::endl;
-		} else {
-			if (INSTRUMENT_FLAG) {
-				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+			std::string typeName = type2cave(*retire_type);
+			stream << indent << "void inline assertActive(" << typeName << " ptr) {" << std::endl;
+			indent++;
+			stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
+			stream << indent << "int myRes;" << std::endl;
+			stream << indent << "myNull_assertActive = NULL;" << std::endl;
+			if (INSTRUMENT_OBJECTS) {
+				stream << indent << "if (ptr->RETIRED_) {" << std::endl;
 			} else {
-				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+				if (INSTRUMENT_FLAG) {
+					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+				} else {
+					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+				}
 			}
+			indent++;
+			stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
+			indent--;
+			stream << indent << "}" << std::endl;
+			indent--;
+			stream << indent << "}" << std::endl;
 		}
-		indent++;
-		stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl;
 	}
 
 	// ********************************************************************* //
@@ -332,8 +337,13 @@ struct CaveOutputVisitor : public Visitor {
 		loop.body->accept(*this);
 	}
 
-	void visit(const IfThenElse& /*node*/) {
-		raise_error<UnsupportedConstructError>("'if' not supported in the translation to CAVE");
+	void visit(const IfThenElse& node) {
+		stream << indent << "if ( ";
+		node.expr->accept(*this);
+		stream << ") ";
+		node.ifBranch->accept(*this);
+		stream << indent << "else ";
+		node.elseBranch->accept(*this);
 	}
 	void visit(const While& node) {
 		stream << indent << "while (";
@@ -368,7 +378,7 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const CompareAndSwap& /*node*/) {
-		raise_error<UnsupportedConstructError>("'CAS' to macros are not supported in the translation to CAVE");
+		raise_error<UnsupportedConstructError>("'CAS' is not supported in the translation to CAVE");
 	}
 
 	void visit(const Skip& /*node*/) {
@@ -408,15 +418,17 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Assert& assrt) {
-		if (!this->whitelist || whitelist->count(&assrt) > 0) {
-			assert(assrt.inv);
-			assrt.inv->accept(*this);
+		if (this->instrument) {
+			if (!this->whitelist || whitelist->count(&assrt) > 0) {
+				assert(assrt.inv);
+				assrt.inv->accept(*this);
+			}
 		}
 	}
 
 	void visit(const Malloc& malloc) {
 		stream << indent << var2cave(malloc.lhs) << " = new();" << std::endl;
-		if (&malloc.lhs.type == &retire_type) {
+		if (this->instrument && &malloc.lhs.type == retire_type) {
 			if (INSTRUMENT_OBJECTS) {
 				stream << indent << var2cave(malloc.lhs) << "->RETIRED_ = false;" << std::endl;
 			} else if (INSTRUMENT_FLAG) {
@@ -438,7 +450,7 @@ struct CaveOutputVisitor : public Visitor {
 	void visit(const Enter& enter) {
 		stream << indent << "// ";
 		cola::print(enter, stream);
-		if (&enter.decl == &retire) {
+		if (this->instrument && &enter.decl == retire) {
 			assert(enter.args.size() == 1);
 			assert(enter.args.at(0)->type().sort == Sort::PTR);
 
@@ -499,8 +511,9 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Program& program) {
-		stream << "// generated CAVE program for '" << program.name << "'" << std::endl << std::endl;
+		stream << "// generated CAVE program for '" << program.name << "'" << std::endl;
 		print_options(program);
+		stream << std::endl;
 
 		// type defs
 		print_delimiter(stream, "type definitions");
@@ -597,7 +610,35 @@ bool prtypes::discharge_assertions(const Program& program, const Function& retir
 }
 
 
+bool prtypes::check_linearizability(const cola::Program& program) {
+	std::string filename = "tmp.cav";
+	std::ofstream outfile(filename);
+	CaveOutputVisitor visitor(outfile);
+	visitor.opt_keys.insert("cavelin");
+	program.accept(visitor);
+	outfile.close();
 
+	std::string spec_file = "spec.cav";
+	auto find = program.options.find("cavespec");
+	if (find != program.options.end()) {
+		// TODO: relative path from executable
+		spec_file = find->second;
+	}
+	find = program.options.find("_path");
+	if (find != program.options.end()) {
+		spec_file = find->second + spec_file;
+	}
+
+	std::string command = "./cave -linear " + spec_file + " " + filename;
+	std::string result = exec(command.data());
+	if (result.find("\nNOT Valid\n") != std::string::npos) {
+		return false;
+	} else if (result.find("\nValid\n") != std::string::npos) {
+		return true;
+	} else {
+		throw CaveError("CAVE failed me (unrcognized output)! Cannot recover.");
+	}
+}
 
 
 

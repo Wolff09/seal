@@ -507,6 +507,7 @@ namespace cola {
 		std::vector<std::unique_ptr<VariableDeclaration>> variables;
 		std::unique_ptr<Function> initializer;
 		std::vector<std::unique_ptr<Function>> functions;
+		std::map<std::string, std::string> options;
 		ACCEPT_COLA_VISITOR
 	};
 

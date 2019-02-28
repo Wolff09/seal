@@ -660,12 +660,13 @@ std::unique_ptr<Statement> make_sequence_from_path(std::vector<const Statement*>
 
 
 void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
-	std::cout << "Trying to fix local unsafe assume..." << std::endl;
+	std::cout << "Trying to remove local unsafe assume by moving it to an earlier program location." << std::endl;
 
 	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
 	auto path = visitor.get_path_or_raise(program);
+	conditionally_raise_error<RefinementError>(path.size() == 0, "could not find locations to move assume to; cannot recover");
 
-	std::cout << "Found path: " << std::endl;
+	std::cout << "Promising control flow locations for moving assume statement to: " << std::endl;
 	for (const auto& elem : path) {
 		std::cout << "   - ";
 		cola::print(*elem, std::cout);
@@ -674,12 +675,20 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 	for (auto it = path.begin(); it != path.end(); ++it) {
 		const bool no_check = (it+1 == path.end()) && !CHECK_SINGLETON_PATH;
 		if (no_check) {
-			std::cout << "Will not check path; have no choice anyways." << std::endl;
+			std::cout << "Moving assume here: ";
+			cola::print(**it, std::cout);
+			std::cout << "(Did not check move; had no choice anyways)" << std::endl;
+		} else {
+			std::cout << "Checking location: ";
+			cola::print(**it, std::cout);
 		}
 
 		// try to insert assertion in path; move assume if possible
 		try {
 			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
+			if (!no_check) {
+				std::cout << " ==> inserting assertion here" << std::endl;
+			}
 
 			// create tmp var of type bool
 			assert(visitor.found_function);
@@ -713,6 +722,7 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 			return;
 
 		} catch (RefinementError err) {
+			std::cout << " ==> cannot insert assertion here" << std::endl;
 			// do nothing, continue with next element on path
 		}
 	}
@@ -721,13 +731,13 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 }
 
 void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
-	std::cout << "Trying to remove local unsafe assume..." << std::endl;
+	std::cout << "Trying to remove unsafe assume statement by repeating commands." << std::endl;
 
 	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
 	auto full_path = visitor.get_full_path_or_raise(program);
-	conditionally_raise_error<RefinementError>(full_path.size() == 0, "found full path to be empty; cannot recover");
+	conditionally_raise_error<RefinementError>(full_path.size() == 0, "could not find commands to be repeated; cannot recover");
 
-	std::cout << "Found full path: " << std::endl;
+	std::cout << "Commands to be repeated: " << std::endl;
 	for (const auto& elem : full_path) {
 		std::cout << "   - ";
 		cola::print(*elem, std::cout);
@@ -738,20 +748,20 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 
 	// check first path element to be an assignment corresponding to the assumption to be replaced
 	auto assignment = dynamic_cast<const Assignment*>(*it);
-	conditionally_raise_error<RefinementError>(!assignment, "full path malformed (first entry); cannot recover");
+	conditionally_raise_error<RefinementError>(!assignment, "repeating commands failed (first entry of 'full_path' malformed); cannot recover");
 	auto assignment_lhs = dynamic_cast<const VariableExpression*>(assignment->lhs.get());
 	auto assignment_rhs = dynamic_cast<const VariableExpression*>(assignment->rhs.get());
-	conditionally_raise_error<RefinementError>(!assignment_lhs, "full path malformed (assignment lhs); cannot recover");
-	conditionally_raise_error<RefinementError>(!assignment_rhs, "full path malformed (assignment rhs); cannot recover");
+	conditionally_raise_error<RefinementError>(!assignment_lhs, "repeating commands failed ('lhs' of assignment in 'full_path' malformed); cannot recover");
+	conditionally_raise_error<RefinementError>(!assignment_rhs, "repeating commands failed ('rhs' of assignment in 'full_path' malformed); cannot recover");
 	auto assumption = dynamic_cast<const BinaryExpression*>(error.pc.expr.get());
-	conditionally_raise_error<RefinementError>(!assumption, "full path malformed (assume); cannot recover");
+	conditionally_raise_error<RefinementError>(!assumption, "repeating commands failed (assume in 'full_path' malformed); cannot recover");
 	auto assumption_lhs = dynamic_cast<const VariableExpression*>(assumption->lhs.get());
 	auto assumption_rhs = dynamic_cast<const VariableExpression*>(assumption->rhs.get());
-	conditionally_raise_error<RefinementError>(!assumption_lhs, "full path malformed (assume lhs); cannot recover");
-	conditionally_raise_error<RefinementError>(!assumption_rhs, "full path malformed (assume rhs); cannot recover");
+	conditionally_raise_error<RefinementError>(!assumption_lhs, "repeating commands failed ('lhs' of assume in 'full_path' malformed); cannot recover");
+	conditionally_raise_error<RefinementError>(!assumption_rhs, "repeating commands failed ('rhs' of assume in 'full_path' malformed); cannot recover");
 	bool well_formed = &assignment_lhs->decl == &assumption_lhs->decl && &assignment_rhs->decl == &assumption_rhs->decl;
 	well_formed |= &assignment_rhs->decl == &assumption_lhs->decl && &assignment_lhs->decl == &assumption_rhs->decl;
-	conditionally_raise_error<RefinementError>(!well_formed, "full path malformed; cannot recover");
+	conditionally_raise_error<RefinementError>(!well_formed, "repeating commands failed ('full_path' malformed); cannot recover");
 	++it;
 
 	// check remaining path elements to be heap-local or right movers
@@ -759,24 +769,26 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	for (; it != full_path.end(); ++it) {
 		(*it)->accept(move_checker);
 	}
-	conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "full path does not move");
+	conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "repeating commands failed (some statements in 'full_path' do not move); cannot recover");
 
 	// copy full path and add after offending assume, add active assertion for offending variable
 	auto new_code = make_sequence_from_path(full_path);
 	AssertionInsertionVisitor insertion(error.pc, std::move(new_code), true /* insert after */);
 	program.accept(insertion);
 
-	// delete offending assume
+	// delete offending assume 
 	*insertion.owner_found = std::make_unique<Skip>();
+	std::cout << " ==> replaced unsafe assume with a repetition of the commands" << std::endl;
 }
 
 void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
-	std::cout << "Trying to fix local unsafe dereference..." << std::endl;
+	std::cout << "Trying to fix unsafe dereference of local pointer by inserting an appropriate assertion earlier in the program." << std::endl;
 
 	InsertionLocationFinderVisitor visitor({ &error.var }, error.pc);
 	auto path = visitor.get_path_or_raise(program);
+	conditionally_raise_error<RefinementError>(path.size() == 0, "could not find locations to insert assertions; cannot recover");
 
-	std::cout << "Found path: " << std::endl;
+	std::cout << "Promising control flow locations for assertion insertion: " << std::endl;
 	for (const auto& elem : path) {
 		std::cout << "   - ";
 		cola::print(*elem, std::cout);
@@ -785,15 +797,25 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 	for (auto it = path.begin(); it != path.end(); ++it) {
 		const bool no_check = (it+1 == path.end()) && !CHECK_SINGLETON_PATH;
 		if (no_check) {
-			std::cout << "Will not check path; have no choice anyways." << std::endl;
+			std::cout << "Inserting assertion here: ";
+			cola::print(**it, std::cout);
+			std::cout << "(Did not check insertion; had no choice anyways)" << std::endl;
+		} else {
+			std::cout << "Checking location: ";
+			cola::print(**it, std::cout);
 		}
 
 		// try to insert assertion in path; move assume if possible
 		try {
 			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
+			if (!no_check) {
+				std::cout << " ==> inserting assertion here" << std::endl;
+			}
 			return;
 
 		} catch (RefinementError err) {
+			std::cout << " ==> cannot insert assertion here";
+			cola::print(**it, std::cout);
 			// do nothing, continue with next element on path
 		}
 	}
@@ -803,13 +825,16 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 
 
 void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
-	std::cout << "Fixing '" << error.var.name << "' in: "; cola::print(error.pc, std::cout);
-
 	try {
 		// insert assertion for offending command
 		insert_active_assertion(program, guarantee_table, error.pc, error.var);
+		std::cout << " ==> inserted active assertion for variable '" << error.var.name << "'" << std::endl;
 
 	} catch (RefinementError err) {
+		std::cout << "Variable '" << error.var.name << "' is not active in: ";
+		cola::print(error.pc, std::cout);
+		std::cout << "(Cannot insert assertion to fix pointer race)" << std::endl;
+
 		// try to move the offending assertion
 		assert(error.pc.expr);
 		if (is_expression_local(*error.pc.expr)) {
@@ -827,6 +852,7 @@ void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable&
 		assert(error.pc.args.at(0));
 		const VariableExpression& expr = *static_cast<const VariableExpression*>(error.pc.args.at(0).get()); // TODO: unhack this
 		insert_active_assertion(program, guarantee_table, error.pc, expr.decl);
+		std::cout << " ==> inserted active assertion for variable '" << expr.decl.name << "'" << std::endl;
 
 	} else {
 		raise_error<RefinementError>("cannot recover from unsafe call to function " + error.pc.decl.name);
@@ -834,13 +860,16 @@ void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable&
 }
 
 void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
-	std::cout << "Fixing '" << error.var.name << "' in: "; cola::print(error.pc, std::cout);
-
 	try {
 		// insert assertion for offending command
 		insert_active_assertion(program, guarantee_table, error.pc, error.var);
+		std::cout << " ==> inserted active assertion for variable '" << error.var.name << "'" << std::endl;
 
 	} catch (RefinementError err) {
+		std::cout << "Variable '" << error.var.name << "' is not active in: ";
+		cola::print(error.pc, std::cout);
+		std::cout << "(Cannot insert assertion to fix pointer race)" << std::endl;
+
 		if (!error.var.is_shared) {
 			// dereferences of local pointers should be guarded by SMR; try find earlier point where it is safe
 			try_fix_local_unsafe_dereference(program, guarantee_table, error);

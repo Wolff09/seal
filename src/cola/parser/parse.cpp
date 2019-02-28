@@ -14,9 +14,24 @@ using namespace antlr4;
 using namespace cola;
 
 
+std::string get_path(std::string filename) {
+	// #include <filesystem>
+	// return std::filesystem::path(filename).parent_path();
+
+	auto find = filename.rfind('/');
+	if (find != std::string::npos) {
+		return filename.substr(0, find+1);
+	} else {
+		return "";
+	}
+}
+
 std::shared_ptr<Program> cola::parse(std::string filename) {
 	std::ifstream file(filename);
-	return parse(file);
+	auto result = parse(file);
+	result->options["_path"] = get_path(filename);
+	std::cout << get_path(filename) << std::endl;
+	return result;
 }
 
 std::shared_ptr<Program> cola::parse(std::istream& input) {

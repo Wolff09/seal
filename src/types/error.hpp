@@ -41,7 +41,7 @@ namespace prtypes {
 		const cola::Assignment& pc;
 		const cola::Dereference& deref;
 		const cola::VariableDeclaration& var;
-		UnsafeDereferenceError(const cola::Assignment& pc_, const cola::Dereference& deref_, const cola::VariableDeclaration& var_) : PointerRaceError("unsafe dereference of potentially invalid variable " + var_.name), pc(pc_), deref(deref_), var(var_) {}
+		UnsafeDereferenceError(const cola::Assignment& pc_, const cola::Dereference& deref_, const cola::VariableDeclaration& var_) : PointerRaceError("unsafe dereference (" + std::to_string(pc_.id) + ") of potentially invalid variable " + var_.name), pc(pc_), deref(deref_), var(var_) {}
 		virtual Kind kind() const override { return DEREF; }
 	};
 
@@ -55,7 +55,7 @@ namespace prtypes {
 	struct UnsafeCallError : public PointerRaceError {
 		const cola::Enter& pc;
 		UnsafeCallError(const cola::Enter& pc_) : PointerRaceError("unsafe call of function " + pc_.decl.name), pc(pc_) {}
-		UnsafeCallError(const cola::Enter& pc_, std::string cause) : PointerRaceError("unsafe call of function " + pc_.decl.name + " (" + cause + ")"), pc(pc_) {}
+		UnsafeCallError(const cola::Enter& pc_, std::string cause) : PointerRaceError("unsafe call (" + std::to_string(pc_.id) + ") of function " + pc_.decl.name + " (" + cause + ")"), pc(pc_) {}
 		virtual Kind kind() const override { return CALL; }
 	};
 

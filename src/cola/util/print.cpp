@@ -377,7 +377,9 @@ struct PrintVisitor final : public Visitor {
 		com.lhs->accept(exprinter);
 		stream << " = ";
 		com.rhs->accept(exprinter);
-		stream << ";" << std::endl;
+		stream << ";";
+		stream << " // " << com.id;
+		stream << std::endl;
 	}
 
 	void visit(const Enter& com) {
@@ -390,7 +392,9 @@ struct PrintVisitor final : public Visitor {
 				com.args.at(i)->accept(exprinter);
 			}
 		}
-		stream << ");" << std::endl;
+		stream << ");";
+		stream << " // " << com.id;
+		stream << std::endl;
 	}
 
 	void visit(const Exit& com) {

@@ -11,6 +11,8 @@
 
 namespace prtypes {
 
+	bool check_linearizability(const cola::Program& program);
+
 	bool discharge_assertions(const cola::Program& program, const cola::Function& retire_function, const Guarantee& active);
 
 	bool discharge_assertions(const cola::Program& program, const cola::Function& retire_function, const Guarantee& active, const std::vector<std::reference_wrapper<const cola::Assert>>& whitelist);

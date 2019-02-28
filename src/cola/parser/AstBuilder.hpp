@@ -114,6 +114,8 @@ namespace cola {
 			antlrcpp::Any visitExprNegation(cola::CoLaParser::ExprNegationContext* context) override;
 			antlrcpp::Any visitInvExpr(cola::CoLaParser::InvExprContext* context) override;
 			antlrcpp::Any visitInvActive(cola::CoLaParser::InvActiveContext* context) override;
+
+			antlrcpp::Any visitOption(cola::CoLaParser::OptionContext *context) override;
 	};
 
 } // namespace cola

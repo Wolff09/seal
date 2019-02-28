@@ -54,7 +54,7 @@ void prtypes::test() {
 	std::string filename = "/Users/wolff/Tools/PointerRaceTypes/test.cola";
 	auto program_ptr = cola::parse(filename);
 	Program& program = *program_ptr;
-	program.name = "TestProgram";
+	// program.name = "TestProgram";
 	
 	std::cout << "Parsed program: " << std::endl;
 	cola::print(program, std::cout);
@@ -137,6 +137,10 @@ void prtypes::test() {
 	std::cout << std::endl << "Checking assertions..." << std::endl;
 	bool assertions_safe = discharge_assertions(program, table);
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
+
+	std::cout << "Checking linearizability under GC..." << std::endl;
+	bool linearizable = prtypes::check_linearizability(program);
+	std::cout << "Linearizability check: " << (linearizable ? "successful" : "failed") << std::endl;
 
 	// // safe predicate
 	// bool safe_valid, safe_invalid;

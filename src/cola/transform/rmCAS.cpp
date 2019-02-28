@@ -216,7 +216,6 @@ struct CasRemovalVisitor : public NonConstVisitor {
 		CasFinderVisitor visitor;
 		node.expr->accept(visitor);
 		if (visitor.found != nullptr) {
-			std::cout << "## Handling: "; cola::print(node, std::cout);
 			assert(!visitor.found_low_level);
 			auto& cas = *visitor.found;
 			assert(current_owner);
@@ -232,7 +231,6 @@ struct CasRemovalVisitor : public NonConstVisitor {
 				auto condition = std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, std::move(dstexpr), cola::copy(cmp));
 				auto assignment = std::make_unique<Assignment>(cola::copy(dst), cola::copy(src));
 				if (in_atomic) {
-					std::cout << " -- in atomic -- " << std::endl;
 					auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(assignment), std::move(node.ifBranch)));
 					auto branch_false = std::move(node.elseBranch);
 					auto ite = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false)));
@@ -283,7 +281,6 @@ struct CasRemovalVisitor : public NonConstVisitor {
 			auto& cmp = *cas.elems.at(0).cmp;
 			auto& src = *cas.elems.at(0).src;
 			// replace cas with: if (dst == cmp) { dst = src; } else { skip; }
-			std::cout << std::endl;
 			auto [preamble, dstexpr] = convert_cas_dst(dst);
 			auto condition = std::make_unique<BinaryExpression>(BinaryExpression::Operator::EQ, cola::copy(dst), cola::copy(cmp));
 			auto assignment = std::make_unique<Assignment>(cola::copy(dst), cola::copy(src));

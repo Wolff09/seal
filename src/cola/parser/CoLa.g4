@@ -3,7 +3,9 @@ grammar CoLa;
 
 /* Parser rules */
 
-program : struct_decl* var_decl* function* EOF ;
+program : opts* struct_decl* var_decl* function* EOF ;
+
+opts : '#' ident=Identifier str=String  #option ;
 
 struct_decl : ('struct' || 'class') name=Identifier '{' field_decl* '}' (';')? ;
 
@@ -79,7 +81,6 @@ cas : 'CAS' '(' dst+=expression ',' cmp+=expression ',' src+=expression ')'
                 '<' cmp+=expression (',' cmp+=expression)* '>' ','
                 '<' src+=expression (',' src+=expression)* '>' ',' ')'
     ;
-// TODO: dCAS, or general cas with multiple params
 
 binop : Eq   #opEq
       | Neq  #opNeq
@@ -140,6 +141,9 @@ Or  : '||' ;
 Neg : '!' ;
 
 Identifier : [a-zA-Z][a-zA-Z0-9]* ;
+
+String : '"' ~[\r\n]* '"'
+       | '\'' ~[\r\n]* '\'' ;
 
 WS    : [ \t\r\n]+ -> skip ; // skip spaces, tabs, newlines
 
