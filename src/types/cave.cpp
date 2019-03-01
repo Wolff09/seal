@@ -13,6 +13,7 @@ using namespace prtypes;
 
 static const bool INSTRUMENT_OBJECTS = false; // does not work
 static const bool INSTRUMENT_FLAG = false; // does not work
+static const bool INSTRUMENT_WITH_HINT = false; // does not improve precision
 static const bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false;
 static const bool INSTRUMENT_INSERT_OPTS = true;
 
@@ -46,9 +47,13 @@ struct CaveOutputVisitor : public Visitor {
 	std::set<std::string> opt_keys = { "cave" };
 
 	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), instrument(true), retire(&retire_function), retire_type(&get_retire_type(retire_function)), whitelist(whitelist) {
+		assert(!INSTRUMENT_OBJECTS);
+		assert(!INSTRUMENT_FLAG);
 	}
 
 	CaveOutputVisitor(std::ostream& stream) : stream(stream), indent(stream), instrument(false), retire(nullptr), retire_type(nullptr), whitelist(nullptr) {
+		assert(!INSTRUMENT_OBJECTS);
+		assert(!INSTRUMENT_FLAG);
 	}
 
     // ********************************************************************* //
@@ -110,6 +115,9 @@ struct CaveOutputVisitor : public Visitor {
 		if (this->instrument && !INSTRUMENT_OBJECTS) {
 			stream << std::endl;
 			stream << indent << type2cave(*retire_type) << " INSTRUMENTATION_PTR_;" << std::endl;
+			if (INSTRUMENT_WITH_HINT) {
+				stream << indent << type2cave(*retire_type) << " HINT_PTR_;" << std::endl;
+			}
 			if (INSTRUMENT_FLAG) {
 				stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
 			}
@@ -161,6 +169,9 @@ struct CaveOutputVisitor : public Visitor {
 		if (this->instrument && !INSTRUMENT_OBJECTS) {
 			stream << indent << "// initialize instrumentation" << std::endl;
 			stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
+			if (INSTRUMENT_WITH_HINT) {
+				stream << indent << "CC_->HINT_PTR_ = NULL;" << std::endl;
+			}
 			if (INSTRUMENT_FLAG) {
 				stream << indent << "CC_->INSTRUMENTATION_RETIRED_ = false;" << std::endl;
 			}
@@ -450,6 +461,16 @@ struct CaveOutputVisitor : public Visitor {
 	void visit(const Enter& enter) {
 		stream << indent << "// ";
 		cola::print(enter, stream);
+		if (this->instrument && INSTRUMENT_WITH_HINT && enter.decl.name == "caveHintRetire") {
+			assert(!INSTRUMENT_OBJECTS);
+			assert(enter.args.size() == 1);
+			assert(enter.args.at(0)->type().sort == Sort::PTR);
+			assert(retire->args.size() == 1);
+			assert(&retire->args.at(0)->type == &enter.args.at(0)->type());
+			stream << indent << "if (CC_->HINT_PTR_ == NULL && CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->HINT_PTR_ = ";
+			enter.args.at(0)->accept(*this);
+			stream << "; } }" << std::endl;
+		}
 		if (this->instrument && &enter.decl == retire) {
 			assert(enter.args.size() == 1);
 			assert(enter.args.at(0)->type().sort == Sort::PTR);
@@ -467,8 +488,15 @@ struct CaveOutputVisitor : public Visitor {
 
 			} else if (!INSTRUMENT_FLAG) {
 				// instrumentation: set if not yet set
-				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
-				enter.args.at(0)->accept(*this);
+				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL";
+				if (INSTRUMENT_WITH_HINT) {
+					stream << " && CC_->HINT_PTR_ != NULL && CC_->HINT_PTR_ == ";
+					enter.args.at(0)->accept(*this);
+					stream << ") { if (*) { CC_->INSTRUMENTATION_PTR_ = CC_->HINT_PTR_";
+				} else {
+					stream << ") { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
+					enter.args.at(0)->accept(*this);
+				}
 				stream << "; } }" << std::endl;
 			}
 		}

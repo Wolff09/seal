@@ -12,14 +12,6 @@ extern void retire(Node* ptr);
 extern void protect1(Node* ptr);
 extern void protect2(Node* ptr);
 
-/**
- * Hinting to avoid CAVE imprecesion.
- * We use this function to create a shared copy of a to-be-retired
- * pointer in the instrumentation.
- * This does not affect the behavior of the program, but forces
- * CAVE to compute RGSep actions with the proper precision.
- */
-extern void caveHintRetire(Node* ptr);
 
 void init() {
 	TOS = NULL;
@@ -82,8 +74,7 @@ data_t pop() {
 				next = top->next;
 				atomic {
 					if (CAS(TOS, top, next)) {
-						caveHintRetire(top);
-						retire(top); // move left to avoid CAVE imprecision
+						retire(top); // moved left to avoid CAVE imprecision
 						flag = true;
 					} else {
 						flag = false;

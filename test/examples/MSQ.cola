@@ -14,6 +14,7 @@ extern void retire(Node* ptr);
 extern void protect1(Node* ptr);
 extern void protect2(Node* ptr);
 
+
 void init() {
 	Head = malloc;
 	Head->next = NULL;
@@ -52,6 +53,7 @@ void enqueue(data_t value) {
 data_t dequeue() {
 	Node* head, next, tail;
 	data_t result;
+	bool flag;
 
 	while (true) {
 		head = Head;
@@ -75,9 +77,15 @@ data_t dequeue() {
 						result = next->val;
 						atomic {
 							if (CAS(Head, head, next)) {
-								retire(head); // move left to avoid CAVE imprecision
-								break;
+								retire(head); // moved left to avoid CAVE imprecision
+								flag = true;
+							} else {
+								flag = false;
 							}
+						}
+						if (flag) {
+							// retire(head);
+							break;
 						}
 					}
 				}
