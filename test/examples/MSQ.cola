@@ -21,8 +21,7 @@ void init() {
 }
 
 void enqueue(data_t value) {
-	Node* tail, next, node, tmp;
-	bool b1;
+	Node* tail, next, node;
 
 	node = malloc;
 	node->val = value;
@@ -51,7 +50,7 @@ void enqueue(data_t value) {
 }
 
 data_t dequeue() {
-	Node* head, next, tail, tmp;
+	Node* head, next, tail;
 	data_t result;
 
 	while (true) {

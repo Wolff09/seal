@@ -221,7 +221,6 @@ struct CasRemovalVisitor : public NonConstVisitor {
 			assert(current_owner);
 			assert(current_owner->get() == &node);
 			assert(this->current_function);
-			VariableDeclaration& tmp = make_tmp_var(*this->current_function);
 			if (cas.elems.size() == 1) {
 				auto& dst = *cas.elems.at(0).dst;
 				auto& cmp = *cas.elems.at(0).cmp;
@@ -236,19 +235,31 @@ struct CasRemovalVisitor : public NonConstVisitor {
 					auto ite = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false)));
 					*current_owner = std::move(ite);
 				} else {
-					auto flag_true = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(true));
-					auto flag_false = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(false));
-					auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(assignment), std::move(flag_true)));
-					auto branch_false = std::make_unique<Scope>(std::move(flag_false));
-					auto ite = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false)));
-					node.expr = std::make_unique<VariableExpression>(tmp);
-					auto replacement = std::make_unique<Sequence>(std::move(ite), std::move(*current_owner));
+					auto [preamblecopy, dstexprcopy] = convert_cas_dst(dst);
+					auto cas_false = combine_cas_preamble_and_ite(std::move(preamblecopy), std::make_unique<Assume>(cola::negate(*condition)));
+					auto cas_true = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<Sequence>(std::make_unique<Assume>(std::move(condition)), std::move(assignment)));
+					auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(cas_true), std::move(node.ifBranch)));
+					auto branch_false = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(cas_false), std::move(node.elseBranch)));
+					auto replacement = std::make_unique<Choice>();
+					replacement->branches.push_back(std::move(branch_true));
+					replacement->branches.push_back(std::move(branch_false));
 					*current_owner = std::move(replacement);
+
+					// VariableDeclaration& tmp = make_tmp_var(*this->current_function);
+					// auto flag_true = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(true));
+					// auto flag_false = std::make_unique<Assignment>(std::make_unique<VariableExpression>(tmp), std::make_unique<BooleanValue>(false));
+					// auto branch_true = std::make_unique<Scope>(std::make_unique<Sequence>(std::move(assignment), std::move(flag_true)));
+					// auto branch_false = std::make_unique<Scope>(std::move(flag_false));
+					// auto ite = combine_cas_preamble_and_ite(std::move(preamble), std::make_unique<IfThenElse>(std::move(condition), std::move(branch_true), std::move(branch_false)));
+					// node.expr = std::make_unique<VariableExpression>(tmp);
+					// auto replacement = std::make_unique<Sequence>(std::move(ite), std::move(*current_owner));
+					// *current_owner = std::move(replacement);
 				}
 
 			} else {
 				throw std::logic_error("not yet implemented: desugaring of kCAS with k!=1");
 			}
+
 		}
 
 	}

@@ -36,14 +36,6 @@ int main(int argc, char** argv) {
 	
 	// std::cout << "Parsed program: " << std::endl;
 	// cola::print(program, std::cout);
-	
-	// preprocessing
-	std::cout << std::endl << "Preprocessing program... " << std::flush;
-	prtypes::preprocess(program);
-	std::cout << "done" << std::endl;
-	program.name += " (preprocessed)";
-	std::cout << "Preprocessed program: " << std::endl;
-	cola::print(program, std::cout);
 
 	// query HP functions
 	auto search_retire = find_function(program, "retire");
@@ -54,6 +46,14 @@ int main(int argc, char** argv) {
 	const Function& retire = *search_retire;
 	const Function& protect1 = *search_protect1;
 	const Function& protect2 = *search_protect2;
+	
+	// preprocessing
+	std::cout << std::endl << "Preprocessing program... " << std::flush;
+	prtypes::preprocess(program, retire);
+	std::cout << "done" << std::endl;
+	program.name += " (preprocessed)";
+	std::cout << "Preprocessed program: " << std::endl;
+	cola::print(program, std::cout);
 
 	// create stuff
 	std::cout << std::endl << "Computing simulation... " << std::flush;
@@ -86,16 +86,36 @@ int main(int argc, char** argv) {
 
 	// type check
 	bool type_safe = false;
+	std::unique_ptr<UnsafeAssumeError> previous_unsafe_assume_error;
+	auto is_reoffending = [&](const UnsafeAssumeError& error) {
+		if (!previous_unsafe_assume_error) {
+			return false;
+		} else {
+			UnsafeAssumeError& other = *previous_unsafe_assume_error;
+			return &error.pc == &other.pc && &error.var == &other.var;
+		}
+	};
+	auto fix = [&](PointerRaceError& err) {
+		std::cout << err.what() << std::endl;
+		switch (err.kind()) {
+			case PointerRaceError::CALL:
+				try_fix_pointer_race(program, table, static_cast<UnsafeCallError&>(err));
+				break;
+			
+			case PointerRaceError::DEREF:
+				try_fix_pointer_race(program, table, static_cast<UnsafeDereferenceError&>(err));
+				break;
+			
+			case PointerRaceError::ASSUME: {
+				auto& error = static_cast<UnsafeAssumeError&>(err);
+				bool reoffending = is_reoffending(error);
+				try_fix_pointer_race(program, table, error, reoffending);
+				break;
+			}
+		}
+	};
 	while (!type_safe) {
 		std::cout << std::endl << "Checking typing..." << std::endl;
-		auto fix = [&](PointerRaceError& err) {
-			std::cout << err.what() << std::endl;
-			switch (err.kind()) {
-				case PointerRaceError::CALL: try_fix_pointer_race(program, table, static_cast<UnsafeCallError&>(err)); break;
-				case PointerRaceError::DEREF: try_fix_pointer_race(program, table, static_cast<UnsafeDereferenceError&>(err)); break;
-				case PointerRaceError::ASSUME: try_fix_pointer_race(program, table, static_cast<UnsafeAssumeError&>(err)); break;
-			}
-		};
 		try {
 			type_safe = type_check(program, table);
 

@@ -75,6 +75,8 @@ inline bool is_expression_local(const Expression& expr) {
 
 struct NeedsAtomicVisitor final : public Visitor {
 	bool result = true;
+	const Function& retire_function;
+	NeedsAtomicVisitor(const Function& retire_function) : retire_function(retire_function) {}
 
 	void visit(const VariableDeclaration& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const VariableDeclaration&)"); }
 	void visit(const Expression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const Expression&)"); }
@@ -126,6 +128,9 @@ struct NeedsAtomicVisitor final : public Visitor {
 		}
 	}
 	void visit(const Enter& node) override {
+		if (&node.decl == &retire_function) {
+			return;
+		}
 		for (const auto& arg : node.args) {
 			if (!is_expression_local(*arg)) {
 				return;
@@ -136,8 +141,8 @@ struct NeedsAtomicVisitor final : public Visitor {
 	void visit(const Exit& /*node*/) override { this->result = false; }
 };
 
-bool needs_atomic(const Statement& stmt) {
-	NeedsAtomicVisitor visitor;
+bool needs_atomic(const Statement& stmt, const Function& retire_function) {
+	NeedsAtomicVisitor visitor(retire_function);
 	stmt.accept(visitor);
 	return visitor.result;
 }
@@ -146,6 +151,8 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	bool in_atomic = false;
 	bool found_return = false;
 	bool found_cmd = false;
+	const Function& retire_function;
+	PreprocessingVisitor(const Function& retire_function) : retire_function(retire_function) {}
 
 	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(VariableDeclaration&)"); }
 	void visit(Expression& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(Expression&)"); }
@@ -172,9 +179,9 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 
 	void handle_statement(std::unique_ptr<Statement>& stmt) {
 		found_cmd = false;
-		stmt->accept(*this);
 		assert(stmt);
-		if (found_cmd && !in_atomic && needs_atomic(*stmt)) {
+		stmt->accept(*this);
+		if (found_cmd && !in_atomic && needs_atomic(*stmt, retire_function)) {
 			stmt = std::make_unique<Atomic>(std::make_unique<Scope>(std::move(stmt)));
 		}
 		found_cmd = false;
@@ -223,6 +230,7 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void visit(Exit& /*node*/) { found_cmd = true; }
 
 	void visit(Function& node) {
+		found_return = false;
 		if (node.body) {
 			node.body->accept(*this);
 		}
@@ -236,12 +244,12 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	}
 };
 
-void prtypes::preprocess(Program& program) {
+void prtypes::preprocess(Program& program, const cola::Function& retire_function) {
 	cola::remove_cas(program);
 	cola::remove_scoped_variables(program);
 	cola::remove_conditionals(program);
 	cola::remove_useless_scopes(program);
 
-	PreprocessingVisitor visitor;
+	PreprocessingVisitor visitor(retire_function);
 	program.accept(visitor);
 }

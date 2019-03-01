@@ -9,7 +9,7 @@
 
 namespace prtypes {
 
-	void try_fix_pointer_race(cola::Program& program, const GuaranteeTable&, const UnsafeAssumeError& error);
+	void try_fix_pointer_race(cola::Program& program, const GuaranteeTable&, const UnsafeAssumeError& error, bool avoid_reoffending=true);
 	
 	void try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeCallError& error);
 

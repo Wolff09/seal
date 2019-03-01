@@ -1,0 +1,102 @@
+#name "Treiber's Stack"
+#cavespec "stack_spec.cav"
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* TOS;
+
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
+
+/**
+ * Hinting to avoid CAVE imprecesion.
+ * We use this function to create a shared copy of a to-be-retired
+ * pointer in the instrumentation.
+ * This does not affect the behavior of the program, but forces
+ * CAVE to compute RGSep actions with the proper precision.
+ */
+extern void caveHintRetire(Node* ptr);
+
+void init() {
+	TOS = NULL;
+}
+
+void push(data_t e) {
+	Node* top, node;
+
+	node = malloc;
+	node->val = e;
+	node->next = NULL;
+
+	/* loop --> peel to avoid CAVE imprecision */
+	// while (true) {
+	// 	top = TOS;
+	// 	protect1(top);
+	// 	if (top == TOS) {
+	// 		node->next = top;
+	// 		atomic {
+	// 			if (CAS(TOS, top, node)) {
+	// 				break;
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	/* unsuccessful iterations */
+	loop {
+		top = TOS;
+		protect1(top);
+		if (top == TOS) {
+			node->next = top;
+			assume(TOS != top);
+		}
+	}
+	/* successful last iteration */
+	top = TOS;
+	protect1(top);
+	assume (top == TOS);
+	node->next = top;
+	atomic {
+		assume(TOS == top);
+		TOS = node;
+	}
+}
+
+data_t pop() {
+	Node* top, next;
+	data_t result;
+	bool flag;
+
+	while (true) {
+		top = TOS;
+		if (top == NULL) {
+			result = EMPTY;
+			break;
+		} else {
+			protect1(top);
+			if (top == TOS) {
+				next = top->next;
+				atomic {
+					if (CAS(TOS, top, next)) {
+						caveHintRetire(top);
+						retire(top); // move left to avoid CAVE imprecision
+						flag = true;
+					} else {
+						flag = false;
+					}
+				}
+				if (flag) {
+					result = top->val;
+					// retire(top);
+					break;
+				}
+			}
+
+		}
+	}
+	return result;
+}

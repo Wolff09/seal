@@ -8,7 +8,7 @@
 
 namespace prtypes {
 
-	void preprocess(cola::Program& program);
+	void preprocess(cola::Program& program, const cola::Function& retire_function);
 
 } // namespace prtypes
 
