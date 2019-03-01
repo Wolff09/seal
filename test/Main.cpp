@@ -141,6 +141,7 @@ int main(int argc, char** argv) {
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
 	std::cout << std::endl;
 
+	throw std::logic_error("breakpoint");
 	std::cout << "Checking linearizability under GC... " << std::flush;
 	bool linearizable = prtypes::check_linearizability(program);
 	std::cout << "done" << std::endl;

@@ -301,7 +301,10 @@ struct CaveOutputVisitor : public Visitor {
 		for (const auto& decl : scope.variables) {
 			print_var_def(*decl);
 		}
-		if (!scope.variables.empty()) {
+		if (INSTRUMENT_WITH_HINT && add_fix_me) {
+			stream << indent << "bool HINT_PROPHECY_;" << std::endl;
+			stream << indent << "HINT_PROPHECY_ = false;" << std::endl << std::endl;
+		} else if (!scope.variables.empty()) {
 			stream << std::endl;
 		}
 		if (add_fix_me) {
@@ -467,9 +470,13 @@ struct CaveOutputVisitor : public Visitor {
 			assert(enter.args.at(0)->type().sort == Sort::PTR);
 			assert(retire->args.size() == 1);
 			assert(&retire->args.at(0)->type == &enter.args.at(0)->type());
+			stream << indent << "if (";
+			enter.args.at(0)->accept(*this);
+			stream << " == NULL) { fail(); }" << std::endl;
+			stream << indent << "if (HINT_PROPHECY_) { fail(); }" << std::endl;;
 			stream << indent << "if (CC_->HINT_PTR_ == NULL && CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->HINT_PTR_ = ";
 			enter.args.at(0)->accept(*this);
-			stream << "; } }" << std::endl;
+			stream << "; HINT_PROPHECY_ = true; } }" << std::endl;
 		}
 		if (this->instrument && &enter.decl == retire) {
 			assert(enter.args.size() == 1);
@@ -487,17 +494,24 @@ struct CaveOutputVisitor : public Visitor {
 				stream << ")->RETIRED_ = true;" << std::endl;
 
 			} else if (!INSTRUMENT_FLAG) {
-				// instrumentation: set if not yet set
-				stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL";
 				if (INSTRUMENT_WITH_HINT) {
-					stream << " && CC_->HINT_PTR_ != NULL && CC_->HINT_PTR_ == ";
+					stream << indent << "atomic { if (HINT_PROPHECY_) {" << std::endl;
+					indent++;
+					stream << indent << "HINT_PROPHECY_ = false;" << std::endl;
+					stream << indent << "if (CC_->HINT_PTR_ != ";
 					enter.args.at(0)->accept(*this);
-					stream << ") { if (*) { CC_->INSTRUMENTATION_PTR_ = CC_->HINT_PTR_";
+					stream << ") { fail(); }" << std::endl;
+					stream << indent << "if (CC_->HINT_PTR_ == NULL) { fail(); }" << std::endl;
+					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL) { fail(); }" << std::endl;
+					stream << indent << "CC_->INSTRUMENTATION_PTR_ = CC_->HINT_PTR_;" << std::endl;
+					indent--;
+					stream << indent << "}}" << std::endl;
 				} else {
-					stream << ") { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
+					// instrumentation: set if not yet set
+					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
 					enter.args.at(0)->accept(*this);
+					stream << "; } }" << std::endl;
 				}
-				stream << "; } }" << std::endl;
 			}
 		}
 	}

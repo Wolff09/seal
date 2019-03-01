@@ -1,4 +1,4 @@
-#name "Michael&Scott's Queue"
+#name "DGLM Queue"
 #cavespec "queue_spec.cav"
 #cavelin 'prover_opts imp_var = "CC_.Tail.next";'
 
@@ -13,6 +13,7 @@ Node* Head;
 extern void retire(Node* ptr);
 extern void protect1(Node* ptr);
 extern void protect2(Node* ptr);
+
 
 void init() {
 	Head = malloc;
@@ -59,7 +60,6 @@ data_t dequeue() {
 		protect1(head);
 
 		if (head == Head) {
-			tail = Tail;
 			next = head->next;
 			protect2(next);
 
@@ -69,23 +69,22 @@ data_t dequeue() {
 					break;
 
 				} else {
-					if (head == tail) {
-						CAS(Tail, tail, next);
-
-					} else {
-						result = next->val;
-						atomic {
-							if (CAS(Head, head, next)) {
-								retire(head); // moved left to avoid CAVE imprecision
-								flag = true;
-							} else {
-								flag = false;
-							}
+					result = next->val;
+					atomic {
+						if (CAS(Head, head, next)) {
+							retire(head); // moved left to avoid CAVE imprecision
+							flag = true;
+						} else {
+							flag = false;
 						}
-						if (flag) {
-							// retire(head);
-							break;
+					}
+					if (flag) {
+						tail = Tail;
+						if (head == tail) {
+							CAS(Tail, tail, next);
 						}
+						// retire(head);
+						break;
 					}
 				}
 			}
