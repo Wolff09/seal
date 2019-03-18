@@ -85,6 +85,16 @@ struct PrintExpressionVisitor final : public Visitor {
 		set_precedence_immi();
 	}
 
+	void visit(const MaxValue& /*expr*/) {
+		stream << "MAX_VAL";
+		set_precedence_immi();
+	}
+
+	void visit(const MinValue& /*expr*/) {
+		stream << "MIN_VAL";
+		set_precedence_immi();
+	}
+
 	void visit(const NDetValue& /*expr*/) {
 		stream << "*";
 		set_precedence_immi();
@@ -427,6 +437,8 @@ struct PrintVisitor final : public Visitor {
 	void visit(const BooleanValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const BooleanValue&))"); }
 	void visit(const NullValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const NullValue&))"); }
 	void visit(const EmptyValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const EmptyValue&))"); }
+	void visit(const MaxValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const MaxValue&))"); }
+	void visit(const MinValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const MinValue&))"); }
 	void visit(const NDetValue& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const NDetValue&))"); }
 	void visit(const VariableExpression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const VariableExpression&))"); }
 	void visit(const NegatedExpression& /*expr*/) { throw std::logic_error("Unexpected invocation (PrintVisitor::visit(const NegatedExpression&))"); }

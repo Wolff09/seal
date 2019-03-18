@@ -17,6 +17,8 @@ namespace cola {
 	struct BooleanValue;
 	struct NullValue;
 	struct EmptyValue;
+	struct MaxValue;
+	struct MinValue;
 	struct NDetValue;
 	struct VariableExpression;
 	struct NegatedExpression;
@@ -58,6 +60,8 @@ namespace cola {
 		virtual void visit(const BooleanValue& node) = 0;
 		virtual void visit(const NullValue& node) = 0;
 		virtual void visit(const EmptyValue& node) = 0;
+		virtual void visit(const MaxValue& node) = 0;
+		virtual void visit(const MinValue& node) = 0;
 		virtual void visit(const NDetValue& node) = 0;
 		virtual void visit(const VariableExpression& node) = 0;
 		virtual void visit(const NegatedExpression& node) = 0;
@@ -94,6 +98,8 @@ namespace cola {
 		virtual void visit(BooleanValue& node) = 0;
 		virtual void visit(NullValue& node) = 0;
 		virtual void visit(EmptyValue& node) = 0;
+		virtual void visit(MaxValue& node) = 0;
+		virtual void visit(MinValue& node) = 0;
 		virtual void visit(NDetValue& node) = 0;
 		virtual void visit(VariableExpression& node) = 0;
 		virtual void visit(NegatedExpression& node) = 0;
@@ -220,6 +226,16 @@ namespace cola {
 	};
 
 	struct EmptyValue : public Expression {
+		const Type& type() const override { return Type::data_type(); }
+		ACCEPT_COLA_VISITOR
+	};
+
+	struct MaxValue : public Expression {
+		const Type& type() const override { return Type::data_type(); }
+		ACCEPT_COLA_VISITOR
+	};
+
+	struct MinValue : public Expression {
 		const Type& type() const override { return Type::data_type(); }
 		ACCEPT_COLA_VISITOR
 	};

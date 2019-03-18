@@ -23,6 +23,12 @@ struct CasFinderVisitor : public Visitor {
 	void visit(const EmptyValue& /*node*/) {
 		on_top_level = false;
 	}
+	void visit(const MaxValue& /*node*/) {
+		on_top_level = false;
+	}
+	void visit(const MinValue& /*node*/) {
+		on_top_level = false;
+	}
 	void visit(const NDetValue& /*node*/) {
 		on_top_level = false;
 	}
@@ -89,6 +95,8 @@ struct CasConditionNeesTransformationVisitor : public Visitor {
 	void visit(const BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const NDetValue&)"); }
 	void visit(const NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const NegatedExpression&)"); }
 	void visit(const BinaryExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const BinaryExpression&)"); }
@@ -141,18 +149,20 @@ struct CasRemovalVisitor : public NonConstVisitor {
 	Function* current_function = nullptr;
 	bool in_atomic = false;
 
-	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: visit(VariableDeclaration&)"); }
-	void visit(Expression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(Expression&)"); }
-	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: visit(BooleanValue&)"); }
-	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: visit(NullValue&)"); }
-	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: visit(EmptyValue&)"); }
-	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: visit(NDetValue&)"); }
-	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(VariableExpression&)"); }
-	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(NegatedExpression&)"); }
-	void visit(BinaryExpression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(BinaryExpression&)"); }
-	void visit(Dereference& /*node*/) { throw std::logic_error("Unexpected invocation: visit(Dereference&)"); }
-	void visit(InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: visit(InvariantExpression&)"); }
-	void visit(InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: visit(InvariantActive&)"); }
+	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(VariableDeclaration&)"); }
+	void visit(Expression& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(Expression&)"); }
+	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(BooleanValue&)"); }
+	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(NullValue&)"); }
+	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(EmptyValue&)"); }
+	void visit(MaxValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(MaxValue&)"); }
+	void visit(MinValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(MinValue&)"); }
+	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(NDetValue&)"); }
+	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(VariableExpression&)"); }
+	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(NegatedExpression&)"); }
+	void visit(BinaryExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(BinaryExpression&)"); }
+	void visit(Dereference& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(Dereference&)"); }
+	void visit(InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(InvariantExpression&)"); }
+	void visit(InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: CasRemovalVisitor::visit(InvariantActive&)"); }
 
 	std::pair<std::unique_ptr<Statement>, std::unique_ptr<Expression>> convert_cas_dst(const Expression& dst) {
 		std::pair<std::unique_ptr<Statement>, std::unique_ptr<Expression>> result;

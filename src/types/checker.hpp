@@ -36,6 +36,8 @@ namespace prtypes {
 			void visit(const cola::BooleanValue& node) override;
 			void visit(const cola::NullValue& node) override;
 			void visit(const cola::EmptyValue& node) override;
+			void visit(const cola::MaxValue& node) override;
+			void visit(const cola::MinValue& node) override;
 			void visit(const cola::NDetValue& node) override;
 			void visit(const cola::VariableExpression& node) override;
 			void visit(const cola::NegatedExpression& node) override;

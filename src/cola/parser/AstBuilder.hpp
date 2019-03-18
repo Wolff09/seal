@@ -105,6 +105,8 @@ namespace cola {
 			antlrcpp::Any visitValueFalse(cola::CoLaParser::ValueFalseContext* context) override;
 			antlrcpp::Any visitValueNDet(cola::CoLaParser::ValueNDetContext* context) override;
 			antlrcpp::Any visitValueEmpty(cola::CoLaParser::ValueEmptyContext* context) override;
+			antlrcpp::Any visitValueMin(cola::CoLaParser::ValueMinContext* context) override;
+			antlrcpp::Any visitValueMax(cola::CoLaParser::ValueMaxContext* context) override;
 			antlrcpp::Any visitExprValue(cola::CoLaParser::ExprValueContext* context) override;
 			antlrcpp::Any visitExprBinary(cola::CoLaParser::ExprBinaryContext* context) override;
 			antlrcpp::Any visitExprIdentifier(cola::CoLaParser::ExprIdentifierContext* context) override;

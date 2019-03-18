@@ -1,0 +1,246 @@
+#name "Vechev CAS Set"
+#cavespec "set_spec.cav"
+// #cave 'prover_opts rem_sorted = "CC_.Head.next";'
+#cave 'prover_opts imp_var = "CC_.Head.next";'
+#cavebound "key"
+#instrumentation "object"
+
+
+struct Node {
+	data_t val;
+	bool marked;
+	Node* next;
+}
+
+Node* Head;
+Node* Tail;
+
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
+
+
+void init() {
+	Tail = malloc;
+	Tail->next = NULL;
+	Tail->marked = false;
+	Tail->val = MAX_VAL;
+	Head = malloc;
+	Head->next = Tail;
+	Head->marked = false;
+	Head->val = MIN_VAL;
+}
+
+
+bool contains(data_t key) {
+	Node* pred, curr;
+	data_t k;
+	Node* tmpNode;
+	bool tmpBool;
+	bool result;
+
+	curr = Head;
+	atomic {
+		protect2(curr);
+		assert(active(curr));
+	}
+	k = curr->val;
+
+	while (k < key) {
+		pred = curr;
+		protect1(pred);
+
+		curr = pred->next;
+		protect2(curr);
+
+		choose {
+			atomic {
+				// assume(!pred->marked)
+				tmpBool = pred->marked;
+				assume(tmpBool == false);
+			}
+			atomic {
+				// assume(curr == pred->next);
+				tmpNode = pred->next;
+				assume(curr == tmpNode);
+			}
+
+			k = curr->val;
+		}{
+			curr = Head;
+			atomic {
+				protect2(curr);
+				assert(active(curr));
+			}
+		}
+	}
+
+	/*** locate done ***/
+
+	if (k == key) {
+		result = true;
+	} else {
+		result = false;
+	}
+
+	return result;
+}
+
+bool add(data_t key) {
+	Node* pred, curr, entry;
+	data_t k;
+	Node* tmpNode;
+	bool tmpBool;
+	bool result;
+
+	entry = malloc;
+	entry->val = key;
+	entry->marked = false;
+
+	while (true) {
+		/*** locate begin ***/
+		
+		curr = Head;
+		atomic {
+			protect2(curr);
+			assert(active(curr));
+		}
+		k = curr->val;
+
+		while (k < key) {
+			pred = curr;
+			protect1(pred);
+
+			curr = pred->next;
+			protect2(curr);
+
+			choose {
+				atomic {
+					// assume(!pred->marked)
+					tmpBool = pred->marked;
+					assume(tmpBool == false);
+				}
+				atomic {
+					// assume(curr == pred->next);
+					tmpNode = pred->next;
+					assume(curr == tmpNode);
+				}
+
+				k = curr->val;
+			}{
+				curr = Head;
+				atomic {
+					protect2(curr);
+					assert(active(curr));
+				}
+			}
+		}
+
+		/*** locate done ***/
+
+		if (k == key) {
+			result = false;
+			// retire(entry); // reclaim new node that was not added to the data structure
+			break;
+
+		} else {
+			entry->next = curr;
+			atomic {
+				choose {
+					// assume(!pred->marked)
+					tmpBool = pred->marked;
+					assume(tmpBool == false);
+					// assume(curr == pred->next);
+					tmpNode = pred->next;
+					assume(curr == tmpNode);
+
+					pred->next = entry;
+					result = true;
+					break;
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+
+bool remove(data_t key) {
+	Node* pred, curr, next;
+	data_t k;
+	Node* tmpNode;
+	bool tmpBool, tmpBool2;
+	bool result;
+
+	while (true) {
+		curr = Head;
+		k = curr->val;
+
+		while (k < key) {
+			pred = curr;
+			protect1(pred);
+
+			curr = pred->next;
+			protect2(curr);
+
+			choose {
+				atomic {
+					// assume(!pred->marked)
+					tmpBool = pred->marked;
+					assume(tmpBool == false);
+				}
+				atomic {
+					// assume(curr == pred->next);
+					tmpNode = pred->next;
+					assume(curr == tmpNode);
+				}
+
+				k = curr->val;
+			}{
+				curr = Head;
+			}
+		}
+
+		/*** locate done ***/
+
+		if (k > key) {
+			result = false;
+			break;
+		} else {
+			next = curr->next;
+			choose {
+				atomic {
+					// tmpBool = !curr->marked && next == curr->next;
+					tmpNode = curr->next;
+					tmpBool2 = curr->marked;
+					tmpBool = false;
+					if (tmpBool2 == false) {
+						if (tmpNode == next) {
+							tmpBool = true;
+						}
+					}
+					assume(tmpBool);
+					curr->marked = true;
+				}
+				atomic {
+					// tmpBool = !pred->marked && curr == pred->next;
+					tmpNode = pred->next;
+					tmpBool2 = pred->marked;
+					tmpBool = false;
+					if (tmpBool2 == false) {
+						if (tmpNode == curr) {
+							tmpBool = true;
+						}
+					}
+					assume(tmpBool);
+					pred->next = next;
+				}
+				result = true;
+				break;
+			}
+		}
+	}
+
+	return result;
+}

@@ -18,170 +18,278 @@ extern void protect3(Node* ptr);
 void init() {
 	Head = malloc;
 	Head->next = NULL;
+	Head->marked = false;
 }
 
-void enqueue(data_t value) {
-	Node* tail, next, node;
 
-	node = malloc;
-	node->val = value;
-	node->next = NULL;
+bool contains(data_t key) {
+	Node* prev, cur, next, tmpPtr;
+	bool prevMark, curMark, result, retry, tmpBool;
+	data_t curKey;
 
-	while (true) {
-		tail = Tail;
-		protect1(tail);
+	// BEGIN FIND
+	retry = true;
+	while (retry) {
 
-		if (tail == Tail) {
-			next = tail->next;
+		atomic {
+			prev = Head;
+			cur = prev->next;
+			prevMark = prev->marked;
+		}
+		protect2(cur);
+		choose {
+			atomic {
+				assume(prevMark == false);
+				tmpPtr = prev->next;
+				assume(cur == tmpPtr);
+			}
 
-			if (tail == Tail) {
-				if (next != NULL) {
-					CAS(Tail, tail, next);
+			while (true) {
 
+				if (cur == NULL) {
+					// return false
+					result = false;
+					retry = false;
+					break;
 				} else {
-					if (CAS(tail->next, NULL, node)) {
-						CAS(Tail, tail, node);
+
+					atomic {
+						next = cur->next;
+						curMark = cur->marked;
+					}
+					curKey = cur->val;
+
+					protect1(next);
+					choose {
+						atomic {
+							tmpPtr = cur->next;
+							tmpBool = cur->marked;
+							assume(curMark == tmpBool);
+							assume(next == tmpPtr);
+						}
+
+						choose {
+							atomic {
+								assume(prevMark == false);
+								tmpPtr = prev->next;
+								assume(cur == tmpPtr);
+							}
+
+							if (!curMark) {
+								if (curKey >= key) {
+									// return curKey == key
+									if (curKey == key) {
+										result = true;
+									} else {
+										result = false;
+									}
+									retry = false;
+									break;
+								} else {
+									atomic {
+										prev = cur;
+										prevMark = curMark;
+									}
+									protect3(cur);
+								}
+
+							} else {
+								atomic {
+									tmpPtr = prev->next;
+									tmpBool = prev->marked;
+									choose {
+										assume(tmpPtr == cur);
+										assume(tmpBool == false);
+										prev->next = next;
+										tmpBool = false;
+										prev->marked = tmpBool;
+										retire(cur);
+									}{
+										// continue with outer loop
+										break; // TODO: correct?
+										// choose {
+										// 	assume(tmpPtr != cur);
+										// 	break;
+										// }{
+										// 	assume(tmpBool != curMark);
+										// 	break;
+										// }
+									}
+								}
+							}
+
+							atomic {
+								cur = next;
+							}
+							protect2(next);
+
+						}{
+							// continue with outer loop
+							break;
+						}
+
+					}{
+						// continue with outer loop
 						break;
 					}
 				}
 			}
+		}{
+			assume(true);
 		}
 	}
-}
+	// END FIND
 
-data_t dequeue() {
-	Node* head, next, tail;
-	data_t result;
-	bool flag;
-
-	while (true) {
-		head = Head;
-		protect1(head);
-
-		if (head == Head) {
-			tail = Tail;
-			next = head->next;
-			protect2(next);
-
-			if (head == Head) {
-				if (next == NULL) {
-					result = EMPTY;
-					break;
-
-				} else {
-					if (head == tail) {
-						CAS(Tail, tail, next);
-
-					} else {
-						result = next->val;
-						atomic {
-							if (CAS(Head, head, next)) {
-								retire(head); // moved left to avoid CAVE imprecision
-								flag = true;
-							} else {
-								flag = false;
-							}
-						}
-						if (flag) {
-							// retire(head);
-							break;
-						}
-					}
-				}
-			}
-		}
-	}
 	return result;
 }
 
 
+bool add(data_t key) {
+	Node* node;
+	bool insertionResult;
+	Node* prev, cur, next, tmpPtr;
+	bool prevMark, curMark, result, retry, tmpBool;
+	data_t curKey;
 
-struct Node {
-	data_t val;
-	bool marked;
-	ptr_t next;
-};
-
-Node* Head;
-
-bool find(key_t key) {
-	Node prev, cur, next;
-	bool prev_mark, cur_mark;
-	data_t cur_key;
-
+	node = malloc;
+	node->val = key;
+	tmpBool = false;
+	node->marked = tmpBool;
 	while (true) {
-		prev = Head;
-		atomic {
-			cur = prev->next;
-			prev_mark = prev->marked;
-		}
-
-		while (true) {
-
-			if (cur == NULL) {
-				return false;
-			}
+		// BEGIN FIND
+		retry = true;
+		while (retry) {
 
 			atomic {
-				next = cur->next;
-				cur_mark = cur->marked;
+				prev = Head;
+				cur = prev->next;
+				prevMark = prev->marked;
 			}
-			cur_key = cur->key;
-
-			// next field of a node contains its mark
-			// bool prev_mark = cur.mark;
-			// bool cur_mark = next.mark;
-
-			if (prev_mark || cur != prev->next) {
-				// continue with outer loop
-				break;
-			}
-
-			if (!cur_mark) {
-				if (cur_key >= key) {
-					return cur_key == key;
-				} else {
-					// re-reading at prev may give
-					//  - uninteded value from intermediate reuse
-					//  - could render prev strongly invalid in case of a free
-					atomic {
-						prev = cur;
-						prev_mark = cur_mark;
-					}
+			protect2(cur);
+			choose {
+				atomic {
+					assume(prevMark == false);
+					tmpPtr = prev->next;
+					assume(cur == tmpPtr);
 				}
 
-			} else {
-				atomic {
-					tmpPtr = prev->next;
-					tmpBool = prev->marked;
-					choose {
-						assume(tmpPtr == cur);
-						assume(tmpBool == cur_mark);
-						prev->next = next;
-						prev->marked = false;
-					}{
+				while (true) {
+
+					if (cur == NULL) {
+						// return false
+						result = false;
+						retry = false;
+						break;
+					} else {
+
+						atomic {
+							next = cur->next;
+							curMark = cur->marked;
+						}
+						curKey = cur->val;
+
+						protect1(next);
 						choose {
-							assume(tmpPtr != cur);
-							break;
+							atomic {
+								tmpPtr = cur->next;
+								tmpBool = cur->marked;
+								assume(curMark == tmpBool);
+								assume(next == tmpPtr);
+							}
+
+							choose {
+								atomic {
+									assume(prevMark == false);
+									tmpPtr = prev->next;
+									assume(cur == tmpPtr);
+								}
+
+								if (!curMark) {
+									if (curKey >= key) {
+										// return curKey == key
+										if (curKey == key) {
+											result = true;
+										} else {
+											result = false;
+										}
+										retry = false;
+										break;
+									} else {
+										atomic {
+											prev = cur;
+											prevMark = curMark;
+										}
+										protect3(cur);
+									}
+
+								} else {
+									atomic {
+										tmpPtr = prev->next;
+										tmpBool = prev->marked;
+										choose {
+											assume(tmpPtr == cur);
+											assume(tmpBool == false);
+											prev->next = next;
+											tmpBool = false;
+											prev->marked = tmpBool;
+											retire(cur);
+										}{
+											// continue with outer loop
+											break; // TODO: correct?
+											// choose {
+											// 	assume(tmpPtr != cur);
+											// 	break;
+											// }{
+											// 	assume(tmpBool != curMark);
+											// 	break;
+											// }
+										}
+									}
+								}
+
+								atomic {
+									cur = next;
+								}
+								protect2(next);
+
+							}{
+								// continue with outer loop
+								break;
+							}
+
 						}{
-							assume(tmpBool != cur_mark);
+							// continue with outer loop
 							break;
 						}
 					}
 				}
+			}{
+				assume(true);
 			}
-
+		}
+		// END FIND
+		if (result) {
+			insertionResult = false;
+			break;
+		} else {
+			node->next = cur;
 			atomic {
-				cur = next;
+				tmpPtr = prev->next;
+				tmpBool = prev->marked;
+				choose {
+					assume(tmpPtr == cur);
+					assume(tmpBool == false);
+					prev->next = node;
+					tmpBool = false;
+					prev->marked = tmpBool;
+					insertionResult = true;
+					break;
+				}{
+					assume(true);
+				}
 			}
 		}
 	}
+
+	return insertionResult;
 }
-
-
-bool Search(key_t key) {
-	return find(key);
-}
-
-
-

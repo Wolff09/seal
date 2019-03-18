@@ -102,6 +102,8 @@ struct MoveVariablesVisitor final : NonConstVisitor {
 	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(BooleanValue&))"); }
 	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(NullValue&))"); }
 	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(EmptyValue&))"); }
+	void visit(MaxValue& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(MaxValue&))"); }
+	void visit(MinValue& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(MinValue&))"); }
 	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(NDetValue&))"); }
 	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(VariableExpression&))"); }
 	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation (NonConstVisitor::visit(NegatedExpression&))"); }

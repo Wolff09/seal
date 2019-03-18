@@ -234,6 +234,8 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const De
 }
 
 void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const VariableDeclaration& /*lhs*/, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
+	std::cout << "DEREF data = sel" << std::endl;
+	debug_type_env(this->current_type_environment);
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
 }
@@ -368,6 +370,8 @@ inline bool typeenv_equals(const TypeEnv& lhs, const TypeEnv& rhs) {
 }
 
 void TypeChecker::check_loop(const Loop& loop) {
+	std::cout << "ENTERING WHILE" << std::endl;
+	debug_type_env(this->current_type_environment);
 	assert(loop.body);
 	TypeEnv pre_types;
 
@@ -377,6 +381,7 @@ void TypeChecker::check_loop(const Loop& loop) {
 		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
 
 	} while (!typeenv_equals(pre_types, this->current_type_environment));
+	std::cout << "EXITING WHILE" << std::endl;
 }
 
 void TypeChecker::check_while(const While& whl) {

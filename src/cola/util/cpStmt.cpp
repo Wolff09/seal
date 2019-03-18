@@ -11,6 +11,8 @@ struct CopyCommandVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const NDetValue&)"); }
 	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const VariableExpression&)"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: CopyCommandVisitor::visit(const NegatedExpression&)"); }

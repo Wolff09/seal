@@ -11,11 +11,30 @@
 using namespace cola;
 using namespace prtypes;
 
-static const bool INSTRUMENT_OBJECTS = false; // does not work
-static const bool INSTRUMENT_FLAG = false; // does not work
-static const bool INSTRUMENT_WITH_HINT = false; // does not improve precision
-static const bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false;
-static const bool INSTRUMENT_INSERT_OPTS = true;
+
+struct CaveConfig {
+	bool INSTRUMENT_OBJECTS = true;
+	const bool INSTRUMENT_FLAG = false; // not supported (does not work)
+	const bool INSTRUMENT_WITH_HINT = false; // not supported (does not improve precision anyways)
+	bool INSTRUMENT_WRAP_ASSERT_ACTIVE = false;
+	bool INSTRUMENT_INSERT_OPTS = true;
+	bool INSTRUMENT_WRAP_SHARED = true;
+	std::string MAX_VAL = "12345";
+};
+
+void update_conf(CaveConfig& conf, const Program& program) {
+	auto search = program.options.find("instrumentation");
+	if (search != program.options.end()) {
+		std::string opt_val = search->second;
+		if (opt_val == "object") {
+			conf.INSTRUMENT_OBJECTS = true;
+		} else if (opt_val == "container") {
+			conf.INSTRUMENT_OBJECTS = false;
+		} else {
+			throw std::logic_error("Unexpected option parameter: option 'instrumentation' must be 'object' or 'container'.");
+		}
+	}
+}
 
 // TODO: guard assertActive with != NULL??
 // TODO: remove imp var option
@@ -36,6 +55,7 @@ const Type& get_retire_type(const Function& retire_function) {
 // TODO: forbid annotated invariants at commands/statements
 
 struct CaveOutputVisitor : public Visitor {
+	CaveConfig conf;
 	std::ostream& stream;
 	Indent indent;
 	const bool instrument;
@@ -44,16 +64,13 @@ struct CaveOutputVisitor : public Visitor {
 	const std::set<const Assert*>* whitelist;
 	bool add_fix_me = false;
 	bool needs_parents = false;
+	const Program* program;
 	std::set<std::string> opt_keys = { "cave" };
 
 	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), instrument(true), retire(&retire_function), retire_type(&get_retire_type(retire_function)), whitelist(whitelist) {
-		assert(!INSTRUMENT_OBJECTS);
-		assert(!INSTRUMENT_FLAG);
 	}
 
 	CaveOutputVisitor(std::ostream& stream) : stream(stream), indent(stream), instrument(false), retire(nullptr), retire_type(nullptr), whitelist(nullptr) {
-		assert(!INSTRUMENT_OBJECTS);
-		assert(!INSTRUMENT_FLAG);
 	}
 
     // ********************************************************************* //
@@ -61,7 +78,7 @@ struct CaveOutputVisitor : public Visitor {
 	// ********************************************************************* //
 
 	void print_options(const Program& program) {
-		if (INSTRUMENT_INSERT_OPTS) {
+		if (this->conf.INSTRUMENT_INSERT_OPTS) {
 			for (std::string key : opt_keys) {
 				auto search = program.options.find(key);
 				if (search != program.options.end()) {
@@ -91,7 +108,7 @@ struct CaveOutputVisitor : public Visitor {
 		for (const auto& [fiedl_name, type] : type.fields) {
 			stream << indent << type2cave(type) << " " << fiedl_name << ";" << std::endl;
 		}
-		if (this->instrument && INSTRUMENT_OBJECTS) {
+		if (this->instrument && this->conf.INSTRUMENT_OBJECTS) {
 			if (&type == retire_type) {
 				// instrument retire flag
 				stream << std::endl;
@@ -104,7 +121,7 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	std::string var2cave(const VariableDeclaration& decl) {
-		if (decl.is_shared) {
+		if (this->conf.INSTRUMENT_WRAP_SHARED && decl.is_shared) {
 			return "CC_->" + decl.name;
 		} else {
 			return decl.name;
@@ -112,13 +129,13 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void print_instrumentation_decls() {
-		if (this->instrument && !INSTRUMENT_OBJECTS) {
+		if (this->instrument && !this->conf.INSTRUMENT_OBJECTS) {
 			stream << std::endl;
 			stream << indent << type2cave(*retire_type) << " INSTRUMENTATION_PTR_;" << std::endl;
-			if (INSTRUMENT_WITH_HINT) {
+			if (this->conf.INSTRUMENT_WITH_HINT) {
 				stream << indent << type2cave(*retire_type) << " HINT_PTR_;" << std::endl;
 			}
-			if (INSTRUMENT_FLAG) {
+			if (this->conf.INSTRUMENT_FLAG) {
 				stream << indent << "bool INSTRUMENTATION_RETIRED_;" << std::endl;
 			}
 		}
@@ -161,19 +178,22 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "constructor {" << std::endl;
 		indent++;
 		stream << indent << "// initialize container" << std::endl;
-		stream << indent << "CC_ = new();" << std::endl;
+		if (this->conf.INSTRUMENT_WRAP_SHARED) {
+			stream << indent << "CC_ = new();" << std::endl;
+		}
 		stream << indent;
 		assert(init.body);
 		init.body->accept(*this);
 		stream << std::endl;
-		if (this->instrument && !INSTRUMENT_OBJECTS) {
+		if (this->instrument && !this->conf.INSTRUMENT_OBJECTS) {
+			std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
 			stream << indent << "// initialize instrumentation" << std::endl;
-			stream << indent << "CC_->INSTRUMENTATION_PTR_ = NULL;" << std::endl;
-			if (INSTRUMENT_WITH_HINT) {
-				stream << indent << "CC_->HINT_PTR_ = NULL;" << std::endl;
+			stream << indent << prefix << "INSTRUMENTATION_PTR_ = NULL;" << std::endl;
+			if (this->conf.INSTRUMENT_WITH_HINT) {
+				stream << indent << prefix << "HINT_PTR_ = NULL;" << std::endl;
 			}
-			if (INSTRUMENT_FLAG) {
-				stream << indent << "CC_->INSTRUMENTATION_RETIRED_ = false;" << std::endl;
+			if (this->conf.INSTRUMENT_FLAG) {
+				stream << indent << prefix << "INSTRUMENTATION_RETIRED_ = false;" << std::endl;
 			}
 			stream << std::endl;
 		}
@@ -208,13 +228,14 @@ struct CaveOutputVisitor : public Visitor {
 			stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
 			stream << indent << "int myRes;" << std::endl;
 			stream << indent << "myNull_assertActive = NULL;" << std::endl;
-			if (INSTRUMENT_OBJECTS) {
+			if (this->conf.INSTRUMENT_OBJECTS) {
 				stream << indent << "if (ptr->RETIRED_) {" << std::endl;
 			} else {
-				if (INSTRUMENT_FLAG) {
-					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_RETIRED_ && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+				std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+				if (this->conf.INSTRUMENT_FLAG) {
+					stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_RETIRED_ && " << prefix << "INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
 				} else {
-					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL && CC_->INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+					stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
 				}
 			}
 			indent++;
@@ -223,6 +244,19 @@ struct CaveOutputVisitor : public Visitor {
 			stream << indent << "}" << std::endl;
 			indent--;
 			stream << indent << "}" << std::endl;
+		}
+	}
+
+	void print_requires(const Function& function) {
+		assert(this->program);
+		auto search = this->program->options.find("cavebound");
+		if (search != program->options.end()) {
+			std::string name = search->second;
+			for (const auto& decl : function.args) {
+				if (decl->name == name) {
+					stream << "requires -" << this->conf.MAX_VAL << " < " << name << " && " << name << " < " << this->conf.MAX_VAL << " ";
+				}
+			}
 		}
 	}
 
@@ -246,6 +280,14 @@ struct CaveOutputVisitor : public Visitor {
 
 	void visit(const EmptyValue& /*expr*/) {
 		stream << "EMPTY";
+	}
+
+	void visit(const MaxValue& /*expr*/) {
+		stream << this->conf.MAX_VAL;
+	}
+
+	void visit(const MinValue& /*expr*/) {
+		stream << "-" << this->conf.MAX_VAL;
 	}
 
 	void visit(const NDetValue& /*expr*/) {
@@ -301,7 +343,7 @@ struct CaveOutputVisitor : public Visitor {
 		for (const auto& decl : scope.variables) {
 			print_var_def(*decl);
 		}
-		if (INSTRUMENT_WITH_HINT && add_fix_me) {
+		if (this->conf.INSTRUMENT_WITH_HINT && add_fix_me) {
 			stream << indent << "bool HINT_PROPHECY_;" << std::endl;
 			stream << indent << "HINT_PROPHECY_ = false;" << std::endl << std::endl;
 		} else if (!scope.variables.empty()) {
@@ -414,7 +456,7 @@ struct CaveOutputVisitor : public Visitor {
 		stream << ")) { fail(); }" << std::endl;
 	}
 	void visit(const InvariantActive& invariant) {
-		if (INSTRUMENT_WRAP_ASSERT_ACTIVE) {
+		if (this->conf.INSTRUMENT_WRAP_ASSERT_ACTIVE) {
 			stream << indent << "if (";
 			invariant.expr->accept(*this);
 			stream << " != NULL) { ";
@@ -425,7 +467,7 @@ struct CaveOutputVisitor : public Visitor {
 		assert(invariant.expr);
 		invariant.expr->accept(*this);
 		stream << ");";
-		if (INSTRUMENT_WRAP_ASSERT_ACTIVE) {
+		if (this->conf.INSTRUMENT_WRAP_ASSERT_ACTIVE) {
 			stream << " }";
 		}
 		stream << std::endl;
@@ -443,10 +485,11 @@ struct CaveOutputVisitor : public Visitor {
 	void visit(const Malloc& malloc) {
 		stream << indent << var2cave(malloc.lhs) << " = new();" << std::endl;
 		if (this->instrument && &malloc.lhs.type == retire_type) {
-			if (INSTRUMENT_OBJECTS) {
+			if (this->conf.INSTRUMENT_OBJECTS) {
 				stream << indent << var2cave(malloc.lhs) << "->RETIRED_ = false;" << std::endl;
-			} else if (INSTRUMENT_FLAG) {
-				stream << indent << "atomic { if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = " << var2cave(malloc.lhs) << "; } } }" << std::endl;
+			} else if (this->conf.INSTRUMENT_FLAG) {
+				std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+				stream << indent << "atomic { if (" << prefix << "INSTRUMENTATION_PTR_ == NULL) { if (*) { " << prefix << "INSTRUMENTATION_PTR_ = " << var2cave(malloc.lhs) << "; } } }" << std::endl;
 			}
 		}
 	}
@@ -464,8 +507,8 @@ struct CaveOutputVisitor : public Visitor {
 	void visit(const Enter& enter) {
 		stream << indent << "// ";
 		cola::print(enter, stream);
-		if (this->instrument && INSTRUMENT_WITH_HINT && enter.decl.name == "caveHintRetire") {
-			assert(!INSTRUMENT_OBJECTS);
+		if (this->instrument && this->conf.INSTRUMENT_WITH_HINT && enter.decl.name == "caveHintRetire") {
+			assert(!this->conf.INSTRUMENT_OBJECTS);
 			assert(enter.args.size() == 1);
 			assert(enter.args.at(0)->type().sort == Sort::PTR);
 			assert(retire->args.size() == 1);
@@ -473,8 +516,9 @@ struct CaveOutputVisitor : public Visitor {
 			stream << indent << "if (";
 			enter.args.at(0)->accept(*this);
 			stream << " == NULL) { fail(); }" << std::endl;
+			std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
 			stream << indent << "if (HINT_PROPHECY_) { fail(); }" << std::endl;;
-			stream << indent << "if (CC_->HINT_PTR_ == NULL && CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->HINT_PTR_ = ";
+			stream << indent << "if (" << prefix << "HINT_PTR_ == NULL && " << prefix << "INSTRUMENTATION_PTR_ == NULL) { if (*) { " << prefix << "HINT_PTR_ = ";
 			enter.args.at(0)->accept(*this);
 			stream << "; HINT_PROPHECY_ = true; } }" << std::endl;
 		}
@@ -487,28 +531,29 @@ struct CaveOutputVisitor : public Visitor {
 			enter.args.at(0)->accept(*this);
 			stream << " == NULL) { fail(); }" << std::endl;
 
-			if (INSTRUMENT_OBJECTS) {
+			if (this->conf.INSTRUMENT_OBJECTS) {
 				// instrumentation: set retired flag
 				stream << indent << "(";
 				enter.args.at(0)->accept(*this);
 				stream << ")->RETIRED_ = true;" << std::endl;
 
-			} else if (!INSTRUMENT_FLAG) {
-				if (INSTRUMENT_WITH_HINT) {
+			} else if (!this->conf.INSTRUMENT_FLAG) {
+				std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+				if (this->conf.INSTRUMENT_WITH_HINT) {
 					stream << indent << "atomic { if (HINT_PROPHECY_) {" << std::endl;
 					indent++;
 					stream << indent << "HINT_PROPHECY_ = false;" << std::endl;
-					stream << indent << "if (CC_->HINT_PTR_ != ";
+					stream << indent << "if (" << prefix << "HINT_PTR_ != ";
 					enter.args.at(0)->accept(*this);
 					stream << ") { fail(); }" << std::endl;
-					stream << indent << "if (CC_->HINT_PTR_ == NULL) { fail(); }" << std::endl;
-					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ != NULL) { fail(); }" << std::endl;
-					stream << indent << "CC_->INSTRUMENTATION_PTR_ = CC_->HINT_PTR_;" << std::endl;
+					stream << indent << "if (" << prefix << "HINT_PTR_ == NULL) { fail(); }" << std::endl;
+					stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL) { fail(); }" << std::endl;
+					stream << indent << "" << prefix << "INSTRUMENTATION_PTR_ = " << prefix << "HINT_PTR_;" << std::endl;
 					indent--;
 					stream << indent << "}}" << std::endl;
 				} else {
 					// instrumentation: set if not yet set
-					stream << indent << "if (CC_->INSTRUMENTATION_PTR_ == NULL) { if (*) { CC_->INSTRUMENTATION_PTR_ = ";
+					stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ == NULL) { if (*) { " << prefix << "INSTRUMENTATION_PTR_ = ";
 					enter.args.at(0)->accept(*this);
 					stream << "; } }" << std::endl;
 				}
@@ -544,6 +589,7 @@ struct CaveOutputVisitor : public Visitor {
 				first = false;
 			}
 			stream << ") ";
+			print_requires(function);
 			assert(function.body);
 			add_fix_me = true;
 			function.body->accept(*this);
@@ -553,6 +599,9 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Program& program) {
+		update_conf(this->conf, program);
+
+		this->program = &program;
 		stream << "// generated CAVE program for '" << program.name << "'" << std::endl;
 		print_options(program);
 		stream << std::endl;
@@ -566,15 +615,20 @@ struct CaveOutputVisitor : public Visitor {
 		// shared variables
 		print_delimiter(stream, "shared variables");
 		stream << indent << "extern int EMPTY;" << std::endl << std::endl;
-		stream << indent << "class Container_ {" << std::endl;
-		indent++;
+		if (this->conf.INSTRUMENT_WRAP_SHARED) {
+			stream << indent << "class Container_ {" << std::endl;
+			indent++;
+		}
 		for (const auto& decl : program.variables) {
 			print_var_def(*decl);
 		}
 		print_instrumentation_decls();
-		indent--;
-		stream << indent << "}" << std::endl << std::endl;
-		stream << indent << "Container_ CC_;" << std::endl << std::endl;
+		if (this->conf.INSTRUMENT_WRAP_SHARED) {
+			indent--;
+			stream << indent << "}" << std::endl << std::endl;
+			stream << indent << "Container_ CC_;" << std::endl;
+		}
+		stream << std::endl;
 
 		// fix Cave strangeness
 		print_delimiter(stream, "bug fixer");

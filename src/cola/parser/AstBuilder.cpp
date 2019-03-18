@@ -1,6 +1,7 @@
 #include "cola/parser/AstBuilder.hpp"
 
 #include "cola/parser/TypeBuilder.hpp"
+#include "cola/util.hpp"
 #include <sstream>
 
 using namespace cola;
@@ -377,6 +378,14 @@ antlrcpp::Any AstBuilder::visitValueNDet(cola::CoLaParser::ValueNDetContext* /*c
 
 antlrcpp::Any AstBuilder::visitValueEmpty(cola::CoLaParser::ValueEmptyContext* /*context*/) {
 	return as_expression(new EmptyValue());
+}
+
+antlrcpp::Any AstBuilder::visitValueMax(cola::CoLaParser::ValueMaxContext* /*context*/) {
+	return as_expression(new MaxValue());
+}
+
+antlrcpp::Any AstBuilder::visitValueMin(cola::CoLaParser::ValueMinContext* /*context*/) {
+	return as_expression(new MinValue());
 }
 
 antlrcpp::Any AstBuilder::visitExprValue(cola::CoLaParser::ExprValueContext* context) {

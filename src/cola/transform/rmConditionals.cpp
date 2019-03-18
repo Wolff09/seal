@@ -13,6 +13,8 @@ struct IsTrueConditionVisitor final : public Visitor {
 	void visit(const BooleanValue& node) override { if (node.value) { result = true; } }
 	void visit(const NullValue& /*node*/) override {}
 	void visit(const EmptyValue& /*node*/) override {}
+	void visit(const MaxValue& /*node*/) override {}
+	void visit(const MinValue& /*node*/) override {}
 	void visit(const NDetValue& /*node*/) override {}
 	void visit(const VariableExpression& /*node*/) override {}
 	void visit(const NegatedExpression& /*node*/) override {}
@@ -158,6 +160,8 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(BooleanValue&))"); }
 	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(NullValue&))"); }
 	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(EmptyValue&))"); }
+	void visit(MaxValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(MaxValue&))"); }
+	void visit(MinValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(MinValue&))"); }
 	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(NDetValue&))"); }
 	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(VariableExpression&))"); }
 	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invokation (RemoveConditionalsVisitor::visit(NegatedExpression&))"); }

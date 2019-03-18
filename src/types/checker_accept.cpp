@@ -17,6 +17,8 @@ struct ContainsPointerVisitor final : public Visitor {
 	void visit(const Dereference& /*node*/) override { result = true; }
 	void visit(const BooleanValue& /*node*/) override { /* do nothing */ }
 	void visit(const EmptyValue& /*node*/) override { /* do nothing */ }
+	void visit(const MaxValue& /*node*/) override { /* do nothing */ }
+	void visit(const MinValue& /*node*/) override { /* do nothing */ }
 	void visit(const NDetValue& /*node*/) override { /* do nothing */ }
 	void visit(const VariableExpression& expr) override { expr.decl.accept(*this); }
 	void visit(const NegatedExpression& expr) override { expr.expr->accept(*this); }
@@ -65,6 +67,8 @@ struct IsBinaryExpressionVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { result = false; }
 	void visit(const NullValue& /*node*/) override { result = false; }
 	void visit(const EmptyValue& /*node*/) override { result = false; }
+	void visit(const MaxValue& /*node*/) override { result = false; }
+	void visit(const MinValue& /*node*/) override { result = false; }
 	void visit(const NDetValue& /*node*/) override { result = false; }
 	void visit(const VariableExpression& /*node*/) override { result = false; }
 	void visit(const NegatedExpression& /*node*/) override { result = false; }
@@ -106,6 +110,8 @@ struct TypeCheckBaseVisitor : public Visitor {
 	virtual void visit(const BooleanValue& /*node*/) override { /* do nothing */ }
 	virtual void visit(const NullValue& /*node*/) override { /* do nothing */ }
 	virtual void visit(const EmptyValue& /*node*/) override { /* do nothing */ }
+	virtual void visit(const MaxValue& /*node*/) override { /* do nothing */ }
+	virtual void visit(const MinValue& /*node*/) override { /* do nothing */ }
 	virtual void visit(const NDetValue& /*node*/) override { /* do nothing */ }
 	virtual void visit(const VariableExpression& /*node*/) override { /* do nothing */ }
 	virtual void visit(const NegatedExpression& /*node*/) override { /* do nothing */ }
@@ -222,6 +228,14 @@ void TypeChecker::visit(const NullValue& /*node*/) {
 
 void TypeChecker::visit(const EmptyValue& /*node*/) {
 	throw std::logic_error("not yet implemented: TypeChecker::visit(const EmptyValue&)");
+}
+
+void TypeChecker::visit(const MaxValue& /*node*/) {
+	throw std::logic_error("not yet implemented: TypeChecker::visit(const MaxValue&)");
+}
+
+void TypeChecker::visit(const MinValue& /*node*/) {
+	throw std::logic_error("not yet implemented: TypeChecker::visit(const MinValue&)");
 }
 
 void TypeChecker::visit(const NDetValue& /*node*/) {

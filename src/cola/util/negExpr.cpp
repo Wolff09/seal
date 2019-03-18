@@ -51,6 +51,8 @@ struct NegateExpressionVisitor final : public Visitor {
 
 	void visit(const NullValue& /*expr*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const NullValue&))"); }
 	void visit(const EmptyValue& /*expr*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const EmptyValue&))"); }
+	void visit(const MaxValue& /*expr*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const MaxValue&))"); }
+	void visit(const MinValue& /*expr*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const MinValue&))"); }
 	void visit(const NDetValue& /*expr*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const NDetValue&))"); }
 	void visit(const Dereference& /*expr*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Dereference&))"); }
 

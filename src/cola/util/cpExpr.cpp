@@ -21,6 +21,16 @@ struct CopyExpressionVisitor final : public Visitor {
 		result = std::make_unique<EmptyValue>();
 	}
 
+	void visit(const MaxValue& /*expr*/) {
+		assert(!result);
+		result = std::make_unique<MaxValue>();
+	}
+
+	void visit(const MinValue& /*expr*/) {
+		assert(!result);
+		result = std::make_unique<MinValue>();
+	}
+
 	void visit(const NDetValue& /*expr*/) {
 		assert(!result);
 		result = std::make_unique<EmptyValue>();
@@ -107,6 +117,8 @@ struct CopyInvariantExpression final : Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const BooleanValue&))"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const NullValue&))"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const EmptyValue&))"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const MaxValue&))"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const MinValue&))"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const NDetValue&))"); }
 	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const VariableExpression&))"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation (CopyInvariantExpression::visit(const NegatedExpression&))"); }

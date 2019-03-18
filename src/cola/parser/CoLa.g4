@@ -92,11 +92,13 @@ binop : Eq   #opEq
       | Or   #opOr
       ;
 
-value : Null   #valueNull
-      | True   #valueTrue
-      | False  #valueFalse
-      | Ndet   #valueNDet
-      | Empty  #valueEmpty
+value : Null    #valueNull
+      | True    #valueTrue
+      | False   #valueFalse
+      | Ndet    #valueNDet
+      | Empty   #valueEmpty
+      | Maxval  #valueMax
+      | Minval  #valueMin
       ;
 
 expression : name=Identifier                        #exprIdentifier
@@ -123,11 +125,13 @@ DataType : 'data_t' ;
 BoolType : 'bool' ;
 IntType  : 'int' ;
 
-Null  : 'NULL' ;
-Empty : 'EMPTY' ;
-True  : 'true' ;
-False : 'false' ;
-Ndet  : '*' ;
+Null   : 'NULL' ;
+Empty  : 'EMPTY' ;
+True   : 'true' ;
+False  : 'false' ;
+Ndet   : '*' ;
+Maxval : 'MAX_VAL' ;
+Minval : 'MIN_VAL' ;
 
 Eq  : '==' ;
 Neq : '!=' ;

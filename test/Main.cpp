@@ -79,10 +79,13 @@ int main(int argc, char** argv) {
 	add_guarantees(protect2);
 
 	// assertion check (initial ones given by programmer)
-	std::cout << std::endl << "Not checking initial assertions program for assertion failures." << std::endl;
-	// std::cout << std::endl << "Checking initial assertions..." << std::endl;
-	// bool initial_assertions_safe = discharge_assertions(program, table);
-	// std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
+	if (false) {
+		std::cout << std::endl << "Not checking initial assertions program for assertion failures." << std::endl;
+	} else {
+		std::cout << std::endl << "Checking initial assertions..." << std::endl;
+		bool initial_assertions_safe = discharge_assertions(program, table);
+		std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
+	}
 
 	// type check
 	bool type_safe = false;

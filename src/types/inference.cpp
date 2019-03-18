@@ -119,6 +119,8 @@ struct IsVariableVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { result = nullptr; }
 	void visit(const NullValue& /*node*/) override { result = nullptr; }
 	void visit(const EmptyValue& /*node*/) override { result = nullptr; }
+	void visit(const MaxValue& /*node*/) override { result = nullptr; }
+	void visit(const MinValue& /*node*/) override { result = nullptr; }
 	void visit(const NDetValue& /*node*/) override { result = nullptr; }
 	void visit(const NegatedExpression& /*node*/) override { result = nullptr; }
 	void visit(const BinaryExpression& /*node*/) override { result = nullptr; }

@@ -30,6 +30,8 @@ struct NameCollectorVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const NDetValue&)"); }
 	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const VariableExpression&)"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NameCollectorVisitor::visit(const NegatedExpression&)"); }
@@ -93,6 +95,8 @@ struct LocalExpressionVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) { /* do nothing */ }
 	void visit(const NullValue& /*node*/) { /* do nothing */ }
 	void visit(const EmptyValue& /*node*/) { /* do nothing */ }
+	void visit(const MaxValue& /*node*/) { /* do nothing */ }
+	void visit(const MinValue& /*node*/) { /* do nothing */ }
 	void visit(const NDetValue& /*node*/) { /* do nothing */ }
 	void visit(const VariableExpression& expr) {
 		expr.decl.accept(*this);
@@ -164,6 +168,8 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(BooleanValue&)"); }
 	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(NullValue&)"); }
 	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(EmptyValue&)"); }
+	void visit(MaxValue& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(MaxValue&)"); }
+	void visit(MinValue& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(MinValue&)"); }
 	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(NDetValue&)"); }
 	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(VariableExpression&)"); }
 	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: AssertionInsertionVisitor::visit(NegatedExpression&)"); }
@@ -322,6 +328,8 @@ struct AssignmentExpressionVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const NDetValue&)"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const NegatedExpression&)"); }
 	void visit(const BinaryExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const BinaryExpression&)"); }
@@ -396,6 +404,8 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const NDetValue&)"); }
 	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const VariableExpression&)"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: InsertionLocationFinderVisitor::visit(const NegatedExpression&)"); }
@@ -574,6 +584,8 @@ struct RightMovernessVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const NDetValue&)"); }
 	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const VariableExpression&)"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const NegatedExpression&)"); }

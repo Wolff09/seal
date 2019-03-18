@@ -26,6 +26,8 @@ struct LocalExpressionVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) { /* do nothing */ }
 	void visit(const NullValue& /*node*/) { /* do nothing */ }
 	void visit(const EmptyValue& /*node*/) { /* do nothing */ }
+	void visit(const MaxValue& /*node*/) { /* do nothing */ }
+	void visit(const MinValue& /*node*/) { /* do nothing */ }
 	void visit(const NDetValue& /*node*/) { /* do nothing */ }
 	void visit(const VariableExpression& expr) {
 		expr.decl.accept(*this);
@@ -83,6 +85,8 @@ struct NeedsAtomicVisitor final : public Visitor {
 	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const BooleanValue&)"); }
 	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const NullValue&)"); }
 	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const MinValue&)"); }
 	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const NDetValue&)"); }
 	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const VariableExpression&)"); }
 	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: NeedsAtomicVisitor::visit(const NegatedExpression&)"); }
@@ -159,6 +163,8 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(BooleanValue&)"); }
 	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(NullValue&)"); }
 	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(EmptyValue&)"); }
+	void visit(MaxValue& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(MaxValue&)"); }
+	void visit(MinValue& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(MinValue&)"); }
 	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(NDetValue&)"); }
 	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(VariableExpression&)"); }
 	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(NegatedExpression&)"); }
