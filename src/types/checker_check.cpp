@@ -58,6 +58,9 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 }
 
 void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
+	std::cout << std::endl << std::endl << ">>>>>> ENTER: "; cola::print(enter, std::cout);
+	debug_type_env(this->current_type_environment);
+
 	// check safe
 	SimulationEngine::VariableDeclarationSet invalid;
 	for (const auto& variable : params) {
@@ -81,17 +84,30 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	// update types
 	TypeEnv result;
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
+		std::cout << "Infering types for: " << decl.get().name << std::endl;
 		result[decl] = inference.infer_enter(guarantees, enter, decl);
 	}
 	this->current_type_environment = std::move(result);
+
+	std::cout << "done";
+	debug_type_env(this->current_type_environment);
+	std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_exit(const Exit& exit) {
+	std::cout << std::endl << std::endl << ">>>>>> EXIT: "; cola::print(exit, std::cout);
+	debug_type_env(this->current_type_environment);
+
 	TypeEnv result;
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
+		std::cout << "Infering types for: " << decl.get().name << std::endl;
 		result[decl] = inference.infer_exit(guarantees, exit);
 	}
 	this->current_type_environment = std::move(result);
+
+	std::cout << "done";
+	debug_type_env(this->current_type_environment);
+	std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& var) {
@@ -188,7 +204,10 @@ void TypeChecker::check_assert_active(const Assert& /*assert*/, const VariableDe
 }
 
 
-void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const VariableDeclaration& rhs) {
+void TypeChecker::check_assign_pointer(const Assignment& node, const VariableDeclaration& lhs, const VariableDeclaration& rhs) {
+	std::cout << "ASSIGN ptr = ptr: "; cola::print(node, std::cout);
+	debug_type_env(this->current_type_environment);
+
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs));
 
@@ -197,6 +216,9 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Variabl
 
 	current_type_environment.at(lhs) = result;
 	current_type_environment.at(rhs) = result;
+	
+	std::cout << "done ASSIGN";
+	debug_type_env(this->current_type_environment);
 }
 
 void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const NullValue& /*rhs*/) {
@@ -234,7 +256,7 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const De
 }
 
 void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const VariableDeclaration& /*lhs*/, const Dereference& rhs_deref, const VariableDeclaration& rhs_var) {
-	std::cout << "DEREF data = sel" << std::endl;
+	std::cout << "DEREF data = sel: "; cola::print(assignment, std::cout);
 	debug_type_env(this->current_type_environment);
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
@@ -376,6 +398,7 @@ void TypeChecker::check_loop(const Loop& loop) {
 	TypeEnv pre_types;
 
 	do {
+		std::cout << "========DOING WHILE" << std::endl;
 		pre_types = this->current_type_environment;
 		loop.body->accept(*this);
 		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);

@@ -38,6 +38,7 @@ namespace prtypes {
 			std::unique_ptr<VataAlphabet> vata_alphabet;
 			std::map<const Guarantee*, VataNfa> guarantee2nfa;
 			VataNfa universalnfa;
+			VataNfa enterexitwellformed;
 
 		public:
 			// Translator(const cola::Program& program, const GuaranteeTable& table);
@@ -47,6 +48,7 @@ namespace prtypes {
 			const Alphabet& get_alphabet() const { return alphabet; }
 			const VataAlphabet& get_vata_alphabet() const { return *vata_alphabet; }
 			const VataNfa& get_universal_nfa() const { return universalnfa; }
+			const VataNfa& get_wellformedness_nfa() const { return enterexitwellformed; }
 			const VataNfa& nfa_for(const Guarantee& guarantee) const { return guarantee2nfa.at(&guarantee); }
 			
 			VataNfa to_nfa(const cola::Observer& observer);

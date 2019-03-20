@@ -58,15 +58,21 @@ int main(int argc, char** argv) {
 	// create stuff
 	std::cout << std::endl << "Computing simulation... " << std::flush;
 	SmrObserverStore store(program, retire);
-	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1));
+	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1));
+	store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
 	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
 	GuaranteeTable table(store);
 	std::cout << "done" << std::endl;
 
 	// adding guarantees
-	auto add_guarantees = [&](const Function& func) {
+	auto add_guarantees = [&](const Function& func, const Function* trans=nullptr) {
 		std::cout << std::endl << "Adding guarantees for " << func.name << "... " << std::flush;
-		auto hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
+		std::vector<std::unique_ptr<cola::Observer>> hp_guarantee_observers;
+		if (trans) {
+			hp_guarantee_observers = prtypes::make_hp_transfer_guarantee_observers(retire, func, *trans, func.name);
+		} else {
+			hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
+		}
 		auto& guarantee_e1 = table.add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
 		auto& guarantee_e2 = table.add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
 		auto& guarantee_p = table.add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);
@@ -74,12 +80,22 @@ int main(int argc, char** argv) {
 		std::cout << "  - " << guarantee_e1.name << ": (transient, valid) = (" << guarantee_e1.is_transient << ", " << guarantee_e1.entails_validity << ")" << std::endl;
 		std::cout << "  - " << guarantee_e2.name << ": (transient, valid) = (" << guarantee_e2.is_transient << ", " << guarantee_e2.entails_validity << ")" << std::endl;
 		std::cout << "  -  " << guarantee_p.name << ": (transient, valid) = (" << guarantee_p.is_transient << ", " << guarantee_p.entails_validity << ")" << std::endl;
+		if (hp_guarantee_observers.size() > 3) {
+			assert(hp_guarantee_observers.size() == 5);
+			auto& guarantee_tprep = table.add_guarantee(std::move(hp_guarantee_observers.at(3)), "Et-" + func.name);
+			std::cout << "  -  " << guarantee_tprep.name << ": (transient, valid) = (" << guarantee_tprep.is_transient << ", " << guarantee_tprep.entails_validity << ")" << std::endl;
+			std::cout << std::endl << std::endl << "****************************" << std::endl;
+			auto& guarantee_t = table.add_guarantee(std::move(hp_guarantee_observers.at(4)), "Pt-" + func.name);
+			std::cout << "  -  " << guarantee_t.name << ": (transient, valid) = (" << guarantee_t.is_transient << ", " << guarantee_t.entails_validity << ")" << std::endl;
+			assert(guarantee_t.entails_validity);
+		}
 	};
-	add_guarantees(protect1);
+	add_guarantees(protect1, &protect2);
 	add_guarantees(protect2);
+	assert(false);
 
 	// assertion check (initial ones given by programmer)
-	if (false) {
+	if (true) {
 		std::cout << std::endl << "Not checking initial assertions program for assertion failures." << std::endl;
 	} else {
 		std::cout << std::endl << "Checking initial assertions..." << std::endl;
@@ -129,6 +145,8 @@ int main(int argc, char** argv) {
 		} catch (UnsafeAssumeError err) {
 			fix(err);
 		}
+
+		if (!type_safe) throw std::logic_error("temp break");
 	}
 	std::cout << "Type check " << (type_safe ? "successful" : "failed") << std::endl << std::endl;
 

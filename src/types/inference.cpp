@@ -368,9 +368,11 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 		state2vata[state.get()] = encoding;
 		if (state->initial) {
 			nfa.add_initial(encoding);
+			std::cout << "  Init: " << encoding << std::endl;
 		}
 		if (state->final) {
 			nfa.add_final(encoding);
+			std::cout << "  Final: " << encoding << std::endl;
 		}
 	}
 
@@ -382,6 +384,7 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 		auto symbols = get_symbol_for_transition(*transition, alphabet);
 		for (const auto& sym : symbols) {
 			nfa.add_trans(src_state, sym.vata_id, dst_state);
+			std::cout << "  " << src_state << "  ==[ " << sym.vata_id << " ]==>  " << dst_state << std::endl;
 			outgoing_vata[&transition->src].insert(sym.vata_id);
 		}
 	}
@@ -475,6 +478,11 @@ std::unique_ptr<VataAlphabet> convert_alphabet(Alphabet& alphabet) {
 		symbol.vata_id = result->translate_symb(symbol.vata_symbol);
 	}
 
+	std::cout << "Alphabet: " << std::endl;
+	for (const auto& symbol : alphabet) {
+		std::cout << "  - " << symbol.vata_id << " = " << symbol.vata_symbol << std::endl;
+	}
+
 	// done
 	return result;
 }
@@ -487,7 +495,9 @@ Translator::Translator(const Program& program_, const Iterable& guarantees_) : p
 
 	// init lookup map for base observers
 	for (const Guarantee& guarantee : guarantees_) {
+		std::cout << std::endl << "Translating " << guarantee.name << std::endl;
 		auto nfa = to_nfa(*guarantee.observer);
+		std::cout << "## end " << guarantee.name << std::endl << std::endl;
 		auto res = guarantee2nfa.insert({ &guarantee, nfa });
 		if (!res.second) {
 			throw std::logic_error("Unexpected non-unique guarantees in set.");
@@ -495,13 +505,62 @@ Translator::Translator(const Program& program_, const Iterable& guarantees_) : p
 	}
 
 	// init universalnfa;
-	std::uintptr_t state = -1;
-	universalnfa.add_initial(state);
-	universalnfa.add_final(state);
-	for (auto symbol : vata_alphabet->get_symbols()) {
-		universalnfa.add_trans(state, symbol, state);
+	{
+		std::uintptr_t state = -1;
+		universalnfa.add_initial(state);
+		universalnfa.add_final(state);
+		for (auto symbol : vata_alphabet->get_symbols()) {
+			universalnfa.add_trans(state, symbol, state);
+		}
+		assert(Vata2::Nfa::is_universal(universalnfa, *vata_alphabet, VATA_PARAMS));
 	}
-	assert(Vata2::Nfa::is_universal(universalnfa, *vata_alphabet, VATA_PARAMS));
+
+	// init enterexitwellformed
+	{
+		std::cout << std::endl << std::endl << "enterexitwellformed:" << std::endl;
+		std::map<const Function*, std::set<std::uintptr_t>> enter_map;
+		std::map<const Function*, std::set<std::uintptr_t>> exit_map;
+		std::set<std::uintptr_t> other_symbols; // other threads, frees
+		for (const auto& symbol : alphabet) {
+			assert(symbol.args.size() > 0);
+			assert(symbol.args.at(0) == SymbolicValue::THREAD || symbol.args.at(0) == SymbolicValue::OTHER);
+			if (&symbol.func != &Observer::free_function() && symbol.args.at(0) == SymbolicValue::THREAD) {
+				switch (symbol.kind) {
+					case Transition::INVOCATION: enter_map[&symbol.func].insert(symbol.vata_id); break;
+					case Transition::RESPONSE: exit_map[&symbol.func].insert(symbol.vata_id); break;
+				}
+			} else {
+				other_symbols.insert(symbol.vata_id);
+			}
+		}
+		std::uintptr_t next_state = 0;
+		std::uintptr_t init_state = next_state++;
+		std::cout << "Init: " << init_state << std::endl;
+		// std::cout << "Final: " << init_state << std::endl;
+		enterexitwellformed.add_initial(init_state);
+		enterexitwellformed.add_final(init_state);
+		for (const auto& [func, symbols] : enter_map) {
+			std::uintptr_t enter_state = next_state++;
+			enterexitwellformed.add_final(enter_state);
+			for (std::uintptr_t sym : symbols) {
+				enterexitwellformed.add_trans(init_state, sym, enter_state);
+				std::cout << "  " << init_state << "  ==[ " << sym << " ]==>  " << enter_state << std::endl;
+			}
+			for (std::uintptr_t sym : exit_map[func]) {
+				enterexitwellformed.add_trans(enter_state, sym, init_state);
+				std::cout << "  " << enter_state << "  ==[ " << sym << " ]==>  " << init_state << std::endl;
+			}
+			for (std::uintptr_t sym : other_symbols) {
+				enterexitwellformed.add_trans(enter_state, sym, enter_state);
+				std::cout << "  " << enter_state << "  ==[ " << sym << " ]==>  " << enter_state << std::endl;
+			}
+		}
+		for (std::uintptr_t sym : other_symbols) {
+			enterexitwellformed.add_trans(init_state, sym, init_state);
+			std::cout << "  " << init_state << "  ==[ " << sym << " ]==>  " << init_state << std::endl;
+		}
+		std::cout << "## done enterexitwellformed:" << std::endl << std::endl;
+	}
 }
 
 template Translator::Translator(const Program& program_, const GuaranteeTable& guarantees_);
@@ -549,10 +608,30 @@ VataNfa nfa_intersection_for_guarantees(Translator& translator, const GuaranteeS
 }
 
 bool nfa_inclusion(Translator& translator, const VataNfa& subset, const VataNfa& superset) {
-	return Vata2::Nfa::is_incl(subset, superset, translator.get_vata_alphabet(), VATA_PARAMS);
+	Vata2::Nfa::Word cex;
+	bool result = Vata2::Nfa::is_incl(subset, superset, translator.get_vata_alphabet(), &cex, VATA_PARAMS);
+	if (!result) {
+		std::cout << "  Inclusion counterexample: ";
+		for (const auto& sym : cex) {
+			std::cout << " " << sym;
+		}
+		std::cout << std::endl;
+	} else {
+		std::cout << "  Inclusion holds" << std::endl;
+	}
+	return result;
+	
+	// return Vata2::Nfa::is_incl(subset, superset, translator.get_vata_alphabet(), VATA_PARAMS);
 }
 
 GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator& translator, const VataNfa& from_nfa, GuaranteeSet baseline={}) {
+	VataNfa behavior = Vata2::Nfa::intersection(translator.get_wellformedness_nfa(), from_nfa);
+	// assert(Vata2::Nfa::is_universal(from_nfa, translator.get_vata_alphabet(), VATA_PARAMS));
+	assert(!Vata2::Nfa::is_lang_empty(translator.get_wellformedness_nfa()));
+	assert(!Vata2::Nfa::is_lang_empty(from_nfa));
+	assert(!Vata2::Nfa::is_lang_empty(behavior)); // TODO: what to do about this?
+	// VataNfa behavior = from_nfa;
+
 	GuaranteeSet result = std::move(baseline);
 	for (const auto& guarantee : guarantee_table) {
 		// if already present (passed as baseline), no need to infer
@@ -561,8 +640,9 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 		}
 
 		// inference by nfa language inclusion
+		std::cout << "  checkinf inference for: " << guarantee.name << std::endl;
 		auto infer = translator.nfa_for(guarantee);
-		if (nfa_inclusion(translator, from_nfa, infer)) {
+		if (nfa_inclusion(translator, behavior, infer)) {
 			result.insert(guarantee);
 		}
 	}

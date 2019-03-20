@@ -125,6 +125,77 @@ std::unique_ptr<Observer> prtypes::make_hp_no_transfer_observer(const Function& 
 	return result;
 }
 
+std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::Function& retire_function, const cola::Function& protect_function, const cola::Function& transfer_protect_function, std::string id) {
+	auto [free_function, ptrtype] = get_basics();
+	assert(takes_single_pointer(free_function));
+	assert(takes_single_pointer(retire_function));
+	assert(takes_single_pointer(protect_function));
+	assert(takes_single_pointer(transfer_protect_function));
+	std::string name_prefix = "HP" + id;
+
+	auto result = std::make_unique<Observer>();
+	result->negative_specification = true;
+
+	// variables
+	result->variables.push_back(std::make_unique<ThreadObserverVariable>(name_prefix + ":thread"));
+	result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
+
+	// states
+	result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".3", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".4", false, true));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".5", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".6", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".7", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".8", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".9", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".10", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".11", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".12", false, true));
+
+	// 'forward' transitions
+	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(0), *result->states.at(1), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_response_self(*result->states.at(1), *result->states.at(2), protect_function, *result->variables.at(0)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(2), *result->states.at(3), retire_function, *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(3), *result->states.at(4), free_function, *result->variables.at(1)));
+
+	// 'backward' transitions
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(1), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(2), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(3), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
+
+	// 'forward' transitions for transfer
+	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(0), *result->states.at(5), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_response_self(*result->states.at(5), *result->states.at(6), transfer_protect_function, *result->variables.at(0)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(6), *result->states.at(7), retire_function, *result->variables.at(1)));
+
+	// 'forward' transitions for transfer copy
+	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(6), *result->states.at(9), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(7), *result->states.at(8), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_response_self(*result->states.at(9), *result->states.at(10), protect_function, *result->variables.at(0)));
+	result->transitions.push_back(mk_transition_response_self(*result->states.at(8), *result->states.at(11), protect_function, *result->variables.at(0)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(9), *result->states.at(8), retire_function, *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(10), *result->states.at(11), retire_function, *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(11), *result->states.at(12), free_function, *result->variables.at(1)));
+
+	// 'backward' transitions for transfer and transfer copy
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(5), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(6), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(7), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(8), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(9), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(10), *result->states.at(2), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(11), *result->states.at(3), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(8), *result->states.at(7), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(9), *result->states.at(6), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(11), *result->states.at(7), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(10), *result->states.at(6), protect_function, *result->variables.at(0), *result->variables.at(1)));
+
+	return result;
+}
+
 std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_observers(const Function& retire_function, const Function& protect_function, std::string id) {
 	auto [free_function, ptrtype] = get_basics();
 	assert(takes_single_pointer(free_function));
@@ -201,6 +272,147 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	std::vector<std::unique_ptr<Observer>> result;
 	result.push_back(std::move(obs_entered));
 	result.push_back(std::move(obs_exited));
+	result.push_back(std::move(obs_safe));
+	return result;
+}
+
+std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee_observers(const cola::Function& retire_function, const cola::Function& protect_function, const cola::Function& transfer_protect_function, std::string id) {
+	auto [free_function, ptrtype] = get_basics();
+	assert(takes_single_pointer(free_function));
+	assert(takes_single_pointer(retire_function));
+	assert(takes_single_pointer(protect_function));
+
+	std::vector<std::unique_ptr<cola::Observer>> result = make_hp_no_transfer_guarantee_observers(retire_function, protect_function, id);
+
+	auto obs_prep = std::make_unique<Observer>();
+	obs_prep->negative_specification = false;
+
+	// variables
+	obs_prep->variables.push_back(std::make_unique<ThreadObserverVariable>("HP-E3:thread"));
+	obs_prep->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("HP-E3:address", ptrtype, false)));
+
+	// states
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.0", true, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.1", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.2", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.3", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.4", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.5", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.6", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.7", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.8", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.9", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.10", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.11", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.12", false, false));
+
+	// transitions for transfer_protect_function protection
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(0), *obs_prep->states.at(1), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_response_self(*obs_prep->states.at(1), *obs_prep->states.at(2), transfer_protect_function, *obs_prep->variables.at(0)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(2), *obs_prep->states.at(3), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(3), *obs_prep->states.at(4), free_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(5), *obs_prep->states.at(6), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_response_self(*obs_prep->states.at(6), *obs_prep->states.at(7), transfer_protect_function, *obs_prep->variables.at(0)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(7), *obs_prep->states.at(3), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(1), *obs_prep->states.at(0), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(2), *obs_prep->states.at(0), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(3), *obs_prep->states.at(5), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(6), *obs_prep->states.at(5), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(7), *obs_prep->states.at(5), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(0), *obs_prep->states.at(5), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(1), *obs_prep->states.at(6), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(5), *obs_prep->states.at(0), free_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(6), *obs_prep->states.at(1), free_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(7), *obs_prep->states.at(2), free_function, *obs_prep->variables.at(1)));
+
+	// transitions for tranfering protection
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(2), *obs_prep->states.at(8), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(3), *obs_prep->states.at(9), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_response_self(*obs_prep->states.at(8), *obs_prep->states.at(10), protect_function, *obs_prep->variables.at(0)));
+	obs_prep->transitions.push_back(mk_transition_response_self(*obs_prep->states.at(9), *obs_prep->states.at(11), protect_function, *obs_prep->variables.at(0)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(8), *obs_prep->states.at(9), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(10), *obs_prep->states.at(11), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(9), *obs_prep->states.at(4), free_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(11), *obs_prep->states.at(4), free_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(8), *obs_prep->states.at(0), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(9), *obs_prep->states.at(5), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(8), *obs_prep->states.at(2), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(10), *obs_prep->states.at(2), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(9), *obs_prep->states.at(3), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(11), *obs_prep->states.at(3), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(7), *obs_prep->states.at(12), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(12), *obs_prep->states.at(9), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(12), *obs_prep->states.at(5), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(12), *obs_prep->states.at(7), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(12), *obs_prep->states.at(8), free_function, *obs_prep->variables.at(1)));
+
+
+	auto obs_safe = std::make_unique<Observer>();
+	obs_safe->negative_specification = false;
+
+	// variables
+	obs_safe->variables.push_back(std::make_unique<ThreadObserverVariable>("HP-PT:thread"));
+	obs_safe->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("HP-PT:address", ptrtype, false)));
+
+	// states
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.0", true, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.1", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.2", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.3", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.4", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.5", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.6", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.7", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.8", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.9", false, false));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.10", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.11", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.12", false, false));
+
+	// transitions for transfer_protect_function protection
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(0), *obs_safe->states.at(1), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(1), *obs_safe->states.at(2), transfer_protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(2), *obs_safe->states.at(3), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(3), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(5), *obs_safe->states.at(6), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(6), *obs_safe->states.at(7), transfer_protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(7), *obs_safe->states.at(3), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(1), *obs_safe->states.at(0), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(2), *obs_safe->states.at(0), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(3), *obs_safe->states.at(5), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(6), *obs_safe->states.at(5), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(7), *obs_safe->states.at(5), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(0), *obs_safe->states.at(5), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(1), *obs_safe->states.at(6), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(5), *obs_safe->states.at(0), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(6), *obs_safe->states.at(1), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(7), *obs_safe->states.at(2), free_function, *obs_safe->variables.at(1)));
+
+	// transitions for tranfering protection
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(2), *obs_safe->states.at(8), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(3), *obs_safe->states.at(9), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(8), *obs_safe->states.at(10), protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(9), *obs_safe->states.at(11), protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(8), *obs_safe->states.at(9), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(10), *obs_safe->states.at(11), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(9), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(11), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(8), *obs_safe->states.at(0), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(9), *obs_safe->states.at(5), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(8), *obs_safe->states.at(2), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(10), *obs_safe->states.at(2), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(9), *obs_safe->states.at(3), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(11), *obs_safe->states.at(3), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(7), *obs_safe->states.at(12), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(12), *obs_safe->states.at(9), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(12), *obs_safe->states.at(5), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(12), *obs_safe->states.at(7), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(12), *obs_safe->states.at(8), free_function, *obs_safe->variables.at(1)));
+
+
+	result.push_back(std::move(obs_prep));
 	result.push_back(std::move(obs_safe));
 	return result;
 }

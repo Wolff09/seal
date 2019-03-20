@@ -134,6 +134,7 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 
 	// intersection with observer languages
 	auto intersect = [&](const Observer& observer) {
+		std::cout << std::endl << "Translating observer" << std::endl;
 		auto automaton = translator.to_nfa(observer);
 		intersection = Vata2::Nfa::intersection(intersection, automaton);
 	};
@@ -144,7 +145,20 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 		intersect(*observer);
 	}
 
-	return Vata2::Nfa::is_lang_empty(intersection);
+	// ensure only valid histories are considered
+	intersection = Vata2::Nfa::intersection(intersection, translator.get_wellformedness_nfa());
+
+	// return Vata2::Nfa::is_lang_empty(intersection);
+	Vata2::Nfa::Word cex;
+	bool result = Vata2::Nfa::is_lang_empty_cex(intersection, &cex);
+	if (!result) {
+		std::cout << "&& Does not entail validity, counterexample: ";
+		for (const auto& sym : cex) {
+			std::cout << " " << sym;
+		}
+		std::cout << std::endl;
+	}
+	return result;
 }
 
 const Guarantee& GuaranteeTable::add_guarantee(std::unique_ptr<Observer> observer, std::string name) {
