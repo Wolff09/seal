@@ -149,13 +149,19 @@ struct VariableExpressionVisitor final : public TypeCheckBaseVisitor {
 	}
 };
 
-struct VariableExpressionOrDereferenceOrNullValueVisitor final : public TypeCheckBaseVisitor {
+struct VariableExpressionOrDereferenceOrNullOrValueVisitor final : public TypeCheckBaseVisitor {
 	const VariableDeclaration* decl = nullptr;
 	const Dereference* deref = nullptr;
 	const NullValue* null = nullptr;
+	const Expression* value = nullptr;
 	void visit(const VariableExpression& var) override { this->decl = &var.decl; }
 	void visit(const NullValue& null) override { this->null = &null; }
 	void visit(const Dereference& deref) override { this->deref = &deref; }
+	void visit(const BooleanValue& value) override { this->value = &value; }
+	void visit(const EmptyValue& value) override { this->value = &value; }
+	void visit(const MaxValue& value) override { this->value = &value; }
+	void visit(const MinValue& value) override { this->value = &value; }
+	void visit(const NDetValue& value) override { this->value = &value; }
 };
 
 struct BinaryExpressionVisitor final : public TypeCheckBaseVisitor {
@@ -176,8 +182,8 @@ const VariableDeclaration& TypeChecker::expression_to_variable(const Expression&
 	return *visitor.decl;
 }
 
-TypeChecker::VariableOrDereferenceOrNull TypeChecker::expression_to_variable_or_dereference_or_null(const Expression& expression) {
-	VariableExpressionOrDereferenceOrNullValueVisitor visitor;
+TypeChecker::VariableOrDereferenceOrNull TypeChecker::expression_to_variable_or_dereference_or_null_or_value(const Expression& expression) {
+	VariableExpressionOrDereferenceOrNullOrValueVisitor visitor;
 	expression.accept(visitor);
 	// conditionally_raise_error<UnsupportedConstructError>(!visitor.decl && !visitor.deref && !visitor.null, "unsupported expression; expected a variable, a dereference, or 'NULL'");
 	// assert(!!visitor.decl ^ !!visitor.deref ^ !!visitor.null);
@@ -191,6 +197,9 @@ TypeChecker::VariableOrDereferenceOrNull TypeChecker::expression_to_variable_or_
 	if (visitor.null) {
 		result.null = visitor.null;
 	}
+	if (visitor.value) {
+		result.value = visitor.value;
+	}
 	return result;
 }
 
@@ -203,9 +212,10 @@ TypeChecker::FlatBinaryExpression TypeChecker::expression_to_flat_binary_express
 	assert(visitor.binary->lhs);
 	assert(visitor.binary->rhs);
 	TypeChecker::FlatBinaryExpression result;
-	result.lhs = &this->expression_to_variable(*visitor.binary->lhs);
+	// result.lhs = &this->expression_to_variable(*visitor.binary->lhs);
+	result.lhs = this->expression_to_variable_or_dereference_or_null_or_value(*visitor.binary->lhs);
 	result.op = visitor.binary->op;
-	result.rhs = this->expression_to_variable_or_dereference_or_null(*visitor.binary->rhs);
+	result.rhs = this->expression_to_variable_or_dereference_or_null_or_value(*visitor.binary->rhs);
 	return result;
 }
 
@@ -339,18 +349,36 @@ void TypeChecker::visit(const Assume& assume) {
 
 	} else {
 		auto flat = expression_to_flat_binary_expression(*assume.expr);
-		if (flat.lhs->type.sort == Sort::PTR) {
-			conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
-			conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assume'; was expecting a variable or 'NULL'");
-			// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
-			if (flat.rhs.var.has_value()) {
-				this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.var);
-			} else {
-				this->check_assume_pointer(assume, *flat.lhs, flat.op, **flat.rhs.null);
-			}
+		conditionally_raise_error<UnsupportedConstructError>(!(flat.lhs.var.has_value() || flat.lhs.deref.has_value()), "unrecognized left-hand-side of condition in 'assume'; was expecting a variable or a dereference");
+		assert(flat.lhs.var.has_value() ^ flat.lhs.deref.has_value());
+		if (flat.lhs.var.has_value()) {
+			if ((*flat.lhs.var)->type.sort == Sort::PTR) {
+				if (flat.rhs.deref.has_value()) {
+					auto& deref_var = expression_to_variable(*(*flat.rhs.deref)->expr);
+					this->check_assume_pointer(assume, **flat.lhs.var, flat.op, **flat.rhs.deref, deref_var);
+				} else {
+					conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assume'; was expecting a variable or 'NULL'");
+					// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
+					if (flat.rhs.var.has_value()) {
+						this->check_assume_pointer(assume, **flat.lhs.var, flat.op, **flat.rhs.var);
+					} else {
+						this->check_assume_pointer(assume, **flat.lhs.var, flat.op, **flat.rhs.null);
+					}	
+				}
 
+			} else {
+				assert(flat.rhs.deref.has_value());
+				assert(false);
+				// this->check_assume_nonpointer(assume, *assume.expr);
+			}
+		} else if (flat.lhs.deref.has_value()) {
+			conditionally_raise_error<UnsupportedConstructError>((*flat.lhs.deref)->sort() == Sort::PTR, "unsupported left-hand-side of condition in 'assume'; dereference must not evaluate to sort 'PTR'");
+			conditionally_raise_error<UnsupportedConstructError>(!flat.rhs.value.has_value(), "unsupported right-hand-side of condition in 'assume'; dereference must be compared to a value");
+
+			auto& deref_var = expression_to_variable(*(*flat.lhs.deref)->expr);
+			this->check_assume_pointer(assume, **flat.lhs.deref, deref_var, flat.op, **flat.rhs.value);
 		} else {
-			this->check_assume_nonpointer(assume, *assume.expr);
+			assert(false);
 		}
 	}
 	this->visit_command_end();
@@ -371,14 +399,15 @@ void TypeChecker::visit(const InvariantExpression& invariant) {
 		this->check_assert_nonpointer(*this->current_assert, *invariant.expr);
 	} else {
 		auto flat = expression_to_flat_binary_expression(*invariant.expr);
-		if (flat.lhs->type.sort == Sort::PTR) {
+		conditionally_raise_error<UnsupportedConstructError>(!flat.rhs.var.has_value(), "unrecognized left-hand-side of condition in 'assert'; was expecting a variable");
+		if ((*flat.lhs.var)->type.sort == Sort::PTR) {
 			conditionally_raise_error<UnsupportedConstructError>(flat.rhs.deref.has_value(), "dereferences within conditions are not supported");
 			conditionally_raise_error<UnsupportedConstructError>(!(flat.rhs.var.has_value() ^ flat.rhs.null.has_value()), "unrecognized right-hand-side of condition in 'assert'; was expecting a variable or 'NULL'");
 			// assert(flat.rhs.var.has_value() ^ flat.rhs.null.has_value());
 			if (flat.rhs.var.has_value()) {
-				this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.var);
+				this->check_assert_pointer(*this->current_assert, **flat.lhs.var, flat.op, **flat.rhs.var);
 			} else {
-				this->check_assert_pointer(*this->current_assert, *flat.lhs, flat.op, **flat.rhs.null);
+				this->check_assert_pointer(*this->current_assert, **flat.lhs.var, flat.op, **flat.rhs.null);
 			}
 		
 		} else {
@@ -389,7 +418,17 @@ void TypeChecker::visit(const InvariantExpression& invariant) {
 
 void TypeChecker::visit(const InvariantActive& invariant) {
 	assert(invariant.expr);
-	this->check_assert_active(*this->current_assert, expression_to_variable(*invariant.expr));
+	auto expr = expression_to_variable_or_dereference_or_null_or_value(*invariant.expr);
+	conditionally_raise_error<UnsupportedConstructError>(!(expr.var.has_value() || expr.deref.has_value()), "unsupported 'active' expression; expected a variable or a dereference");
+	assert(expr.var.has_value() ^ expr.deref.has_value());
+	if (expr.var.has_value()) {
+		this->check_assert_active(*this->current_assert, **expr.var);
+	} else if (expr.deref.has_value()) {
+		auto& var = expression_to_variable(*(*expr.deref)->expr);
+		this->check_assert_active(*this->current_assert, **expr.deref, var);
+	} else {
+		assert(false);
+	}
 }
 
 void TypeChecker::visit(const Return& retrn) {
@@ -412,8 +451,8 @@ void TypeChecker::visit(const Assignment& assignment) {
 	assert(assignment.lhs->type().sort == assignment.rhs->type().sort);
 
 	if (assignment.lhs->type().sort == Sort::PTR) {
-		auto lhs = expression_to_variable_or_dereference_or_null(*assignment.lhs);
-		auto rhs = expression_to_variable_or_dereference_or_null(*assignment.rhs);
+		auto lhs = expression_to_variable_or_dereference_or_null_or_value(*assignment.lhs);
+		auto rhs = expression_to_variable_or_dereference_or_null_or_value(*assignment.rhs);
 
 		conditionally_raise_error<UnsupportedConstructError>(lhs.null.has_value(), "cannot assign to 'NULL'");
 		conditionally_raise_error<UnsupportedConstructError>(lhs.deref.has_value() && rhs.deref.has_value(), "simultanious dereference on left-hand-side and right-hand-side of assignment are not supported");
@@ -445,22 +484,22 @@ void TypeChecker::visit(const Assignment& assignment) {
 			}
 		}
 	} else {
-		auto lhs = expression_to_variable_or_dereference_or_null(*assignment.lhs);
-		auto rhs = expression_to_variable_or_dereference_or_null(*assignment.rhs);
+		auto lhs = expression_to_variable_or_dereference_or_null_or_value(*assignment.lhs);
+		auto rhs = expression_to_variable_or_dereference_or_null_or_value(*assignment.rhs);
 
 		if (lhs.deref.has_value()) {
 			auto& deref_var = expression_to_variable(*(*lhs.deref)->expr);
-			conditionally_raise_error<UnsupportedConstructError>(!rhs.var.has_value(), "unrecognized right-hand-side; data selector must be assigned from variable'");
+			conditionally_raise_error<UnsupportedConstructError>(!(rhs.var.has_value() || rhs.value.has_value()), "unrecognized right-hand-side; data selector must be assigned from variable");
 			check_assign_nonpointer(assignment, **lhs.deref, deref_var, **rhs.var);
 
 		} else if (rhs.deref.has_value()) {
 			auto& deref_var = expression_to_variable(*(*rhs.deref)->expr);
-			conditionally_raise_error<UnsupportedConstructError>(!lhs.var.has_value(), "unrecognized left-hand-side; data selector must be read into variable'");
+			conditionally_raise_error<UnsupportedConstructError>(!lhs.var.has_value(), "unrecognized left-hand-side; data selector must be read into variable");
 			check_assign_nonpointer(assignment, **lhs.var, **rhs.deref, deref_var);
 
 		} else {
-			conditionally_raise_error<UnsupportedConstructError>(contains_pointer(*assignment.lhs), "unrecognized left-hand-side; data expression must not contain pointers'");
-			conditionally_raise_error<UnsupportedConstructError>(contains_pointer(*assignment.rhs), "unrecognized right-hand-side; data expression must not contain pointers'");
+			conditionally_raise_error<UnsupportedConstructError>(contains_pointer(*assignment.lhs), "unrecognized left-hand-side; data expression must not contain pointers");
+			conditionally_raise_error<UnsupportedConstructError>(contains_pointer(*assignment.rhs), "unrecognized right-hand-side; data expression must not contain pointers");
 			check_assign_nonpointer(assignment, *assignment.lhs, *assignment.rhs);
 		}
 	}

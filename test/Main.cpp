@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
 			assert(hp_guarantee_observers.size() == 5);
 			auto& guarantee_tprep = table.add_guarantee(std::move(hp_guarantee_observers.at(3)), "Et-" + func.name);
 			std::cout << "  -  " << guarantee_tprep.name << ": (transient, valid) = (" << guarantee_tprep.is_transient << ", " << guarantee_tprep.entails_validity << ")" << std::endl;
-			std::cout << std::endl << std::endl << "****************************" << std::endl;
+			// std::cout << std::endl << std::endl << "****************************" << std::endl;
 			auto& guarantee_t = table.add_guarantee(std::move(hp_guarantee_observers.at(4)), "Pt-" + func.name);
 			std::cout << "  -  " << guarantee_t.name << ": (transient, valid) = (" << guarantee_t.is_transient << ", " << guarantee_t.entails_validity << ")" << std::endl;
 			assert(guarantee_t.entails_validity);
@@ -92,11 +92,11 @@ int main(int argc, char** argv) {
 	};
 	add_guarantees(protect1, &protect2);
 	add_guarantees(protect2);
-	assert(false);
+	// assert(false);
 
 	// assertion check (initial ones given by programmer)
 	if (true) {
-		std::cout << std::endl << "Not checking initial assertions program for assertion failures." << std::endl;
+		std::cout << std::endl << "Not checking initial assertions in program for assertion failures." << std::endl;
 	} else {
 		std::cout << std::endl << "Checking initial assertions..." << std::endl;
 		bool initial_assertions_safe = discharge_assertions(program, table);
@@ -146,7 +146,10 @@ int main(int argc, char** argv) {
 			fix(err);
 		}
 
-		if (!type_safe) throw std::logic_error("temp break");
+		if (!type_safe) {
+			cola::print(program, std::cout);
+			throw std::logic_error("temp break");
+		}
 	}
 	std::cout << "Type check " << (type_safe ? "successful" : "failed") << std::endl << std::endl;
 

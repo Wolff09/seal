@@ -8,6 +8,65 @@
 using namespace cola;
 using namespace prtypes;
 
+
+struct CollectDerefVisitor final : public Visitor {
+	std::vector<const Dereference*> derefs;
+	bool is_assume = true;
+
+	void visit(const VariableDeclaration& /*node*/) { /* do nothing */ }
+	void visit(const BooleanValue& /*node*/) { /* do nothing */ }
+	void visit(const NullValue& /*node*/) { /* do nothing */ }
+	void visit(const EmptyValue& /*node*/) { /* do nothing */ }
+	void visit(const MaxValue& /*node*/) { /* do nothing */ }
+	void visit(const MinValue& /*node*/) { /* do nothing */ }
+	void visit(const NDetValue& /*node*/) { /* do nothing */ }
+	void visit(const VariableExpression& /*node*/) { /* do nothing */ }
+	void visit(const NegatedExpression& node) {
+		assert(node.expr);
+		node.expr->accept(*this);
+	}
+	void visit(const BinaryExpression& node) {
+		assert(node.lhs);
+		node.lhs->accept(*this);
+		assert(node.rhs);
+		node.rhs->accept(*this);
+	}
+	void visit(const Dereference& node) {
+		if (node.sort() == Sort::PTR) {
+			this->derefs.push_back(&node);
+		}
+	}
+
+	void visit(const Assume& node) {
+		assert(node.expr);
+		node.expr->accept(*this);
+	}
+	
+	void visit(const Expression& /*node*/) { throw std::logic_error("Unexpected invocation: CollectDerefVisitor::visit(const Expression&)"); }
+	void visit(const InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: CollectDerefVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: CollectDerefVisitor::visit(const InvariantActive&)"); }
+	void visit(const Sequence& /*node*/) { is_assume = false; }
+	void visit(const Scope& /*node*/) { is_assume = false; }
+	void visit(const Atomic& /*node*/) { is_assume = false; }
+	void visit(const Choice& /*node*/) { is_assume = false; }
+	void visit(const IfThenElse& /*node*/) { is_assume = false; }
+	void visit(const Loop& /*node*/) { is_assume = false; }
+	void visit(const While& /*node*/) { is_assume = false; }
+	void visit(const Skip& /*node*/) { is_assume = false; }
+	void visit(const Break& /*node*/) { is_assume = false; }
+	void visit(const Continue& /*node*/) { is_assume = false; }
+	void visit(const Assert& /*node*/) { is_assume = false; }
+	void visit(const Return& /*node*/) { is_assume = false; }
+	void visit(const Malloc& /*node*/) { is_assume = false; }
+	void visit(const Assignment& /*node*/) { is_assume = false; }
+	void visit(const Enter& /*node*/) { is_assume = false; }
+	void visit(const Exit& /*node*/) { is_assume = false; }
+	void visit(const Macro& /*node*/) { is_assume = false; }
+	void visit(const CompareAndSwap& /*node*/) { is_assume = false; }
+	void visit(const Function& /*node*/) { throw std::logic_error("Unexpected invocation: CollectDerefVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) { throw std::logic_error("Unexpected invocation: CollectDerefVisitor::visit(const Program&)"); }
+};
+
 struct LocalExpressionVisitor final : public Visitor {
 	bool result = true;
 	std::set<const VariableDeclaration*> decls;
@@ -183,10 +242,28 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void visit(Continue& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
 	void visit(Macro& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
 
+	void handle_assume(std::unique_ptr<Statement>& stmt) {
+		assert(stmt);
+		CollectDerefVisitor visitor;
+		stmt->accept(visitor);
+		if (visitor.is_assume && !visitor.derefs.empty()) {
+			cola::print(*stmt, std::cout);
+			std::unique_ptr<Statement> result = std::move(stmt);
+			for (const auto& deref : visitor.derefs) {
+				assert(deref);
+				auto assertion = std::make_unique<Assert>(std::make_unique<InvariantActive>(cola::copy(*deref)));
+				result = std::make_unique<Sequence>(std::move(result), std::move(assertion));
+			}
+			stmt = std::move(result);
+		}
+		assert(stmt);
+	}
+
 	void handle_statement(std::unique_ptr<Statement>& stmt) {
 		found_cmd = false;
 		assert(stmt);
 		stmt->accept(*this);
+		handle_assume(stmt);
 		if (found_cmd && !in_atomic && needs_atomic(*stmt, retire_function)) {
 			stmt = std::make_unique<Atomic>(std::make_unique<Scope>(std::move(stmt)));
 		}
@@ -213,6 +290,7 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 		found_cmd = false;
 	}
 	void visit(Choice& node) {
+		conditionally_raise_error<UnsupportedConstructError>(node.branches.size() == 1, "'choice' with only one branch indicates error; maybe you meant to add a branch containing just 'skip'");
 		for (auto& branch : node.branches) {
 			assert(branch);
 			branch->accept(*this);

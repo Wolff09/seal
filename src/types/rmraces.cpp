@@ -742,6 +742,12 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 	raise_error<RefinementError>("could not infer valid move to fix pointer race");
 }
 
+std::string expr_to_string(const Expression& expr) {
+	std::stringstream result;
+	cola::print(expr, result);
+	return result.str();
+}
+
 void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
 	std::cout << "Trying to remove unsafe assume statement by repeating commands." << std::endl;
 
@@ -761,18 +767,25 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	// check first path element to be an assignment corresponding to the assumption to be replaced
 	auto assignment = dynamic_cast<const Assignment*>(*it);
 	conditionally_raise_error<RefinementError>(!assignment, "repeating commands failed (first entry of 'full_path' malformed)");
-	auto assignment_lhs = dynamic_cast<const VariableExpression*>(assignment->lhs.get());
-	auto assignment_rhs = dynamic_cast<const VariableExpression*>(assignment->rhs.get());
-	conditionally_raise_error<RefinementError>(!assignment_lhs, "repeating commands failed ('lhs' of assignment in 'full_path' malformed)");
-	conditionally_raise_error<RefinementError>(!assignment_rhs, "repeating commands failed ('rhs' of assignment in 'full_path' malformed)");
 	auto assumption = dynamic_cast<const BinaryExpression*>(error.pc.expr.get());
 	conditionally_raise_error<RefinementError>(!assumption, "repeating commands failed (assume in 'full_path' malformed)");
-	auto assumption_lhs = dynamic_cast<const VariableExpression*>(assumption->lhs.get());
-	auto assumption_rhs = dynamic_cast<const VariableExpression*>(assumption->rhs.get());
-	conditionally_raise_error<RefinementError>(!assumption_lhs, "repeating commands failed ('lhs' of assume in 'full_path' malformed)");
-	conditionally_raise_error<RefinementError>(!assumption_rhs, "repeating commands failed ('rhs' of assume in 'full_path' malformed)");
-	bool well_formed = &assignment_lhs->decl == &assumption_lhs->decl && &assignment_rhs->decl == &assumption_rhs->decl;
-	well_formed |= &assignment_rhs->decl == &assumption_lhs->decl && &assignment_lhs->decl == &assumption_rhs->decl;
+	auto assignment_lhs = dynamic_cast<const VariableExpression*>(assignment->lhs.get());
+	conditionally_raise_error<RefinementError>(!assignment_lhs, "repeating commands failed ('lhs' of assignment in 'full_path' malformed)");
+	// auto assumption_lhs = dynamic_cast<const VariableExpression*>(assumption->lhs.get());
+	// conditionally_raise_error<RefinementError>(!assumption_lhs, "repeating commands failed ('lhs' of assume in 'full_path' malformed)");
+	// auto assignment_rhs = dynamic_cast<const VariableExpression*>(assignment->rhs.get());
+	// conditionally_raise_error<RefinementError>(!assignment_rhs, "repeating commands failed ('rhs' of assignment in 'full_path' malformed)");
+	// auto assumption_rhs = dynamic_cast<const VariableExpression*>(assumption->rhs.get());
+	// conditionally_raise_error<RefinementError>(!assumption_rhs, "repeating commands failed ('rhs' of assume in 'full_path' malformed)");
+	// bool well_formed = &assignment_lhs->decl == &assumption_lhs->decl && &assignment_rhs->decl == &assumption_rhs->decl;
+	// well_formed |= &assignment_rhs->decl == &assumption_lhs->decl && &assignment_lhs->decl == &assumption_rhs->decl;
+	// conditionally_raise_error<RefinementError>(!well_formed, "repeating commands failed ('full_path' malformed)");
+	std::string assign_lhs = expr_to_string(*assignment->lhs);
+	std::string assign_rhs = expr_to_string(*assignment->rhs);
+	std::string assume_lhs = expr_to_string(*assumption->lhs);
+	std::string assume_rhs = expr_to_string(*assumption->rhs);
+	bool well_formed = assign_lhs == assume_lhs && assume_rhs == assume_rhs;
+	well_formed |= assign_lhs == assume_rhs && assume_rhs == assume_lhs;
 	conditionally_raise_error<RefinementError>(!well_formed, "repeating commands failed ('full_path' malformed)");
 	++it;
 

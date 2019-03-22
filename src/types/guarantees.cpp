@@ -134,7 +134,7 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 
 	// intersection with observer languages
 	auto intersect = [&](const Observer& observer) {
-		std::cout << std::endl << "Translating observer" << std::endl;
+//		std::cout << std::endl << "Translating observer" << std::endl;
 		auto automaton = translator.to_nfa(observer);
 		intersection = Vata2::Nfa::intersection(intersection, automaton);
 	};
@@ -152,11 +152,11 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 	Vata2::Nfa::Word cex;
 	bool result = Vata2::Nfa::is_lang_empty_cex(intersection, &cex);
 	if (!result) {
-		std::cout << "&& Does not entail validity, counterexample: ";
-		for (const auto& sym : cex) {
-			std::cout << " " << sym;
-		}
-		std::cout << std::endl;
+		// std::cout << "&& Does not entail validity, counterexample: ";
+		// for (const auto& sym : cex) {
+		// 	std::cout << " " << sym;
+		// }
+		// std::cout << std::endl;
 	}
 	return result;
 }

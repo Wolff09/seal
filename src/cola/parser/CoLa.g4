@@ -105,8 +105,8 @@ expression : name=Identifier                        #exprIdentifier
            | value                                  #exprValue
            | '(' expr=expression ')'                #exprParens
            | Neg expr=expression                    #exprNegation
-           | lhs=expression binop rhs=expression    #exprBinary
            | expr=expression '->' field=Identifier  #exprDeref
+           | lhs=expression binop rhs=expression    #exprBinary
            | cas                                    #exprCas
            ;
 

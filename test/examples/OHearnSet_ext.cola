@@ -3,7 +3,7 @@
 // #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
-#instrumentation "object"
+#instrumentation "container"
 
 
 struct Node {
@@ -38,37 +38,45 @@ bool contains(data_t key) {
 	Node* tmpNode;
 	bool tmpBool;
 	bool result;
+	bool restart;
 
-	curr = Head;
-	atomic {
-		protect2(curr);
-		assert(active(curr));
-	}
-	k = curr->val;
+	/*** locate begin ***/
 
-	while (k < key) {
-		pred = curr;
-		protect1(pred);
-
-		curr = pred->next;
+	restart = true;
+	while (true) {
+		pred = Head;
+		atomic {
+			curr = pred->next;
+		}
 		protect2(curr);
 
 		choose {
-			// assume(!pred->marked && curr == pred->next);
-			atomic {
-				tmpBool = pred->marked;
-				assume(tmpBool == false);
-				tmpNode = pred->next;
-				assume(curr == tmpNode);
+			assume(curr == pred->next);
+			k = curr->val;
+
+			while (k < key) {
+				pred = curr;
+				protect1(pred);
+
+				curr = pred->next;
+				protect2(curr);
+
+				choose {
+					atomic {
+						assume(pred->marked == false);
+						assume(curr == pred->next);
+					}
+					k = curr->val;
+				}{
+					break;
+				}
 			}
 
-			k = curr->val;
-		}{
-			curr = Head;
-			atomic {
-				protect2(curr);
-				assert(active(curr));
+			if (!restart) {
+				break;
 			}
+		}{
+			skip;
 		}
 	}
 
@@ -96,15 +104,16 @@ bool add(data_t key) {
 
 	while (true) {
 		/*** locate begin ***/
-		
+
 		curr = Head;
 		atomic {
+			// protection needed for type check to go through
+			// alternatively one could peel the first loop iteration
 			protect2(curr);
 			assert(active(curr));
 		}
-		k = curr->val;
 
-		while (k < key) {
+		while (true) {
 			pred = curr;
 			protect1(pred);
 
@@ -117,16 +126,26 @@ bool add(data_t key) {
 					tmpBool = pred->marked;
 					assume(tmpBool == false);
 					tmpNode = pred->next;
-					assume(curr == tmpNode);
+					/* manual atomicity abstraction */
+					// assume(curr == tmpNode);
+					curr = tmpNode;
+					protect2(curr);
+					assert(active(curr)); // needs to be inferred?
 				}
 
 				k = curr->val;
 			}{
 				curr = Head;
 				atomic {
+					// protection needed for type check to go through
+					// alternatively one could restart the outer loop
 					protect2(curr);
 					assert(active(curr));
 				}
+			}
+
+			if (k >= key) {
+				break;
 			}
 		}
 
@@ -146,11 +165,14 @@ bool add(data_t key) {
 					assume(tmpBool == false);
 					// assume(curr == pred->next);
 					tmpNode = pred->next;
+					assert(active(tmpNode)); // needs to be inferred?
 					assume(curr == tmpNode);
 
 					pred->next = entry;
 					result = true;
 					break;
+				}{
+					skip;
 				}
 			}
 		}
@@ -169,10 +191,17 @@ bool remove(data_t key) {
 	bool result;
 
 	while (true) {
-		curr = Head;
-		k = curr->val;
+		/*** locate begin ***/
 
-		while (k < key) {
+		curr = Head;
+		atomic {
+			// protection needed for type check to go through
+			// alternatively one could peel the first loop iteration
+			protect2(curr);
+			assert(active(curr));
+		}
+
+		while (true) {
 			pred = curr;
 			protect1(pred);
 
@@ -185,12 +214,26 @@ bool remove(data_t key) {
 					tmpBool = pred->marked;
 					assume(tmpBool == false);
 					tmpNode = pred->next;
-					assume(curr == tmpNode);
+					/* manual atomicity abstraction */
+					// assume(curr == tmpNode);
+					curr = tmpNode;
+					protect2(curr);
+					assert(active(curr)); // needs to be inferred?
 				}
 
 				k = curr->val;
 			}{
 				curr = Head;
+				atomic {
+					// protection needed for type check to go through
+					// alternatively one could restart the outer loop
+					protect2(curr);
+					assert(active(curr));
+				}
+			}
+
+			if (k >= key) {
+				break;
 			}
 		}
 
@@ -201,23 +244,24 @@ bool remove(data_t key) {
 			break;
 		} else {
 			atomic {
-				// tmpBool = !pred->marked && curr == pred->next;
-				tmpNode = pred->next;
-				tmpBool2 = pred->marked;
-				tmpBool = false;
-				if (tmpBool2 == false) {
-					if (tmpNode == curr) {
-						tmpBool = true;
-					}
-				}
-				if (tmpBool) {
+
+				choose {
+					// assume(!pred->marked)
+					tmpBool = pred->marked;
+					assume(tmpBool == false);
+					// assume(curr == pred->next);
+					tmpNode = pred->next;
+					assert(active(tmpNode)); // needs to be inferred?
+					assume(curr == tmpNode);
+
 					next = curr->next;
-					tmpBool = true;
-					curr->marked = tmpBool;
+					curr->marked = true;
 					pred->next = next;
 					retire(curr);
 					result = true;
 					break;
+				}{
+					skip;
 				}
 			}
 		}

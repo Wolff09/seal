@@ -324,6 +324,10 @@ std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee
 	obs_prep->states.push_back(std::make_unique<State>("HP-E3.10", false, true));
 	obs_prep->states.push_back(std::make_unique<State>("HP-E3.11", false, true));
 	obs_prep->states.push_back(std::make_unique<State>("HP-E3.12", false, false));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.13", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.14", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.15", false, true));
+	obs_prep->states.push_back(std::make_unique<State>("HP-E3.16", false, true));
 
 	// transitions for transfer_protect_function protection
 	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(0), *obs_prep->states.at(1), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
@@ -366,6 +370,24 @@ std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee
 	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(12), *obs_prep->states.at(7), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
 	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(12), *obs_prep->states.at(8), free_function, *obs_prep->variables.at(1)));
 
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(10), *obs_prep->states.at(13), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(11), *obs_prep->states.at(14), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(13), *obs_prep->states.at(14), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(13), *obs_prep->states.at(0), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(14), *obs_prep->states.at(5), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(14), *obs_prep->states.at(4), free_function, *obs_prep->variables.at(1)));
+
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(13), *obs_prep->states.at(15), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_response_self(*obs_prep->states.at(15), *obs_prep->states.at(10), transfer_protect_function, *obs_prep->variables.at(0)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self(*obs_prep->states.at(14), *obs_prep->states.at(16), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_response_self(*obs_prep->states.at(16), *obs_prep->states.at(11), transfer_protect_function, *obs_prep->variables.at(0)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(15), *obs_prep->states.at(16), retire_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_any_thread(*obs_prep->states.at(16), *obs_prep->states.at(4), free_function, *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(15), *obs_prep->states.at(13), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(16), *obs_prep->states.at(14), transfer_protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(15), *obs_prep->states.at(0), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+	obs_prep->transitions.push_back(mk_transition_invocation_self_neg(*obs_prep->states.at(16), *obs_prep->states.at(5), protect_function, *obs_prep->variables.at(0), *obs_prep->variables.at(1)));
+
 
 	auto obs_safe = std::make_unique<Observer>();
 	obs_safe->negative_specification = false;
@@ -390,6 +412,8 @@ std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee
 	obs_safe->states.push_back(std::make_unique<State>("HP-PT.12", false, false));
 	obs_safe->states.push_back(std::make_unique<State>("HP-PT.13", false, true));
 	obs_safe->states.push_back(std::make_unique<State>("HP-PT.14", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.15", false, true));
+	obs_safe->states.push_back(std::make_unique<State>("HP-PT.16", false, true));
 
 	// transitions for transfer_protect_function protection
 	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(0), *obs_safe->states.at(1), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
@@ -438,6 +462,17 @@ std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee
 	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(13), *obs_safe->states.at(0), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(14), *obs_safe->states.at(5), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(14), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
+
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(13), *obs_safe->states.at(15), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(15), *obs_safe->states.at(10), transfer_protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self(*obs_safe->states.at(14), *obs_safe->states.at(16), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_response_self(*obs_safe->states.at(16), *obs_safe->states.at(11), transfer_protect_function, *obs_safe->variables.at(0)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(15), *obs_safe->states.at(16), retire_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_any_thread(*obs_safe->states.at(16), *obs_safe->states.at(4), free_function, *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(15), *obs_safe->states.at(13), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(16), *obs_safe->states.at(14), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(15), *obs_safe->states.at(0), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
+	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(16), *obs_safe->states.at(5), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
 
 	// ************************************************************************************************************************************* //
 	// ************************************************************************************************************************************* //

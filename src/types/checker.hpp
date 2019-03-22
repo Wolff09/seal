@@ -79,11 +79,14 @@ namespace prtypes {
 			void check_return(const cola::Return& retrn, const cola::VariableDeclaration& var);
 			void check_assume_nonpointer(const cola::Assume& assume, const cola::Expression& expr);
 			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::VariableDeclaration& rhs);
+			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::Dereference& rhs_deref, const cola::VariableDeclaration& rhs_var);
 			void check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::NullValue& rhs);
+			void check_assume_pointer(const cola::Assume& assume, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, cola::BinaryExpression::Operator op, const cola::Expression& rhs);
 			void check_assert_nonpointer(const cola::Assert& assert, const cola::Expression& expr);
 			void check_assert_pointer(const cola::Assert& assert, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::VariableDeclaration& rhs);
 			void check_assert_pointer(const cola::Assert& assert, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::NullValue& rhs);
 			void check_assert_active(const cola::Assert& assert, const cola::VariableDeclaration& ptr);
+			void check_assert_active(const cola::Assert& assert, const cola::Dereference& deref, const cola::VariableDeclaration& ptr);
 			void check_assign_pointer(const cola::Assignment& node, const cola::VariableDeclaration& lhs, const cola::VariableDeclaration& rhs);
 			void check_assign_pointer(const cola::Assignment& node, const cola::VariableDeclaration& lhs, const cola::NullValue& rhs);
 			void check_assign_pointer(const cola::Assignment& node, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, const cola::VariableDeclaration& rhs);
@@ -107,21 +110,24 @@ namespace prtypes {
 			TypeEnv current_type_environment;
 			bool inside_atomic = false;
 			const cola::Assert* current_assert;
+			std::vector<TypeEnv> break_envs;
 
 			struct VariableOrDereferenceOrNull {
 				std::optional<const cola::VariableDeclaration*> var;
 				std::optional<const cola::Dereference*> deref;
 				std::optional<const cola::NullValue*> null;
+				std::optional<const cola::Expression*> value;
 			};
 			struct FlatBinaryExpression {
-				const cola::VariableDeclaration* lhs;
+				// const cola::VariableDeclaration* lhs;
+				VariableOrDereferenceOrNull lhs;
 				cola::BinaryExpression::Operator op;
 				VariableOrDereferenceOrNull rhs;
 			};
 
 			bool is_pointer_valid(const cola::VariableDeclaration& variable);
 			const cola::VariableDeclaration& expression_to_variable(const cola::Expression& expression);
-			VariableOrDereferenceOrNull expression_to_variable_or_dereference_or_null(const cola::Expression& expression);
+			VariableOrDereferenceOrNull expression_to_variable_or_dereference_or_null_or_value(const cola::Expression& expression);
 			FlatBinaryExpression expression_to_flat_binary_expression(const cola::Expression& expression);
 	};
 
