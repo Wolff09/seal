@@ -3,7 +3,7 @@
 // #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
-#instrumentation "object"
+#instrumentation "container"
 
 
 struct Node {
@@ -32,47 +32,58 @@ void init() {
 }
 
 
-bool contains(data_t key) {
-	Node* pred, curr;
-	data_t k;
-	Node* tmpNode;
-	bool tmpBool;
-	bool result;
+inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
+	// k3: CAVE hack for necessary precision
 
 	curr = Head;
+	k = MIN_VAL;
+	k3 = MIN_VAL;
 	atomic {
+		// protection needed for type check to go through
+		// alternatively one could peel the first loop iteration
 		protect2(curr);
 		assert(active(curr));
 	}
-	k = curr->val;
 
-	while (k < key) {
+	while (true) { // do while (k < key)
 		pred = curr;
+		k3 = k;
 		protect1(pred);
 
 		curr = pred->next;
 		protect2(curr);
 
 		choose {
-			// assume(!pred->marked && curr == pred->next);
 			atomic {
-				tmpBool = pred->marked;
-				assume(tmpBool == false);
-				tmpNode = pred->next;
-				assume(curr == tmpNode);
+				assume(pred->marked == false);
+				assume(curr == pred->next);
 			}
 
 			k = curr->val;
 		}{
 			curr = Head;
+			k = MIN_VAL;
+			k3 = MIN_VAL;
 			atomic {
+				// protection for type check (as before)
 				protect2(curr);
 				assert(active(curr));
 			}
 		}
-	}
 
-	/*** locate done ***/
+		if (k >= key) {
+			break;
+		}
+	}
+}
+
+
+bool contains(data_t key) {
+	Node* pred, curr;
+	data_t k, k3;
+	bool result;
+
+	locate(pred, curr, key, k, k3);
 
 	if (k == key) {
 		result = true;
@@ -85,9 +96,7 @@ bool contains(data_t key) {
 
 bool add(data_t key) {
 	Node* pred, curr, entry;
-	data_t k;
-	Node* tmpNode;
-	bool tmpBool;
+	data_t k, k3;
 	bool result;
 
 	entry = malloc;
@@ -95,42 +104,7 @@ bool add(data_t key) {
 	entry->marked = false;
 
 	while (true) {
-		/*** locate begin ***/
-		
-		curr = Head;
-		atomic {
-			protect2(curr);
-			assert(active(curr));
-		}
-		k = curr->val;
-
-		while (k < key) {
-			pred = curr;
-			protect1(pred);
-
-			curr = pred->next;
-			protect2(curr);
-
-			choose {
-				// assume(!pred->marked && curr == pred->next);
-				atomic {
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					tmpNode = pred->next;
-					assume(curr == tmpNode);
-				}
-
-				k = curr->val;
-			}{
-				curr = Head;
-				atomic {
-					protect2(curr);
-					assert(active(curr));
-				}
-			}
-		}
-
-		/*** locate done ***/
+		locate(pred, curr, key, k, k3);
 
 		if (k == key) {
 			result = false;
@@ -141,21 +115,19 @@ bool add(data_t key) {
 			entry->next = curr;
 			atomic {
 				choose {
-					// assume(!pred->marked)
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					// assume(curr == pred->next);
-					tmpNode = pred->next;
-					assume(curr == tmpNode);
+					assume(pred->marked == false);
+					assume(curr == pred->next);
 
 					pred->next = entry;
+					k3 = k;
 					result = true;
 					break;
+				}{
+					skip; // retry
 				}
 			}
 		}
 	}
-
 
 	return result;
 }
@@ -163,64 +135,34 @@ bool add(data_t key) {
 
 bool remove(data_t key) {
 	Node* pred, curr, next;
-	data_t k;
-	Node* tmpNode;
-	bool tmpBool, tmpBool2;
+	data_t k, k3;
 	bool result;
 
 	while (true) {
-		curr = Head;
-		k = curr->val;
-
-		while (k < key) {
-			pred = curr;
-			protect1(pred);
-
-			curr = pred->next;
-			protect2(curr);
-
-			choose {
-				// assume(!pred->marked && curr == pred->next);
-				atomic {
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					tmpNode = pred->next;
-					assume(curr == tmpNode);
-				}
-
-				k = curr->val;
-			}{
-				curr = Head;
-			}
-		}
-
-		/*** locate done ***/
+		locate(pred, curr, key, k, k3);
 
 		if (k > key) {
 			result = false;
 			break;
+
 		} else {
 			atomic {
-				// tmpBool = !pred->marked && curr == pred->next;
-				tmpNode = pred->next;
-				tmpBool2 = pred->marked;
-				tmpBool = false;
-				if (tmpBool2 == false) {
-					if (tmpNode == curr) {
-						tmpBool = true;
-					}
-				}
-				if (tmpBool) {
+				choose {
+					assume(pred->marked == false);
+					assume(curr == pred->next);
+
 					next = curr->next;
-					tmpBool = true;
-					curr->marked = tmpBool;
+					curr->marked = true;
 					pred->next = next;
 					retire(curr);
 					result = true;
 					break;
+				}{
+					skip; // retry
 				}
 			}
 		}
 	}
+
 	return result;
 }
