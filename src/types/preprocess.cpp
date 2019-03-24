@@ -9,6 +9,244 @@ using namespace cola;
 using namespace prtypes;
 
 
+struct MacroCopyVisitor final : public Visitor {
+	const Macro& to_copy;
+	std::map<const VariableDeclaration*, const VariableDeclaration*> intern2extern;
+	std::unique_ptr<AstNode> result;
+
+	MacroCopyVisitor(const Macro& to_copy) : to_copy(to_copy) {
+		conditionally_raise_error<UnsupportedConstructError>(to_copy.decl.return_type != Type::void_type(), "inline functions must have void type");
+		assert(to_copy.args.size() == to_copy.decl.args.size());
+		for (std::size_t i = 0; i < to_copy.args.size(); ++i) {
+			const Expression* arg = to_copy.args.at(i).get();
+			conditionally_raise_error<UnsupportedConstructError>(typeid(*arg) != typeid(VariableExpression), "only variables may be passed to inline functions");
+			const VariableDeclaration* external_decl = &static_cast<const VariableExpression*>(arg)->decl;
+			const VariableDeclaration* internal_decl = to_copy.decl.args.at(i).get();
+			conditionally_raise_error<UnsupportedConstructError>(external_decl->type != internal_decl->type, "type missmatch in invocation of inline function '" + to_copy.decl.name + "'");
+			intern2extern.insert({ internal_decl, external_decl });
+		}
+	}
+
+	template<typename R>
+	std::unique_ptr<R> copy_node(const AstNode& node) {
+		{
+			const AnnotatedStatement* tmp = dynamic_cast<const AnnotatedStatement*>(&node);
+			conditionally_raise_error<UnsupportedConstructError>(tmp && tmp->annotation, "annotations are not supported in inline functions");
+		}
+		node.accept(*this);
+		AstNode* res_ptr = result.release();
+		R* res_cast = dynamic_cast<R*>(res_ptr);
+		if (!res_cast) {
+			throw std::logic_error("I got lost casting...");
+		}
+		std::unique_ptr<R> result;
+		result.reset(res_cast);
+		return result;
+	}
+
+	void visit(const Function& /*node*/) { throw std::logic_error("Unexpected invocation: MacroCopyVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) { throw std::logic_error("Unexpected invocation: MacroCopyVisitor::visit(const Program&)"); }
+
+	void visit(const VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: MacroCopyVisitor::visit(const VariableDeclaration&)"); }
+	void visit(const Expression& /*node*/) { throw std::logic_error("Unexpected invocation: MacroCopyVisitor::visit(const Expression&)"); }
+	void visit(const BooleanValue& node) {
+		result = std::make_unique<BooleanValue>(node.value);
+	}
+	void visit(const NullValue& /*node*/) {
+		result = std::make_unique<NullValue>();
+	}
+	void visit(const EmptyValue& /*node*/) {
+		result = std::make_unique<EmptyValue>();
+	}
+	void visit(const MaxValue& /*node*/) {
+		result = std::make_unique<MaxValue>();
+	}
+	void visit(const MinValue& /*node*/) {
+		result = std::make_unique<MinValue>();
+	}
+	void visit(const NDetValue& /*node*/) {
+		result = std::make_unique<NDetValue>();
+	}
+	void visit(const VariableExpression& node) {
+		const VariableDeclaration* decl;
+		if (node.decl.is_shared) {
+			decl = &node.decl;
+		} else {
+			auto search = intern2extern.find(&node.decl);
+			conditionally_raise_error<std::logic_error>(search == intern2extern.end(), "Unexpected variable '" + node.decl.name + "'; could not externatlize.");
+			decl = search->second;
+		}
+		assert(decl);
+		result = std::make_unique<VariableExpression>(*decl);
+	}
+	void visit(const NegatedExpression& node) {
+		result = std::make_unique<NegatedExpression>(copy_node<Expression>(*node.expr));
+	}
+	void visit(const BinaryExpression& node) {
+		result = std::make_unique<BinaryExpression>(node.op, copy_node<Expression>(*node.lhs), copy_node<Expression>(*node.rhs));
+	}
+	void visit(const Dereference& node) {
+		result = std::make_unique<Dereference>(copy_node<Expression>(*node.expr), node.fieldname);
+	}
+	void visit(const InvariantExpression& node) {
+		result = std::make_unique<InvariantExpression>(copy_node<Expression>(*node.expr));
+	}
+	void visit(const InvariantActive& node) {
+		result = std::make_unique<InvariantActive>(copy_node<Expression>(*node.expr));
+	}
+
+	void visit(const Sequence& node) {
+		result = std::make_unique<Sequence>(copy_node<Statement>(*node.first), copy_node<Statement>(*node.second));
+	}
+	void visit(const Scope& node) {
+		conditionally_raise_error<UnsupportedConstructError>(!node.variables.empty(), "Cannot copy variables from inline function");
+		result = std::make_unique<Scope>(copy_node<Statement>(*node.body));
+	}
+	void visit(const Atomic& node) {
+		result = std::make_unique<Atomic>(copy_node<Scope>(*node.body));
+	}
+	void visit(const Choice& node) {
+		auto stmt = std::make_unique<Choice>();
+		for (const auto& branch : node.branches) {
+			stmt->branches.push_back(copy_node<Scope>(*branch));
+		}
+		result = std::move(stmt);
+	}
+	void visit(const IfThenElse& node) {
+		result = std::make_unique<IfThenElse>(copy_node<Expression>(*node.expr), copy_node<Scope>(*node.ifBranch), copy_node<Scope>(*node.elseBranch));
+	}
+	void visit(const Loop& node) {
+		result = std::make_unique<Loop>(copy_node<Scope>(*node.body));
+	}
+	void visit(const While& node) {
+		result = std::make_unique<While>(copy_node<Expression>(*node.expr), copy_node<Scope>(*node.body));
+	}
+	void visit(const Skip& /*node*/) {
+		result = std::make_unique<Skip>();
+	}
+	void visit(const Break& /*node*/) {
+		result = std::make_unique<Break>();
+	}
+	void visit(const Continue& /*node*/) {
+		result = std::make_unique<Continue>();
+	}
+	void visit(const Assume& node) {
+		result = std::make_unique<Assume>(copy_node<Expression>(*node.expr));
+	}
+	void visit(const Assert& node) {
+		result = std::make_unique<Assert>(copy_node<Invariant>(*node.inv));
+	}
+	void visit(const Return& /*node*/) {
+		raise_error<UnsupportedConstructError>("'return' is not supported in inline functions");
+	}
+	void visit(const Malloc& /*node*/) {
+		raise_error<UnsupportedConstructError>("'malloc' is not supported in inline functions");
+	}
+	void visit(const Assignment& node) {
+		result = std::make_unique<Assignment>(copy_node<Expression>(*node.lhs), copy_node<Expression>(*node.rhs));
+	}
+	void visit(const Enter& node) {
+		auto stmt = std::make_unique<Enter>(node.decl);
+		for (auto const& arg : node.args) {
+			stmt->args.push_back(copy_node<Expression>(*arg));
+		}
+		result = std::move(stmt);
+	}
+	void visit(const Exit& node) {
+		result = std::make_unique<Exit>(node.decl);
+	}
+	void visit(const Macro& /*node*/) {
+		raise_error<UnsupportedConstructError>("inline function calls are not supported in inline functions");
+	}
+	void visit(const CompareAndSwap& /*node*/) {
+		raise_error<UnsupportedConstructError>("'CAS' not supported in inline functions");
+	}
+};
+
+struct InliningVisitor final : public NonConstVisitor {
+	std::unique_ptr<Statement>* owner;
+
+	void visit(VariableDeclaration& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(VariableDeclaration&)"); }
+	void visit(Expression& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(Expression&)"); }
+	void visit(BooleanValue& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(BooleanValue&)"); }
+	void visit(NullValue& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(NullValue&)"); }
+	void visit(EmptyValue& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(EmptyValue&)"); }
+	void visit(MaxValue& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(MaxValue&)"); }
+	void visit(MinValue& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(MinValue&)"); }
+	void visit(NDetValue& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(NDetValue&)"); }
+	void visit(VariableExpression& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(VariableExpression&)"); }
+	void visit(NegatedExpression& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(NegatedExpression&)"); }
+	void visit(BinaryExpression& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(BinaryExpression&)"); }
+	void visit(Dereference& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(Dereference&)"); }
+	void visit(InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(InvariantExpression&)"); }
+	void visit(InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: InliningVisitor::visit(InvariantActive&)"); }
+
+	void visit(Skip& /*node*/) { /* do nothing */ }
+	void visit(Break& /*node*/) { /* do nothing */ }
+	void visit(Continue& /*node*/) { /* do nothing */ }
+	void visit(Assume& /*node*/) { /* do nothing */ }
+	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(Return& /*node*/) { /* do nothing */ }
+	void visit(Malloc& /*node*/) { /* do nothing */ }
+	void visit(Assignment& /*node*/) { /* do nothing */ }
+	void visit(Enter& /*node*/) { /* do nothing */ }
+	void visit(Exit& /*node*/) { /* do nothing */ }
+	void visit(CompareAndSwap& /*node*/) { /* do nothing */ }
+
+	void visit(Macro& node) {
+		assert(owner);
+		MacroCopyVisitor visitor(node);
+		*owner = visitor.copy_node<Scope>(*node.decl.body);
+	}
+
+	void handle_statement(std::unique_ptr<Statement>& stmt) {
+		owner = &stmt;
+		stmt->accept(*this);
+	}
+	void visit(Sequence& node) {
+		handle_statement(node.first);
+		handle_statement(node.second);
+	}
+	void visit(Scope& node) {
+		handle_statement(node.body);
+	}
+	void visit(Atomic& node) {
+		node.body->accept(*this);
+	}
+	void visit(Choice& node) {
+		for (const auto& branch : node.branches) {
+			branch->accept(*this);
+		}
+	}
+	void visit(IfThenElse& node) {
+		node.ifBranch->accept(*this);
+		node.elseBranch->accept(*this);
+	}
+	void visit(Loop& node) {
+		node.body->accept(*this);
+	}
+	void visit(While& node) {
+		node.body->accept(*this);
+	}
+	void visit(Function& function) {
+		if (function.kind == Function::INTERFACE && function.body) {
+			function.body->accept(*this);
+		}
+	}
+	void visit(Program& program) {
+		for (const auto& function : program.functions) {
+			function->accept(*this);
+		}
+
+		auto functions = std::move(program.functions);
+		for (auto& function : functions) {
+			if (function->kind != Function::MACRO) {
+				program.functions.push_back(std::move(function));
+			}
+		}
+	}
+};
+
 struct CollectDerefVisitor final : public Visitor {
 	std::vector<const Dereference*> derefs;
 	bool is_assume = true;
@@ -240,14 +478,14 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	}
 	void visit(CompareAndSwap& /*node*/) { throw std::logic_error("Unexpected invocation: PreprocessingVisitor::visit(CompareAndSwap&)"); }
 	void visit(Continue& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
-	void visit(Macro& /*node*/) { raise_error<UnsupportedConstructError>("'continue' not supported"); }
+	void visit(Macro& /*node*/) { raise_error<UnsupportedConstructError>("inline functions not supported"); }
 
 	void handle_assume(std::unique_ptr<Statement>& stmt) {
 		assert(stmt);
 		CollectDerefVisitor visitor;
 		stmt->accept(visitor);
 		if (visitor.is_assume && !visitor.derefs.empty()) {
-			cola::print(*stmt, std::cout);
+			// cola::print(*stmt, std::cout)
 			std::unique_ptr<Statement> result = std::move(stmt);
 			for (const auto& deref : visitor.derefs) {
 				assert(deref);
@@ -329,6 +567,9 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 };
 
 void prtypes::preprocess(Program& program, const cola::Function& retire_function) {
+	InliningVisitor inliner;
+	program.accept(inliner);
+
 	cola::remove_cas(program);
 	cola::remove_scoped_variables(program);
 	cola::remove_conditionals(program);

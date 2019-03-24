@@ -32,55 +32,58 @@ void init() {
 }
 
 
-bool contains(data_t key) {
-	Node* pred, curr;
-	data_t k;
-	Node* tmpNode;
-	bool tmpBool;
-	bool result;
-	bool restart;
+inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
+	// k3: CAVE hack for necessary precision
 
-	/*** locate begin ***/
+	curr = Head;
+	k = MIN_VAL;
+	k3 = MIN_VAL;
+	atomic {
+		// protection needed for type check to go through
+		// alternatively one could peel the first loop iteration
+		protect2(curr);
+		assert(active(curr));
+	}
 
-	restart = true;
-	while (true) {
-		pred = Head;
-		atomic {
-			curr = pred->next;
-		}
+	while (true) { // do while (k < key)
+		pred = curr;
+		k3 = k;
+		protect1(pred);
+
+		curr = pred->next;
 		protect2(curr);
 
 		choose {
-			assume(curr == pred->next);
+			atomic {
+				assume(pred->marked == false);
+				assume(curr == pred->next);
+			}
+
 			k = curr->val;
-
-			while (k < key) {
-				pred = curr;
-				protect1(pred);
-
-				curr = pred->next;
-				protect2(curr);
-
-				choose {
-					atomic {
-						assume(pred->marked == false);
-						assume(curr == pred->next);
-					}
-					k = curr->val;
-				}{
-					break;
-				}
-			}
-
-			if (!restart) {
-				break;
-			}
 		}{
-			skip;
+			curr = Head;
+			k = MIN_VAL;
+			k3 = MIN_VAL;
+			atomic {
+				// protection for type check (as before)
+				protect2(curr);
+				assert(active(curr));
+			}
+		}
+
+		if (k >= key) {
+			break;
 		}
 	}
+}
 
-	/*** locate done ***/
+
+bool contains(data_t key) {
+	Node* pred, curr;
+	data_t k, k3;
+	bool result;
+
+	locate(pred, curr, key, k, k3);
 
 	if (k == key) {
 		result = true;
@@ -93,9 +96,7 @@ bool contains(data_t key) {
 
 bool add(data_t key) {
 	Node* pred, curr, entry;
-	data_t k;
-	Node* tmpNode;
-	bool tmpBool;
+	data_t k, k3;
 	bool result;
 
 	entry = malloc;
@@ -103,53 +104,7 @@ bool add(data_t key) {
 	entry->marked = false;
 
 	while (true) {
-		/*** locate begin ***/
-
-		curr = Head;
-		atomic {
-			// protection needed for type check to go through
-			// alternatively one could peel the first loop iteration
-			protect2(curr);
-			assert(active(curr));
-		}
-
-		while (true) {
-			pred = curr;
-			protect1(pred);
-
-			curr = pred->next;
-			protect2(curr);
-
-			choose {
-				// assume(!pred->marked && curr == pred->next);
-				atomic {
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					tmpNode = pred->next;
-					/* manual atomicity abstraction */
-					// assume(curr == tmpNode);
-					curr = tmpNode;
-					protect2(curr);
-					assert(active(curr)); // needs to be inferred?
-				}
-
-				k = curr->val;
-			}{
-				curr = Head;
-				atomic {
-					// protection needed for type check to go through
-					// alternatively one could restart the outer loop
-					protect2(curr);
-					assert(active(curr));
-				}
-			}
-
-			if (k >= key) {
-				break;
-			}
-		}
-
-		/*** locate done ***/
+		locate(pred, curr, key, k, k3);
 
 		if (k == key) {
 			result = false;
@@ -160,24 +115,19 @@ bool add(data_t key) {
 			entry->next = curr;
 			atomic {
 				choose {
-					// assume(!pred->marked)
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					// assume(curr == pred->next);
-					tmpNode = pred->next;
-					assert(active(tmpNode)); // needs to be inferred?
-					assume(curr == tmpNode);
+					assume(pred->marked == false);
+					assume(curr == pred->next);
 
 					pred->next = entry;
+					k3 = k;
 					result = true;
 					break;
 				}{
-					skip;
+					skip; // retry
 				}
 			}
 		}
 	}
-
 
 	return result;
 }
@@ -185,74 +135,21 @@ bool add(data_t key) {
 
 bool remove(data_t key) {
 	Node* pred, curr, next;
-	data_t k;
-	Node* tmpNode;
-	bool tmpBool, tmpBool2;
+	data_t k, k3;
 	bool result;
 
 	while (true) {
-		/*** locate begin ***/
-
-		curr = Head;
-		atomic {
-			// protection needed for type check to go through
-			// alternatively one could peel the first loop iteration
-			protect2(curr);
-			assert(active(curr));
-		}
-
-		while (true) {
-			pred = curr;
-			protect1(pred);
-
-			curr = pred->next;
-			protect2(curr);
-
-			choose {
-				// assume(!pred->marked && curr == pred->next);
-				atomic {
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					tmpNode = pred->next;
-					/* manual atomicity abstraction */
-					// assume(curr == tmpNode);
-					curr = tmpNode;
-					protect2(curr);
-					assert(active(curr)); // needs to be inferred?
-				}
-
-				k = curr->val;
-			}{
-				curr = Head;
-				atomic {
-					// protection needed for type check to go through
-					// alternatively one could restart the outer loop
-					protect2(curr);
-					assert(active(curr));
-				}
-			}
-
-			if (k >= key) {
-				break;
-			}
-		}
-
-		/*** locate done ***/
+		locate(pred, curr, key, k, k3);
 
 		if (k > key) {
 			result = false;
 			break;
+
 		} else {
 			atomic {
-
 				choose {
-					// assume(!pred->marked)
-					tmpBool = pred->marked;
-					assume(tmpBool == false);
-					// assume(curr == pred->next);
-					tmpNode = pred->next;
-					assert(active(tmpNode)); // needs to be inferred?
-					assume(curr == tmpNode);
+					assume(pred->marked == false);
+					assume(curr == pred->next);
 
 					next = curr->next;
 					curr->marked = true;
@@ -261,10 +158,11 @@ bool remove(data_t key) {
 					result = true;
 					break;
 				}{
-					skip;
+					skip; // retry
 				}
 			}
 		}
 	}
+
 	return result;
 }

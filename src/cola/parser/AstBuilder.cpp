@@ -19,10 +19,15 @@ void AstBuilder::pushScope() {
 }
 
 std::vector<std::unique_ptr<VariableDeclaration>> AstBuilder::popScope() {
-	std::vector<std::unique_ptr<VariableDeclaration>> decls;
+	std::vector<std::unique_ptr<VariableDeclaration>> decls, tmp;
 	decls.reserve(_scope.back().size());
-	for (auto& entry : _scope.back()) {
-		decls.push_back(std::move(entry.second));
+	tmp.reserve(_scope.back().size());
+	for (auto& entry : _scope.back()) { // reverses variable order?
+		tmp.push_back(std::move(entry.second));
+	}
+	while (!tmp.empty()) {
+		decls.push_back(std::move(tmp.back()));
+		tmp.pop_back();
 	}
 	_scope.pop_back();
 	return decls;

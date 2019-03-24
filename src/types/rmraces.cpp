@@ -793,8 +793,14 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	RightMovernessVisitor move_checker(guarantee_table.observer_store.retire_function);
 	for (; it != full_path.end(); ++it) {
 		(*it)->accept(move_checker);
+		if (!move_checker.right_moves(guarantee_table.observer_store.simulation)) {
+			std::cout << " ==> cannot repeat command: ";
+			cola::print(**it, std::cout);
+			raise_error<RefinementError>("repeating commands failed (some statements in 'full_path' do not move)");
+		}
 	}
-	conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "repeating commands failed (some statements in 'full_path' do not move)");
+	assert(!move_checker.right_moves(guarantee_table.observer_store.simulation));
+	// conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "repeating commands failed (some statements in 'full_path' do not move)");
 
 	// copy full path and add after offending assume, add active assertion for offending variable
 	auto new_code = make_sequence_from_path(full_path);
@@ -840,7 +846,7 @@ void try_fix_nonlocal_unsafe_assume(Program& program, const GuaranteeTable& guar
 			return;
 
 		} catch (RefinementError err) {
-			std::cout << " ==> cannot insert assertion here";
+			std::cout << " ==> cannot insert assertion here: ";
 			cola::print(**it, std::cout);
 			// do nothing, continue with next element on path
 		}
@@ -882,7 +888,7 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 			return;
 
 		} catch (RefinementError err) {
-			std::cout << " ==> cannot insert assertion here";
+			std::cout << " ==> cannot insert assertion here: ";
 			cola::print(**it, std::cout);
 			// do nothing, continue with next element on path
 		}
