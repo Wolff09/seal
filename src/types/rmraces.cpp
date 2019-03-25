@@ -573,10 +573,14 @@ struct RightMovernessVisitor final : public Visitor {
 	RightMovernessVisitor(const Function& retire) : retire_function(retire) {}
 
 	bool right_moves(const SimulationEngine& engine) {
-		if (!engine.is_repeated_execution_simulating(this->events)) {
+		if (this->moves && !engine.is_repeated_execution_simulating(this->events)) {
 			this->moves = false;
 		}
 		return this->moves;
+	}
+
+	void reset_moverness() {
+		this->moves = true;
 	}
 
 	void visit(const VariableDeclaration& /*node*/) override { throw std::logic_error("Unexpected invocation: RightMovernessVisitor::visit(const VariableDeclaration&)"); }
@@ -790,17 +794,41 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	++it;
 
 	// check remaining path elements to be heap-local or right movers
+	std::set<const Statement*> ignore_non_movers;
 	RightMovernessVisitor move_checker(guarantee_table.observer_store.retire_function);
 	for (; it != full_path.end(); ++it) {
+		assert(move_checker.right_moves(guarantee_table.observer_store.simulation));
 		(*it)->accept(move_checker);
 		if (!move_checker.right_moves(guarantee_table.observer_store.simulation)) {
-			std::cout << " ==> cannot repeat command: ";
-			cola::print(**it, std::cout);
-			raise_error<RefinementError>("repeating commands failed (some statements in 'full_path' do not move)");
+			const Statement& stmt = **it;
+			if (typeid(stmt) == typeid(Assume)) {
+				std::cout << "WARNING: ignoring (not repeating) non-moving assume statement: ";
+				cola::print(stmt, std::cout);
+				ignore_non_movers.insert(&stmt);
+				move_checker.reset_moverness();
+			// } else if (typeid(stmt) == typeid(Assert)) {
+			// 	std::cout << "WARNING: ignoring (not repeating) non-moving assert statement: ";
+			// 	cola::print(stmt, std::cout);
+			// 	ignore_non_movers.insert(&stmt);
+			// 	move_checker.reset_moverness();
+			} else {
+				std::cout << " ==> cannot repeat command: ";
+				cola::print(stmt, std::cout);
+				raise_error<RefinementError>("repeating commands failed (some statements in 'full_path' do not move)");
+			}
 		}
 	}
-	assert(!move_checker.right_moves(guarantee_table.observer_store.simulation));
+	assert(move_checker.right_moves(guarantee_table.observer_store.simulation));
 	// conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "repeating commands failed (some statements in 'full_path' do not move)");
+
+	// filter full path
+	auto tmp = std::move(full_path);
+	full_path.clear();
+	for (const Statement* stmt : tmp) {
+		if (ignore_non_movers.count(stmt) == 0) {
+			full_path.push_back(stmt);
+		}
+	}
 
 	// copy full path and add after offending assume, add active assertion for offending variable
 	auto new_code = make_sequence_from_path(full_path);
@@ -930,14 +958,19 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 }
 
 void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeCallError& error) {
+	std::cout << "I am here..." << std::endl;
 	if (&error.pc.decl == &guarantee_table.observer_store.retire_function) {
+		std::cout << "... to resolve" << std::endl;
 		assert(error.pc.args.size() == 1);
 		assert(error.pc.args.at(0));
 		const VariableExpression& expr = *static_cast<const VariableExpression*>(error.pc.args.at(0).get()); // TODO: unhack this
+		std::cout << "... going to add" << std::endl;
 		insert_active_assertion(program, guarantee_table, error.pc, expr.decl);
+		std::cout << "... added" << std::endl;
 		std::cout << " ==> inserted active assertion for variable '" << expr.decl.name << "'" << std::endl;
 
 	} else {
+		std::cout << "... to fail" << std::endl;
 		raise_error<RefinementError>("cannot recover from unsafe call to function " + error.pc.decl.name);
 	}
 }

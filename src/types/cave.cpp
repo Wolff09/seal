@@ -12,6 +12,92 @@ using namespace cola;
 using namespace prtypes;
 
 
+struct DerefAssignmentVisitor final : public Visitor {
+	bool deref_has_begun = false;
+	bool deref_has_ended = false;
+	bool expr_is_deref = false;
+	std::vector<const Assignment*> deref_assignments;
+
+	void visit(const InvariantExpression& /*node*/) { throw std::logic_error("Unexpected invocation: DerefAssignmentVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) { throw std::logic_error("Unexpected invocation: DerefAssignmentVisitor::visit(const InvariantActive&)"); }
+	void visit(const Expression& /*node*/) { throw std::logic_error("Unexpected invocation: DerefAssignmentVisitor::visit(const Expression&)"); }
+	void visit(const VariableDeclaration& /*node*/) { this->expr_is_deref = false; }
+	void visit(const BooleanValue& /*node*/) { this->expr_is_deref = false; }
+	void visit(const NullValue& /*node*/) { this->expr_is_deref = false; }
+	void visit(const EmptyValue& /*node*/) { this->expr_is_deref = false; }
+	void visit(const MaxValue& /*node*/) { this->expr_is_deref = false; }
+	void visit(const MinValue& /*node*/) { this->expr_is_deref = false; }
+	void visit(const NDetValue& /*node*/) { this->expr_is_deref = false; }
+	void visit(const VariableExpression& /*node*/) { this->expr_is_deref = false; }
+	void visit(const NegatedExpression& /*node*/) { this->expr_is_deref = false; }
+	void visit(const BinaryExpression& /*node*/) { this->expr_is_deref = false; }
+	void visit(const Dereference& /*node*/) { this->expr_is_deref = true; }
+
+	void visit(const Sequence& node) {
+		node.first->accept(*this);
+		node.second->accept(*this);
+	}
+	void visit(const Scope& node) {
+		deref_has_ended = deref_has_begun;
+		node.body->accept(*this);
+		deref_has_ended = deref_has_begun;
+	}
+	void visit(const Atomic& node) {
+		deref_has_ended = deref_has_begun;
+		node.body->accept(*this);
+		deref_has_ended = deref_has_begun;
+	}
+	void visit(const Choice& node) {
+		for (const auto& branch : node.branches) {
+			deref_has_ended = deref_has_begun;
+			branch->accept(*this);
+			deref_has_ended = deref_has_begun;
+		}
+	}
+	void visit(const IfThenElse& node) {
+		deref_has_ended = deref_has_begun;
+		node.ifBranch->accept(*this);
+		deref_has_ended = deref_has_begun;
+		node.elseBranch->accept(*this);
+		deref_has_ended = deref_has_begun;
+	}
+	void visit(const Loop& node) {
+		deref_has_ended = deref_has_begun;
+		node.body->accept(*this);
+		deref_has_ended = deref_has_begun;
+	}
+	void visit(const While& node) {
+		deref_has_ended = deref_has_begun;
+		node.body->accept(*this);
+		deref_has_ended = deref_has_begun;
+	}
+
+	void visit(const Assignment& node) {
+		node.lhs->accept(*this);
+		if (expr_is_deref) {
+			conditionally_raise_error<UnsupportedConstructError>(deref_has_ended, "assignments to dereference expressions must appear subsequentially within an atomic block");
+			deref_has_begun = true;
+			deref_assignments.push_back(&node);
+		} else {
+			deref_has_ended = deref_has_begun;
+		}
+	}
+	void visit(const Skip& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Break& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Continue& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Assume& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Assert& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Return& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Malloc& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Enter& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Exit& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Macro& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const CompareAndSwap& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const Function& /*node*/) { throw std::logic_error("Unexpected invocation: DerefAssignmentVisitor::visit(const Function&)"); }
+	void visit(const Program& /*node*/) { throw std::logic_error("Unexpected invocation: DerefAssignmentVisitor::visit(const Program&)"); }
+};
+
+
 struct CaveConfig {
 	bool INSTRUMENT_OBJECTS = true;
 	const bool INSTRUMENT_FLAG = false; // not supported (does not work)
@@ -66,6 +152,8 @@ struct CaveOutputVisitor : public Visitor {
 	bool needs_parents = false;
 	const Program* program;
 	std::set<std::string> opt_keys = { "cave" };
+	bool inside_atomic = false;
+	std::vector<const Assignment*> derefs_in_current_atomic;
 
 	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), instrument(true), retire(&retire_function), retire_type(&get_retire_type(retire_function)), whitelist(whitelist) {
 	}
@@ -360,9 +448,18 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Atomic& atomic) {
+		conditionally_raise_error<UnsupportedConstructError>(this->inside_atomic, "nested atomics are not supported in the translation to CAVE");
+		DerefAssignmentVisitor visitor;
+		atomic.accept(visitor);
+		this->derefs_in_current_atomic = std::move(visitor.deref_assignments);
+		this->inside_atomic = true;
+
 		stream << indent << "atomic ";
 		assert(atomic.body);
-		atomic.body->accept(*this);	
+		atomic.body->accept(*this);
+
+		this->derefs_in_current_atomic.clear();
+		this->inside_atomic = false;
 	}
 
 	void visit(const Sequence& seq) {
@@ -495,13 +592,33 @@ struct CaveOutputVisitor : public Visitor {
 	}
 
 	void visit(const Assignment& assign) {
-		stream << indent;
-		assert(assign.lhs);
-		assign.lhs->accept(*this);
-		stream << " = ";
-		assert(assign.rhs);
-		assign.rhs->accept(*this);
-		stream << ";" << std::endl;
+		auto handle_assign = [&] (const Assignment& to_handle) {
+			assert(to_handle.lhs);
+			to_handle.lhs->accept(*this);
+			stream << " = ";
+			assert(to_handle.rhs);
+			to_handle.rhs->accept(*this);
+		};
+
+		if (this->inside_atomic && std::count(this->derefs_in_current_atomic.begin(), this->derefs_in_current_atomic.end(), &assign) > 0) {
+			assert(!this->derefs_in_current_atomic.empty());
+			if (this->derefs_in_current_atomic.at(0) == &assign) {
+				stream << indent;
+				bool is_first = true;
+				for (const auto& stmt : this->derefs_in_current_atomic) {
+					if (!is_first) {
+						stream << ", ";
+					}
+					is_first = false;
+					handle_assign(*stmt);
+				}
+				stream << ";" << std::endl;
+			}
+		} else {
+			stream << indent;
+			handle_assign(assign);
+			stream << ";" << std::endl;
+		}
 	}
 
 	void visit(const Enter& enter) {

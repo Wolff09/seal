@@ -51,7 +51,13 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 		protect2(curr);
 
 		choose {
-			assume(curr == pred->next);
+			// assume(curr == pred->next);
+			atomic {
+				curr = pred->next; // atomicity abstraction
+				protect2(curr); // atomicity abstraction
+				assert(active(curr)); // inferred
+				assert(active(pred->next)); // preprocessing
+			}
 			assume(curr != NULL);
 			k = curr->val;
 		}{
@@ -108,11 +114,16 @@ bool add(data_t key) {
 		} else {
 			entry->next = curr;
 			atomic {
-				if (curr == pred->next) {
+				choose {
+					assume(curr == pred->next);
+					assert(active(pred->next)); // preprocessing
 					pred->next = entry;
 					k3 = k3;
 					result = true;
 					break;
+				}{
+					assume(curr != pred->next);
+					assert(active(pred->next)); // preprocessing (unnecessary, in fact)
 				}
 			}
 		}
@@ -141,10 +152,15 @@ bool remove(data_t key) {
 			atomic {
 				choose {
 					assume(curr == pred->next);
-					assume(next == curr->next);
+					assert(active(pred->next)); // preprocessing
+					// assume(next == curr->next);
+					next = curr->next; // atomicity abstraction
+                    assert(active(pred->next)); // atomicity abstraction
+                    assert(active(curr->next)); // preprocessing (unnecessary, in fact)
 
 					curr->next = NULL;
 					pred->next = next;
+					assert(active(curr)); // inferred
 					retire(curr);
 					result = true;
 					break;
