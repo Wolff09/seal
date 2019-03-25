@@ -441,6 +441,8 @@ void TypeChecker::check_loop(const Loop& loop) {
 }
 
 void TypeChecker::check_while(const While& whl) {
+//	std::cout << "ENTERING WHILE " << whl.id << std::endl;
+//	debug_type_env(this->current_type_environment);
 	assert(whl.expr);
 	assert(whl.body);
 
@@ -453,6 +455,8 @@ void TypeChecker::check_while(const While& whl) {
 	// apply loop rule, but peel breaking iterations
 	TypeEnv pre_types;
 	do {
+//		std::cout << "========DOING WHILE " << whl.id << std::endl;
+//		debug_type_env(this->current_type_environment);
 		pre_types = this->current_type_environment;
 		whl.body->accept(*this);
 		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
@@ -472,6 +476,8 @@ void TypeChecker::check_while(const While& whl) {
 
 	assert(this->break_envs.empty());
 	this->current_type_environment = std::move(*result);
+//	std::cout << "EXITING WHILE" << std::endl;
+//	debug_type_env(this->current_type_environment);
 
 	// // on-the-fly handle 'while (<cond>) { <body> }' as 'loop { assume(<cond>); <body> }; assume(!<cond>);'
 	// auto assume_positive = std::make_unique<Assume>(cola::copy(*whl.expr));

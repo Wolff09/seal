@@ -146,10 +146,10 @@ int main(int argc, char** argv) {
 			fix(err);
 		}
 
-		if (!type_safe) {
-			cola::print(program, std::cout);
-			throw std::logic_error("temp break");
-		}
+		// if (!type_safe) {
+		// 	cola::print(program, std::cout);
+		// 	throw std::logic_error("temp break");
+		// }
 	}
 	std::cout << "Type check " << (type_safe ? "successful" : "failed") << std::endl << std::endl;
 
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
 	std::cout << std::endl;
 
-	// throw std::logic_error("breakpoint");
+	throw std::logic_error("breakpoint");
 	std::cout << "Checking linearizability under GC... " << std::flush;
 	bool linearizable = prtypes::check_linearizability(program);
 	std::cout << "done" << std::endl;

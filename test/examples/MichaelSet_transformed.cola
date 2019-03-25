@@ -1,4 +1,4 @@
-#name "Vechev CAS Set, manually transformed"
+#name "Michael's Set, simplified and manually transformed"
 #cavespec "set_spec.cav"
 // #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
@@ -13,26 +13,21 @@ struct Node {
 }
 
 Node* Head;
-Node* Tail;
 
 extern void retire(Node* ptr);
 extern void protect1(Node* ptr);
 extern void protect2(Node* ptr);
+extern void protect3(Node* ptr);
 
 
 void init() {
-	Tail = malloc;
-	Tail->next = NULL;
-	Tail->marked = false;
-	Tail->val = MAX_VAL;
 	Head = malloc;
-	Head->next = Tail;
+	Head->next = NULL;
 	Head->marked = false;
-	Head->val = MIN_VAL;
 }
 
 
-inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
+inline void locate(Node* pred, Node* curr, Node* next, data_t key, data_t k, data_t k3) {
 	// k3: CAVE hack for necessary precision
 
 	curr = Head;
@@ -58,13 +53,19 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 				assume(pred->marked == false);
 				// assume(curr == pred->next);
 				curr = pred->next; // atomicity abstraction
-				protect2(curr); // atomicity abstraction
-				assert(active(pred->next)); // preprocessing
-				assert(active(curr)); // inferred
+                protect2(curr); // atomicity abstraction
+                assert(active(pred->next)); // preprocessing
+                assert(active(curr)); // inferred
 			}
 
-			k = curr->val;
+			if (curr == NULL) {
+				k = MAX_VAL;
+				break;
+			} else {
+				k = curr->val;
+			}
 		}{
+			// retry
 			curr = Head;
 			k = MIN_VAL;
 			k3 = MIN_VAL;
@@ -75,19 +76,40 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 			}
 		}
 
-		if (k >= key) {
-			break;
+		if (curr->marked == false) {
+			if (k >= key) {
+				break;
+			}
+		} else {
+			next = curr->next;
+			atomic {
+				assume(pred->marked == false);
+				assume(curr == pred->next);
+				pred->next = next;
+				assert(active(curr)); // inferred
+				retire(curr);
+			}
+
+			// retry
+			curr = Head;
+			k = MIN_VAL;
+			k3 = MIN_VAL;
+			atomic {
+				// protection for type check (as before)
+				protect2(curr);
+				assert(active(curr));
+			}
 		}
 	}
 }
 
 
 bool contains(data_t key) {
-	Node* pred, curr;
+	Node* pred, curr, next;
 	data_t k, k3;
 	bool result;
 
-	locate(pred, curr, key, k, k3);
+	locate(pred, curr, next, key, k, k3);
 
 	if (k == key) {
 		result = true;
@@ -98,34 +120,37 @@ bool contains(data_t key) {
 	return result;
 }
 
+
 bool add(data_t key) {
-	Node* pred, curr, entry;
+	Node* pred, curr, next, entry;
 	data_t k, k3;
 	bool result;
 
-	entry = malloc;
-	entry->val = key;
-	entry->marked = false;
-
 	while (true) {
-		locate(pred, curr, key, k, k3);
+		locate(pred, curr, next, key, k, k3);
 
 		if (k == key) {
 			result = false;
-			// retire(entry); // reclaim new node that was not added to the data structure
 			break;
 
 		} else {
+			// allocate here since retire in locate fools the type system into believing that entry could be retired
+			entry = malloc;
+			entry->val = key;
+			entry->marked = false;
+
 			entry->next = curr;
 			atomic {
 				choose {
 					assume(pred->marked == false);
 					assume(curr == pred->next);
+
 					pred->next = entry;
-					k3 = k3;
+					k3 = k;
 					result = true;
 					break;
 				}{
+					// retire(entry); // reclaim new node that was not added to the data structure
 					skip; // retry
 				}
 			}
@@ -135,14 +160,13 @@ bool add(data_t key) {
 	return result;
 }
 
-
 bool remove(data_t key) {
 	Node* pred, curr, next;
 	data_t k, k3;
 	bool result;
 
 	while (true) {
-		locate(pred, curr, key, k, k3);
+		locate(pred, curr, next, key, k, k3);
 
 		if (k > key) {
 			result = false;
@@ -153,16 +177,13 @@ bool remove(data_t key) {
 			choose {
 				atomic {
 					assume(curr->marked == false);
-					// assume(next == curr->next);
-					next = curr->next; // atomicity abstraction
-					assert(active(curr->next)); //preprocessing
+					assume(next == curr->next);
 					curr->marked = true;
 				}
 				atomic {
 					assume(pred->marked == false);
 					assume(curr == pred->next);
 					pred->next = next;
-					assert(active(curr)); // inferred
 					retire(curr);
 				}
 				result = true;

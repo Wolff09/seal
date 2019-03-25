@@ -1,7 +1,8 @@
 #name "Michael&Scott's Queue"
 #cavespec "queue_spec.cav"
-#cavelin 'prover_opts imp_var = "CC_.Tail.next";'
-// TODO: instrument no object
+#cave 'prover_opts imp_var = "CC_.Tail.next";'
+// #cave 'prover_opts imp_var = "CC_.Head.next";'
+#instrumentation "container"
 
 struct Node {
 	data_t val;

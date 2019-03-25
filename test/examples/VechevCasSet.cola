@@ -121,6 +121,8 @@ bool add(data_t key) {
 					k3 = k3;
 					result = true;
 					break;
+				}{
+					skip; // retry
 				}
 			}
 		}
@@ -158,6 +160,8 @@ bool remove(data_t key) {
 				}
 				result = true;
 				break;
+			}{
+				skip; // retry
 			}
 		}
 	}
