@@ -958,19 +958,14 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 }
 
 void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeCallError& error) {
-	std::cout << "I am here..." << std::endl;
 	if (&error.pc.decl == &guarantee_table.observer_store.retire_function) {
-		std::cout << "... to resolve" << std::endl;
 		assert(error.pc.args.size() == 1);
 		assert(error.pc.args.at(0));
 		const VariableExpression& expr = *static_cast<const VariableExpression*>(error.pc.args.at(0).get()); // TODO: unhack this
-		std::cout << "... going to add" << std::endl;
 		insert_active_assertion(program, guarantee_table, error.pc, expr.decl);
-		std::cout << "... added" << std::endl;
 		std::cout << " ==> inserted active assertion for variable '" << expr.decl.name << "'" << std::endl;
 
 	} else {
-		std::cout << "... to fail" << std::endl;
 		raise_error<RefinementError>("cannot recover from unsafe call to function " + error.pc.decl.name);
 	}
 }
