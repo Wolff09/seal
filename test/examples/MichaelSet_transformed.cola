@@ -175,15 +175,29 @@ bool remove(data_t key) {
 		} else {
 			next = curr->next;
 			choose {
+				// atomic {
+				// 	assume(curr->marked == false);
+				// 	assume(next == curr->next);
+				// 	curr->marked = true;
+				// }
+				// atomic {
+				// 	assume(pred->marked == false);
+				// 	assume(curr == pred->next);
+				// 	pred->next = next;
+				// 	retire(curr);
+				// }
 				atomic {
 					assume(curr->marked == false);
-					assume(next == curr->next);
+					// assume(next == curr->next);
+					next = curr->next; // atomicity abstraction
+					assert(active(curr->next)); //preprocessing
 					curr->marked = true;
 				}
 				atomic {
 					assume(pred->marked == false);
 					assume(curr == pred->next);
 					pred->next = next;
+					assert(active(curr)); // inferred
 					retire(curr);
 				}
 				result = true;
