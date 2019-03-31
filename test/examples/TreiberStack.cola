@@ -1,0 +1,73 @@
+#name "Treiber's Stack"
+#cavespec "stack_spec.cav"
+#instrumentation "container"
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* TOS;
+
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
+
+
+void init() {
+	TOS = NULL;
+}
+
+void push(data_t e) {
+	Node* top, node;
+
+	node = malloc;
+	node->val = e;
+	node->next = NULL;
+
+	while (true) {
+		top = TOS;
+		protect1(top);
+		if (top == TOS) {
+			node->next = top;
+			if (CAS(TOS, top, node)) {
+				break;
+			}
+		}
+	}
+}
+
+data_t pop() {
+	Node* top, next;
+	data_t result;
+	bool flag;
+
+	while (true) {
+		top = TOS;
+		if (top == NULL) {
+			result = EMPTY;
+			break;
+
+		} else {
+			protect1(top);
+			if (top == TOS) {
+				next = top->next;
+				atomic {
+					if (CAS(TOS, top, next)) {
+						retire(top); // moved left to avoid CAVE imprecision
+						flag = true;
+					} else {
+						flag = false;
+					}
+				}
+				if (flag) {
+					result = top->val;
+					// retire(top);
+					break;
+				}
+			}
+
+		}
+	}
+	return result;
+}

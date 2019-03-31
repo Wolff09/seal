@@ -77,6 +77,7 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 		assert(prtypes::has_binding(current_type_environment, params.at(0)));
 		bool arg_is_valid = is_pointer_valid(params.at(0));
 		bool arg_is_active = this->current_type_environment.at(params.at(0)).count(guarantee_table.active_guarantee()) > 0;
+		arg_is_active |= this->current_type_environment.at(params.at(0)).count(guarantee_table.local_guarantee()) > 0;
 		conditionally_raise_error<UnsafeCallError>(!arg_is_valid, enter, "invalid argument");
 		conditionally_raise_error<UnsafeCallError>(!arg_is_active, enter, "argument not active");
 	}

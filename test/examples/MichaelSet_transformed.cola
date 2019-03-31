@@ -1,6 +1,5 @@
 #name "Michael's Set, simplified and manually transformed"
 #cavespec "set_spec.cav"
-// #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
 #instrumentation "container"
@@ -56,6 +55,7 @@ inline void locate(Node* pred, Node* curr, Node* next, data_t key, data_t k, dat
                 protect2(curr); // atomicity abstraction
                 assert(active(pred->next)); // preprocessing
                 assert(active(curr)); // inferred
+                k3 = k3;
 			}
 
 			if (curr == NULL) {
@@ -88,6 +88,7 @@ inline void locate(Node* pred, Node* curr, Node* next, data_t key, data_t k, dat
 				pred->next = next;
 				assert(active(curr)); // inferred
 				retire(curr);
+				k3 = k3;
 			}
 
 			// retry
@@ -150,7 +151,7 @@ bool add(data_t key) {
 					result = true;
 					break;
 				}{
-					// retire(entry); // reclaim new node that was not added to the data structure
+					retire(entry); // reclaim new node that was not added to the data structure
 					skip; // retry
 				}
 			}
@@ -192,6 +193,7 @@ bool remove(data_t key) {
 					next = curr->next; // atomicity abstraction
 					assert(active(curr->next)); //preprocessing
 					curr->marked = true;
+					k3 = k3;
 				}
 				atomic {
 					assume(pred->marked == false);
@@ -199,6 +201,7 @@ bool remove(data_t key) {
 					pred->next = next;
 					assert(active(curr)); // inferred
 					retire(curr);
+					k3 = k3;
 				}
 				result = true;
 				break;

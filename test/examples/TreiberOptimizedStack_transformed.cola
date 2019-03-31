@@ -1,0 +1,93 @@
+#name "Treiber's Stack"
+#cavespec "stack_spec.cav"
+#instrumentation "container"
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* TOS;
+
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
+
+
+void init() {
+	TOS = NULL;
+}
+
+void push(data_t e) {
+	Node* top, node;
+	Node* tmp;
+
+	node = malloc;
+	node->val = e;
+	node->next = NULL;
+
+	while (true) {
+		top = TOS;
+		node->next = top;
+		atomic {
+			assert(active(TOS));
+			choose {
+				tmp = node->next;   // ensure atomicity abstraction is correct (node->next has not changed)
+				assert(top == tmp); // ensure atomicity abstraction is correct (node->next has not changed)
+
+				// assume(TOS == top);
+				top = TOS; // atomicity abstraction
+				node->next = top; // atomicity abstraction
+				TOS = node;
+				break;
+			}{
+				assume(TOS != top);
+			}
+		}
+	}
+}
+
+data_t pop() {
+	Node* top, next;
+	data_t result;
+	bool flag;
+
+	while (true) {
+		top = TOS;
+		if (top == NULL) {
+			result = EMPTY;
+			break;
+
+		} else {
+			protect1(top);
+			choose {
+				atomic {
+					// assume(top == TOS);
+					top = TOS; // atomicity abstraction
+                    assume(top != NULL); // atomicity abstraction
+                    protect1(top); // atomicity abstraction
+                    assert(active(top)); // inferred
+				}
+				next = top->next;
+				atomic {
+					assert(active(TOS));
+					if (CAS(TOS, top, next)) {
+						retire(top); // moved left to avoid CAVE imprecision
+						flag = true;
+					} else {
+						flag = false;
+					}
+				}
+				if (flag) {
+					result = top->val;
+					// retire(top);
+					break;
+				}
+			}{
+				skip;
+			}
+
+		}
+	}
+	return result;
+}

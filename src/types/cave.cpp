@@ -469,19 +469,30 @@ struct CaveOutputVisitor : public Visitor {
 		seq.second->accept(*this);
 	}
 
-	void visit(const Choice& choice) {
+	void print_choice(const Choice& choice, std::size_t first_branch) {
+		assert(choice.branches.size() - first_branch > 0);
+		auto remaining_branches = choice.branches.size() - first_branch;
 		stream << indent << "if (*) ";
-		assert(choice.branches.size() > 0);
-		assert(choice.branches.size() <= 2);
-		bool first = true;
-		for (const auto& branch : choice.branches) {
-			if (!first) {
-				stream << indent << "else ";
-			}
-			assert(branch);
-			branch->accept(*this);
-			first = false;
+		choice.branches.at(first_branch)->accept(*this);
+		remaining_branches--;
+		first_branch++;
+		if (remaining_branches == 0) {
+			return;
+		} else if (remaining_branches == 1) {
+			stream << indent << "else ";
+			choice.branches.at(first_branch)->accept(*this);
+		} else {
+			stream << indent << "else {" << std::endl;
+			indent++;
+			print_choice(choice, first_branch);
+			indent--;
+			stream << indent << "}" << std::endl;
 		}
+	}
+
+	void visit(const Choice& choice) {
+		assert(choice.branches.size() > 0);
+		print_choice(choice, 0);
 	}
 
 	void visit(const Loop& loop) {

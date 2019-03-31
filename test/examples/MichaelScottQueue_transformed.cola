@@ -1,0 +1,141 @@
+#name "Michael&Scott's Queue, manually transformed"
+#cavespec "queue_spec.cav"
+#cave 'prover_opts imp_var = "CC_.Tail.next";'
+#instrumentation "container"
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* Tail;
+Node* Head;
+
+extern void retire(Node* ptr);
+extern void protect1(Node* ptr);
+extern void protect2(Node* ptr);
+
+void init() {
+	Head = malloc;
+	Head->next = NULL;
+	Tail = Head;
+}
+
+void enqueue(data_t value) {
+	Node* tail, next, node;
+
+	node = malloc;
+	node->val = value;
+	node->next = NULL;
+
+	while (true) {
+		tail = Tail;
+		protect1(tail);
+
+		choose {
+			atomic {
+				// assume(tail = Tail);
+				tail = Tail; // atomicity abstraction
+				protect1(tail); // atomicity abstraction
+				assert(active(tail)); // inferred
+			}
+			next = tail->next;
+
+			choose {
+				atomic {
+					assert(active(Tail)); // inferred
+					assume(tail == Tail);
+				}
+				if (next != NULL) {
+					atomic {
+						assert(active(Tail)); // inferred
+						CAS(Tail, tail, next);
+					}
+
+				} else {
+					if (CAS(tail->next, NULL, node)) {
+						atomic {
+							assert(active(Tail)); // inferred
+							CAS(Tail, tail, node);
+						}
+						break;
+					}
+				}
+			}{
+				skip;
+			}
+		}{
+			skip;
+		}
+	}
+}
+
+data_t dequeue() {
+	Node* head, next, tail;
+	data_t result;
+	bool tmp;
+
+	while (true) {
+		head = Head;
+		protect1(head);
+
+		choose {
+			atomic {
+				// assume(head == Head);
+				head = Head; // atomicity abstraction
+				protect1(head); // atomicity abstraction
+				assert(active(head)); // inferred
+			}
+			atomic {
+				tail = Tail;
+				assert(active(tail)); // atomicity abstraction
+				if (head == tail) {   // atomicity abstraction
+					tmp = true;       // atomicity abstraction
+				} else {              // atomicity abstraction
+					tmp = false;      // atomicity abstraction
+				}                     // atomicity abstraction
+			}
+			next = head->next;
+			protect2(next);
+
+			choose {
+				atomic {
+					assert(active(Head)); // inferred
+					assume(head == Head);
+					assert(active(next)); // inferred
+				}
+				if (next == NULL) {
+					result = EMPTY;
+					break;
+
+				} else {
+					choose {
+						// assume(head == tail);
+						assume(tmp); // atomicity abstraction
+						assert(head == tail); // ensuring correctness of atomicity abstraction
+						atomic {
+							assert(active(Tail)); // inferred
+							CAS(Tail, tail, next);
+						}
+
+					}{
+						assume(head != tail);
+						result = next->val;
+						atomic {
+							assert(active(Head));
+							if (CAS(Head, head, next)) {
+								retire(head); // moved left to avoid CAVE imprecision
+								break;
+							}
+						}
+					}
+				}
+			}{
+				skip;
+			}
+		}{
+			skip;
+		}
+	}
+	return result;
+}

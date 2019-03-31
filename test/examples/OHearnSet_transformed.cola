@@ -1,6 +1,5 @@
 #name "O'Hearn Set, manually transformed"
 #cavespec "set_spec.cav"
-// #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
 #instrumentation "container"
@@ -61,6 +60,7 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 				protect2(curr); // atomicity abstraction
 				assert(active(pred->next)); // preprocessing
 				assert(active(curr)); // inferred
+				k3 = k3;
 			}
 
 			k = curr->val;
@@ -112,7 +112,7 @@ bool add(data_t key) {
 
 		if (k == key) {
 			result = false;
-			// retire(entry); // reclaim new node that was not added to the data structure
+			retire(entry); // reclaim new node that was not added to the data structure
 			break;
 
 		} else {
@@ -163,6 +163,7 @@ bool remove(data_t key) {
 					assert(active(curr)); // inferred
 					retire(curr);
 					result = true;
+					k3 = k3;
 					break;
 				}{
 					skip; // retry

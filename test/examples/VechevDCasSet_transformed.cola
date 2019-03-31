@@ -1,6 +1,5 @@
-#name "Vechev DCAS Set"
+#name "Vechev DCAS Set, manually transformed"
 #cavespec "set_spec.cav"
-// #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
 #instrumentation "container"
@@ -108,7 +107,7 @@ bool add(data_t key) {
 
 		if (k == key) {
 			result = false;
-			// retire(entry); // reclaim new node that was not added to the data structure
+			retire(entry); // reclaim new node that was not added to the data structure
 			break;
 
 		} else {
@@ -136,8 +135,6 @@ bool add(data_t key) {
 bool remove(data_t key) {
 	Node* pred, curr, next;
 	data_t k, k3;
-	Node* tmpNode;
-	bool tmpBool;
 	bool result;
 
 	while (true) {

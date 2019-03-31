@@ -146,12 +146,13 @@ int main(int argc, char** argv) {
 			fix(err);
 		}
 
-		// if (!type_safe) {
-		// 	cola::print(program, std::cout);
-		// 	throw std::logic_error("temp break");
-		// }
+		if (!type_safe) {
+			cola::print(program, std::cout);
+			throw std::logic_error("temp break");
+		}
 	}
 	std::cout << "Type check " << (type_safe ? "successful" : "failed") << std::endl << std::endl;
+	// exit(0);
 
 	// print program after modifications
 	std::cout << "Transformed program: " << std::endl;
@@ -160,7 +161,8 @@ int main(int argc, char** argv) {
 
 	// assertion check
 	std::cout << std::endl << "Checking assertions... " << std::flush;
-	bool assertions_safe = discharge_assertions(program, table);
+	bool assertions_safe = false;
+	assertions_safe = discharge_assertions(program, table);
 	std::cout << "done" << std::endl;
 	std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
 	std::cout << std::endl;

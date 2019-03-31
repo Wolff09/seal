@@ -79,9 +79,13 @@ data_t dequeue() {
 						}
 					}
 					if (flag) {
-						tail = Tail;
-						if (head == tail) {
+						choose {
+							tail = Tail;
+							assume(head == tail);
 							CAS(Tail, tail, next);
+						}{
+							tail = Tail;
+							assume(head != tail);
 						}
 						// retire(head);
 						break;
