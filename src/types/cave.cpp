@@ -780,7 +780,7 @@ struct CaveOutputVisitor : public Visitor {
 	}
 };
 
-void to_cave_input(const Program& program, const Function& retire_function, const Guarantee& /*active*/, std::set<const Assert*>* whitelist, std::ostream& stream) {
+void to_cave_input(const Program& program, const Function& retire_function, std::set<const Assert*>* whitelist, std::ostream& stream) {
 	CaveOutputVisitor visitor(stream, retire_function, whitelist);
 	program.accept(visitor);
 }
@@ -802,13 +802,14 @@ std::string exec(const char* cmd) {
 }
 
 
-bool discharge_assertions_impl(const Program& program, const Function& retire_function, const Guarantee& active, std::set<const Assert*>* whitelist) {
-	std::string filename = "tmp.cav";
+bool discharge_assertions_impl(const Program& program, const Function& retire_function, std::set<const Assert*>* whitelist) {
+	std::string filename = "tmp_memchk.cav";
 	std::ofstream outfile(filename);
-	to_cave_input(program, retire_function, active, whitelist, outfile);
+	to_cave_input(program, retire_function, whitelist, outfile);
 	outfile.close();
 
 	// std::string command = "./cave -allow_leaks -lm -por " + filename;
+	// TODO: call CAVE executable relativ to working dir
 	std::string command = "./cave -allow_leaks " + filename;
 	std::string result = exec(command.data());
 	if (result.find("\nNOT Valid\n") != std::string::npos) {
@@ -820,22 +821,22 @@ bool discharge_assertions_impl(const Program& program, const Function& retire_fu
 	}
 }
 
-bool prtypes::discharge_assertions(const Program& program, const Function& retire_function, const Guarantee& active) {
-	return discharge_assertions_impl(program, retire_function, active, nullptr);
+bool prtypes::discharge_assertions(const Program& program, const Function& retire_function) {
+	return discharge_assertions_impl(program, retire_function, nullptr);
 }
 
 
-bool prtypes::discharge_assertions(const Program& program, const Function& retire_function, const Guarantee& active, const std::vector<std::reference_wrapper<const Assert>>& whitelist) {
+bool prtypes::discharge_assertions(const Program& program, const Function& retire_function, const std::vector<std::reference_wrapper<const Assert>>& whitelist) {
 	std::set<const Assert*> set;
 	for (const Assert& assert : whitelist) {
 		set.insert(&assert);
 	}
-	return discharge_assertions_impl(program, retire_function, active, &set);
+	return discharge_assertions_impl(program, retire_function, &set);
 }
 
 
 bool prtypes::check_linearizability(const cola::Program& program) {
-	std::string filename = "tmp.cav";
+	std::string filename = "tmp_linear.cav";
 	std::ofstream outfile(filename);
 	CaveOutputVisitor visitor(outfile);
 	visitor.opt_keys.insert("cavelin");
@@ -853,6 +854,7 @@ bool prtypes::check_linearizability(const cola::Program& program) {
 		spec_file = find->second + spec_file;
 	}
 
+	// TODO: call CAVE executable relativ to working dir
 	std::string command = "./cave -linear " + spec_file + " " + filename;
 	std::string result = exec(command.data());
 	if (result.find("\nNOT Valid\n") != std::string::npos) {
@@ -863,13 +865,3 @@ bool prtypes::check_linearizability(const cola::Program& program) {
 		throw CaveError("CAVE failed me (unrcognized output)! Cannot recover.");
 	}
 }
-
-
-
-
-
-
-
-
-
-

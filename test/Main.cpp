@@ -1,4 +1,6 @@
 #include <iostream>
+#include "tclap/CmdLine.h"
+
 #include "types/check.hpp"
 #include "types/observer.hpp"
 #include "types/factory.hpp"

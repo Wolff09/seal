@@ -16,7 +16,7 @@ if (NOT CAVE_GENERATED_SRC_DIR)
   set(CAVE_GENERATED_SRC_DIR ${CMAKE_BINARY_DIR}/cave_generated_src)
 endif()
 
-# build provided VATA2 version
+# build provided CAVE version
 ExternalProject_ADD(
   cave
   PREFIX             ${CAVE_LOCAL_ROOT}
