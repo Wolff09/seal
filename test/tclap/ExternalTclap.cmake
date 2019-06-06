@@ -8,7 +8,7 @@ PROJECT(tclap_fetcher CXX)
 INCLUDE(ExternalProject)
 
 if(NOT EXISTS "${TCLAP_REPO}")
-  message(FATAL_ERROR "Unable to find TCLAP code base. TCLAP_REPO: ${CAVE_REPO}")
+  message(FATAL_ERROR "Unable to find TCLAP code base. TCLAP_REPO: ${TCLAP_REPO}")
 endif()
 
 # default path for source files
