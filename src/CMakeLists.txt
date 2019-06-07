@@ -1,3 +1,3 @@
 add_subdirectory(cola)
 add_subdirectory(types)
-add_subdirectory(related)
+add_subdirectory(common)

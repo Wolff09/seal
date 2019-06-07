@@ -946,7 +946,7 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 				try_remove_unsafe_assume(program, guarantee_table, error);
 			} catch (RefinementError suberr) {
 				if (avoid_reoffending) {
-					throw suberr;
+					throw std::move(suberr);
 				} else {
 					std::cout << suberr.what() << std::endl;
 					try_fix_nonlocal_unsafe_assume(program, guarantee_table, error);
@@ -985,7 +985,7 @@ void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable&
 			// dereferences of local pointers should be guarded by SMR; try find earlier point where it is safe
 			try_fix_local_unsafe_dereference(program, guarantee_table, error);
 		} else {
-			throw err;
+			throw std::move(err);
 		}
 
 	}

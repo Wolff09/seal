@@ -10,6 +10,7 @@
 #include <ostream>
 #include <optional>
 #include "cola/ast.hpp"
+#include "cola/observer.hpp"
 
 
 namespace cola {
@@ -21,6 +22,7 @@ namespace cola {
 	std::unique_ptr<Command> copy(const Command& cmd);
 	
 	std::unique_ptr<Expression> negate(const Expression& expr);
+
 
 	struct Indent {
 		static const std::size_t indention_size = 4;
