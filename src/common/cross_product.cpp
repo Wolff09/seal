@@ -92,25 +92,6 @@ struct CrossProductHelper final {
 		return false;
 	}
 
-	// std::deque<const Transition*> get_matching_transitions_for_other_states(const std::vector<const State*>& states, const Transition& transition) {
-	// 	std::deque<const Transition*> result;
-	// 	for (const Transition* trans : all_transitions) {
-	// 		if (is_outgoing(states, trans) && &trans.src != &transition.src && &trans.label == &transition.label) {
-	// 			result.push_back(trans);
-	// 		}
-	// 	}
-	// 	return result;
-	// }
-
-	// void create_transitions(const std::vector<const State*>& states) {
-	// 	for (const Transition* transition : all_transitions) {
-	// 		if (is_outgoing(states, *transition)) {
-	// 			auto matches = get_matching_transitions_for_other_states(states, *transition);
-				
-	// 		}
-	// 	}
-	// }
-
 	std::set<std::pair<const Function*, Transition::Kind>> collect_outgoing_labels(const std::vector<const State*>& states) {
 		std::set<std::pair<const Function*, Transition::Kind>> result;
 		for (const Transition* transition : all_transitions) {
@@ -201,7 +182,51 @@ struct CrossProductHelper final {
 		return *states2cross.at(new_state);
 	}
 
+	std::unique_ptr<Guard> translate_guard(const Guard& guard) {
+		throw std::logic_error("not implemented");
+	}
+
+	std::unique_ptr<Guard> translate_and_merge_guards(const std::vector<const Transition*>& transitions) {
+		throw std::logic_error("not implemented");
+	}
+
+	std::deque<std::vector<bool>> make_boolean_combinations(std::size_t size) {
+		assert(size > 0);
+		std::deque<std::vector<bool>> result;
+		std::vector<bool> current(size);
+
+		auto all_set = [](const std::vector<bool>& vec) -> bool {
+			for (bool b : vec) {
+				if (!b) {
+					return false;
+				}
+			}
+			return true;
+		};
+		auto increment = [&]() {
+			for (std::size_t index = 0; index < current.size(); ++index) {
+				if (current.at(index)) {
+					current.at(index) = false;
+				} else {
+					current.at(index) = true;
+					break;
+				}
+			}
+		};
+
+		for (; !all_set(current); increment()) {
+			increment();
+			std::vector<bool> copy(current);
+			result.push_back(std::move(current));
+		}
+		result.push_back(std::move(current));
+		return result;
+	}
+
 	std::deque<std::unique_ptr<Guard>> make_guards(const std::vector<const Transition*>& transitions) {
+		// for (const auto& bcombination : make_boolean_combinations(transitions.size())) {
+		// 	auto guard = translate_and_merge_guardsfvl;jkdjhfidlahfjklsdahjfjkl;dsah;fljdsfdsaklfj;dasfijflo;rihjfiklo;dsjlkfdjsa l;kfdsjl;kafds
+		// }
 		throw std::logic_error("not yet implemented");
 	}
 

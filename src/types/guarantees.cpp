@@ -1,6 +1,7 @@
 #include "types/guarantees.hpp"
 #include "types/factory.hpp"
 #include "types/inference.hpp"
+#include "cola/util.hpp"
 #include "vata2/nfa.hh"
 #include <deque>
 #include <array>
@@ -9,8 +10,26 @@ using namespace cola;
 using namespace prtypes;
 
 
+std::unique_ptr<Guarantee> copy_guarantee(const Guarantee& guarantee) {
+	std::vector<std::unique_ptr<Observer>> observers;
+	for (const auto& observer : guarantee.crossproduct) {
+		observers.push_back(cola::copy(*observer));
+	}
+	auto result = std::make_unique<Guarantee>(guarantee.name, std::move(observers));
+	result->is_transient = guarantee.is_transient;
+	result->entails_validity = guarantee.entails_validity;
+	return result;
+}
+
+std::vector<std::unique_ptr<Observer>> make_crossproduct(std::unique_ptr<Observer> observer) {
+	std::vector<std::unique_ptr<Observer>> crossproduct;
+	crossproduct.push_back(std::move(observer));
+	return crossproduct;
+}
+
 std::unique_ptr<Guarantee> make_guarantee(const SmrObserverStore& store, std::string name, bool transient, bool valid) {
-	auto result = std::make_unique<Guarantee>(name, prtypes::make_active_local_guarantee_observer(store.retire_function, name));
+	auto observer = prtypes::make_active_local_guarantee_observer(store.retire_function, name);
+	auto result = std::make_unique<Guarantee>(name, make_crossproduct(std::move(observer)));
 	result->is_transient = transient;
 	result->entails_validity = valid;
 	return result;
@@ -67,7 +86,7 @@ struct InferferenceVisitor final : public ObserverVisitor {
 	void visit(const Observer& /*obj*/) { throw std::logic_error("Unexpected invocation: InferferenceVisitor::visit(const Observer&)"); }
 };
 
-bool is_guarantee_transient(const Observer& observer) {
+bool is_observer_transient(const Observer& observer) {
 	auto is_state_final = [&](const State& state) -> bool {
 		return state.final == !observer.negative_specification;
 	};
@@ -83,6 +102,16 @@ bool is_guarantee_transient(const Observer& observer) {
 		}
 	}
 	return false;
+}
+
+bool is_guarantee_transient(const Guarantee& guarantee) {
+	for (const auto& observer : guarantee.crossproduct) {
+		assert(!observer->negative_specification); // TODO: raise exception if not satisfied
+		if (!is_observer_transient(*observer)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 struct FindObservedAddressVisitor final : public ObserverVisitor {
@@ -130,7 +159,8 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 	
 	// get guarantee observer language, concate with free(*)
 	auto intersection = translator.nfa_for(guarantee);
-	intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.observer));
+	// intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.observer));
+	intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.crossproduct.at(0))); // <<<<<<<<------------------------------- TODO: is this correct???
 
 	// intersection with observer languages
 	auto intersect = [&](const Observer& observer) {
@@ -161,14 +191,24 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 	return result;
 }
 
-const Guarantee& GuaranteeTable::add_guarantee(std::unique_ptr<Observer> observer, std::string name) {
-	// create guarantee
-	raise_if_assumption_unsatisfied(*observer);
-	auto guarantee = std::make_unique<Guarantee>(name, std::move(observer));
+void GuaranteeTable::add_guarantee(std::vector<std::unique_ptr<Observer>> crossproduct_observer, std::string name) {
+	for (const auto& observer : crossproduct_observer) {
+		raise_if_assumption_unsatisfied(*observer);
+	}
+
+	// create new guarantee
+	auto guarantee = std::make_unique<Guarantee>(name, std::move(crossproduct_observer));
+	guarantee->is_transient = is_guarantee_transient(*guarantee);
+	guarantee->entails_validity = false;
+
+	// add a copy of guarantee if it entails validity
+	if (entails_guarantee_validity(observer_store, *guarantee)) {
+		auto safe_guarantee = copy_guarantee(*guarantee);
+		safe_guarantee->name += "-SAFE";
+		safe_guarantee->entails_validity = true;
+		this->all_guarantees.push_back(std::move(safe_guarantee));
+	}
+
+	// add guarantee
 	this->all_guarantees.push_back(std::move(guarantee));
-	Guarantee& result = *this->all_guarantees.back().get();
-	// after adding, check its properties
-	result.is_transient = is_guarantee_transient(*result.observer);
-	result.entails_validity = entails_guarantee_validity(observer_store, result);
-	return result;
 }

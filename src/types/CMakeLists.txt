@@ -51,6 +51,7 @@ set(SOURCES
 	cave.cpp
 	rmraces.cpp
 	preprocess.cpp
+	synthesis.cpp
 )
 
 add_library(PRTypes ${SOURCES})

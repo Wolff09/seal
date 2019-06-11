@@ -21,6 +21,8 @@ namespace cola {
 
 	std::unique_ptr<Command> copy(const Command& cmd);
 	
+	std::unique_ptr<Observer> copy(const Observer& observer);
+	
 	std::unique_ptr<Expression> negate(const Expression& expr);
 
 

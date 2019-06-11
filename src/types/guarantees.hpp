@@ -15,11 +15,16 @@ namespace prtypes {
 
 	struct Guarantee final {
 		std::string name;
-		std::unique_ptr<cola::Observer> observer;
+		std::vector<std::unique_ptr<cola::Observer>> crossproduct;
 		bool is_transient = true; // false ==> stable under interference
 		bool entails_validity = false; // true ==> pointer is guaranteed to be valid
-		Guarantee(std::string name_, std::unique_ptr<cola::Observer> observer_) : name(name_), observer(std::move(observer_)) {
-			assert(observer);
+		Guarantee(std::string name, std::vector<std::unique_ptr<cola::Observer>> observers) : name(name), crossproduct(std::move(observers)) {
+			assert(this->crossproduct.size() > 0);
+			for (const auto& observer : this->crossproduct) {
+				assert(observer);
+				assert(!observer->negative_specification || this->crossproduct.size() == 1);
+				// TODO: ensure that observers are compatible => same observer variables
+			}
 		}
 	};
 
@@ -50,9 +55,9 @@ namespace prtypes {
 		GuaranteeTable(const SmrObserverStore& observer_store);
 		const Guarantee& active_guarantee() const;
 		const Guarantee& local_guarantee() const;
-		const Guarantee& add_guarantee(std::unique_ptr<cola::Observer> observer, std::string name);
-		const Guarantee& add_guarantee(std::unique_ptr<cola::Observer> observer) {
-			return this->add_guarantee(std::move(observer), "G-" + std::to_string(this->all_guarantees.size()));
+		void add_guarantee(std::vector<std::unique_ptr<cola::Observer>> crossproduct_observer, std::string name);
+		void add_guarantee(std::vector<std::unique_ptr<cola::Observer>> crossproduct_observer) {
+			this->add_guarantee(std::move(crossproduct_observer), "G-" + std::to_string(this->all_guarantees.size()));
 		}
 
 		GuaranteeTableIterator begin() const { return GuaranteeTableIterator(all_guarantees.cbegin()); }

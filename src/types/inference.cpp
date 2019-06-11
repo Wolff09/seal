@@ -494,9 +494,18 @@ Translator::Translator(const Program& program_, const Iterable& guarantees_) : p
 	vata_alphabet = convert_alphabet(alphabet);
 
 	// init lookup map for base observers
+	auto compute_guaranatee_nfa = [&](const Guarantee& guarantee) {
+		assert(!guarantee.crossproduct.empty());
+		auto iterator = guarantee.crossproduct.begin();
+		VataNfa result = to_nfa(**iterator);
+		for (++iterator; iterator != guarantee.crossproduct.end(); ++iterator) {
+			result = Vata2::Nfa::intersection(result, to_nfa(**iterator));
+		}
+		return result;
+	};
 	for (const Guarantee& guarantee : guarantees_) {
 //		std::cout << std::endl << "Translating " << guarantee.name << std::endl;
-		auto nfa = to_nfa(*guarantee.observer);
+		auto nfa = compute_guaranatee_nfa(guarantee);
 //		std::cout << "## end " << guarantee.name << std::endl << std::endl;
 		auto res = guarantee2nfa.insert({ &guarantee, nfa });
 		if (!res.second) {
