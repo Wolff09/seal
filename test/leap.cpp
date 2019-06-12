@@ -109,7 +109,7 @@ static void read_input() {
 	input.store = std::make_unique<SmrObserverStore>(program, retire);
 	SmrObserverStore& store = *input.store;
 	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1));
-	store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
+	// store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2)); // TODO: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<======================================================================== re-enable this
 	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
 	input.table = std::make_unique<GuaranteeTable>(store);
 	GuaranteeTable& table = *input.table;
@@ -146,6 +146,13 @@ static void read_input() {
 //	}
 
 	prtypes::populate_guarantee_table_with_synthesized_guarantees(table);
+
+	std::cout << "List of guarantees:" << std::endl;
+	for (const auto& guarantee : table) {
+		std::cout << "  - " << guarantee.name << ": (transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")" << std::endl;
+	}
+
+	throw std::logic_error("---tmp break---");
 }
 
 template<typename ErrorClass, typename... Targs>

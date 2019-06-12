@@ -82,3 +82,10 @@ std::unique_ptr<Observer> cola::copy(const Observer& observer) {
 	observer.accept(visitor);
 	return std::move(visitor.result);
 }
+
+std::unique_ptr<ObserverVariable> cola::copy(const ObserverVariable& variable) {
+	CopyObserverVisitor visitor;
+	visitor.result = std::make_unique<Observer>();
+	variable.accept(visitor);
+	return std::move(visitor.result->variables.back());
+}

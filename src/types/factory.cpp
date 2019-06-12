@@ -68,7 +68,7 @@ std::unique_ptr<Observer> prtypes::make_base_smr_observer(const Function& retire
 	auto [free_function, ptrtype] = get_basics();
 	assert(takes_single_pointer(free_function));
 	assert(takes_single_pointer(retire_function));
-	std::string name_prefix = "SmrBase";
+	std::string name_prefix = "Base";
 
 	auto result = std::make_unique<Observer>();
 	result->negative_specification = true;
@@ -131,7 +131,7 @@ std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::F
 	assert(takes_single_pointer(retire_function));
 	assert(takes_single_pointer(protect_function));
 	assert(takes_single_pointer(transfer_protect_function));
-	std::string name_prefix = "HP" + id;
+	std::string name_prefix = "HP*" + id;
 
 	auto result = std::make_unique<Observer>();
 	result->negative_specification = true;
@@ -141,6 +141,7 @@ std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::F
 	result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
 
 	// states
+	result->states.reserve(14);
 	result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
 	result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, false));
 	result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, false));
