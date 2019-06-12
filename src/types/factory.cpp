@@ -154,8 +154,8 @@ std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::F
 	result->states.push_back(std::make_unique<State>(name_prefix + ".9", false, false));
 	result->states.push_back(std::make_unique<State>(name_prefix + ".10", false, false));
 	result->states.push_back(std::make_unique<State>(name_prefix + ".11", false, false));
-	result->states.push_back(std::make_unique<State>(name_prefix + ".12", false, true));
-	result->states.push_back(std::make_unique<State>(name_prefix + ".13", false, true));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".12", false, false)); // TODO: should those states be final??
+	result->states.push_back(std::make_unique<State>(name_prefix + ".13", false, false)); // TODO: should those states be final??
 
 	// protect observed
 	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(0), *result->states.at(1), protect_function, *result->variables.at(0), *result->variables.at(1)));

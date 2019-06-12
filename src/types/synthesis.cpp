@@ -31,10 +31,8 @@ void debug(const T& collection, std::string info="") {
 
 	std::set<std::string> lines;
 	for (const auto& elem : collection) {
-		std::string line = "  -[" + std::to_string(elem.first.size()) + "|" + std::to_string(elem.second.size()) + "] ";
-		line += print(elem.first);
-		line += "|  ";
-		line += print(elem.second);
+		std::string line = "  -[" + std::to_string(elem.size()) + "] ";
+		line += print(elem);
 		lines.insert(line);
 	}
 	for (const auto& line : lines) {
@@ -72,17 +70,6 @@ struct TransitionInfo {
 	TransitionInfo(const State* dst, const Function* label, Transition::Kind kind, z3::expr formula, bool closure, bool onlyone) : TransitionInfo(dst, label, kind, formula, closure, nullptr) { this->onlyone = onlyone; }
 };
 
-
-std::unique_ptr<Observer> make_blueprint(const Observer& observer) {
-	auto result = cola::copy(observer);
-	result->negative_specification = false;
-	// do not change final states for now (they are used to prune the synthesized types)
-	// do it later, after synthesis
-	// for (const auto& state : result->states) {
-	// 	state->final = false;
-	// }
-	return result;
-}
 
 template<typename T>
 void make_states_final(Observer& observer, T& state_collection) {
@@ -206,12 +193,12 @@ bool is_sat(z3::solver& solver, z3::expr expr) {
 
 bool needs_closure(z3::context& context, z3::solver& solver, z3::expr expr) {
 	z3::expr check = expr && (context.int_const("__THRD") != context.int_const("__SELF"));
-	return is_sat(solver, std::move(expr));
+	return is_sat(solver, std::move(check));
 }
 
 TransitionInfo make_transition_info(z3::context& context, z3::solver& solver, const Transition& transition) {
 	auto formula = translate(context, *transition.guard);
-	bool closure = needs_closure(context, solver, formula);
+	bool closure = (&transition.src != &transition.dst) && needs_closure(context, solver, formula);
 	return TransitionInfo(&transition.dst, &transition.label, transition.kind, std::move(formula), closure, &transition);
 }
 
@@ -239,7 +226,7 @@ std::pair<std::set<std::pair<const Function*, Transition::Kind>>, std::map<Trans
 					}
 				}
 				if (is_the_only_one || is_sat(solver, staying)) {
-					result[key].emplace_back(state.get(), label, kind, staying, needs_closure(context, solver, staying), is_the_only_one);
+					result[key].emplace_back(state.get(), label, kind, staying, false /* needs_closure(context, solver, staying) */, is_the_only_one);
 				}
 			}
 		}
@@ -303,18 +290,20 @@ struct CrossProducer {
 	using worklist_t = std::deque<State*>;
 
 	std::vector<std::reference_wrapper<const Observer>> observers;
+	std::set<const State*> active_states;
 	z3::context context;
 	z3::solver solver;
 	std::set<std::pair<const Function*, Transition::Kind>> symbols;
 	std::map<TransitionKey, std::vector<TransitionInfo>> post_map;
 
 	std::unique_ptr<Observer> result;
+	std::set<const State*> result_active;
 	State* final_state;
 	std::map<crossstate_t, State*> state2cross;
 	std::map<const State*, crossstate_t> cross2state;
 	GuardCopyTransformer guardguy;
 
-	CrossProducer(std::vector<std::reference_wrapper<const Observer>> observers) : observers(observers), context(), solver(context) {
+	CrossProducer(std::vector<std::reference_wrapper<const Observer>> observers, std::set<const State*> active) : observers(observers), active_states(std::move(active)), context(), solver(context) {
 		add_observers_to_z3(context, solver, observers);
 		auto [symbols, post_map] = make_post_map(context, solver, observers);
 		this->symbols = std::move(symbols);
@@ -326,6 +315,7 @@ struct CrossProducer {
 
 	void init_result() {
 		result = std::make_unique<Observer>();
+		result_active.clear();
 
 		// add variables
 		assert(!observers.empty());
@@ -371,10 +361,13 @@ struct CrossProducer {
 	State* make_new_state(const crossstate_t& state) {
 		// we assume that there is only one initial state that is handled separately
 		bool is_final = false;
+		bool is_active = false;
 		for (const auto& elem : state) {
-			if (elem->final) {
+			if (is_final || elem->final) {
 				is_final = true;
-				break;
+			}
+			if (is_active || active_states.count(elem) > 0) {
+				is_active = true;
 			}
 		}
 		if (is_final) {
@@ -383,6 +376,9 @@ struct CrossProducer {
 			auto new_state = std::make_unique<State>(make_name(state), false, is_final);
 			State* result_state = new_state.get();
 			result->states.push_back(std::move(new_state));
+			if (is_active) {
+				result_active.insert(result_state);
+			}
 			return result_state;
 		}
 	}
@@ -458,7 +454,7 @@ struct CrossProducer {
 			}
 		}
 
-		if (&src == &dst) {
+		if (&src == &dst || &src == final_state) {
 			return; // we do not need the transition
 		}
 
@@ -504,7 +500,7 @@ struct CrossProducer {
 		return result;
 	}
 
-	std::unique_ptr<Observer> make_cross_product() {
+	std::pair<std::unique_ptr<Observer>, std::set<const State*>> make_cross_product() {
 		init_result();
 		worklist_t worklist = { get_initial_state() };
 
@@ -518,29 +514,30 @@ struct CrossProducer {
 			}
 		}
 
-		return std::move(result);
+		return { std::move(result), std::move(result_active) };
 	}
 };
 
 
 struct Synthesizer {
 	using stateset_t = std::set<const State*>;
-	using synthstate_t = std::pair<stateset_t, stateset_t>;
+	using synthstate_t = stateset_t;
 	using reachset_t = std::set<synthstate_t>;
 	using worklist_t = std::deque<synthstate_t>;
 
-	std::unique_ptr<Observer> base_observer; // blueprint without final states
-	std::unique_ptr<Observer> impl_observer; // blueprint without final states
+	std::unique_ptr<Observer> blueprint;
+	const stateset_t active_states;
 	z3::context context;
 	z3::solver solver;
 	std::set<std::pair<const Function*, Transition::Kind>> symbols;
 	std::map<TransitionKey, std::vector<TransitionInfo>> post_map;
 
-	Synthesizer(const Observer& base_observer_, const Observer& impl_observer_)
-		: base_observer(make_blueprint(base_observer_)), impl_observer(make_blueprint(impl_observer_)), context(), solver(context)
+	Synthesizer(std::unique_ptr<Observer> observer, stateset_t active)
+		: blueprint(std::move(observer)), active_states(std::move(active)), context(), solver(context)
 	{
-		add_observers_to_z3(context, solver, { *base_observer, *impl_observer });
-		auto [symbols, post_map] = make_post_map(context, solver, { *base_observer, *impl_observer });
+		blueprint->negative_specification = false;
+		add_observers_to_z3(context, solver, { *blueprint });
+		auto [symbols, post_map] = make_post_map(context, solver, { *blueprint });
 		this->symbols = std::move(symbols);
 		this->post_map = std::move(post_map);
 	}
@@ -565,29 +562,18 @@ struct Synthesizer {
 	}
 
 	std::pair<reachset_t, worklist_t> initialize_synthesis() {
-		// TODO: this relies on internal knowledge of how the base observer looks like. BAD!
-		reachset_t reach;
-		worklist_t worklist;
-		for (const auto& state1 : base_observer->states) {
-			if (state1->initial) {
-				stateset_t base_state({ state1.get() });
-				stateset_t impl_state;
-				for (const auto& state2 : impl_observer->states) {
-					impl_state.insert(state2.get());
-				}
-				synthstate_t init = { std::move(base_state), std::move(impl_state) };
-				auto insertion = reach.insert(init);
-				if (insertion.second) {
-					worklist.push_back(init);
-				}
-			}
+		synthstate_t active(active_states);
+		synthstate_t all;
+		for (const auto& state : blueprint->states) {
+			all.insert(state.get());
 		}
-		assert(!worklist.empty());
-		assert(reach.size() <= worklist.size());
-		return { reach, worklist };
+
+		reachset_t reach = { all, active };
+		worklist_t worklist = { all, active };
+		return { std::move(reach), std::move(worklist) };
 	}
 
-	bool is_definitely_final(const stateset_t& set) {
+	bool is_definitely_final(const synthstate_t& set) {
 		for (const auto& state : set) {
 			if (!state->final) {
 				return false;
@@ -596,38 +582,27 @@ struct Synthesizer {
 		return true;
 	}
 
-	bool is_definitely_final(const synthstate_t& state) {
-		return is_definitely_final(state.first) || is_definitely_final(state.second);
-	}
-
-	std::deque<synthstate_t> synthesis_post(const synthstate_t& state) {
+	std::deque<synthstate_t> synthesis_post(const synthstate_t& to_post) {
 		std::deque<synthstate_t> result;
 
 		for (auto [label, kind] : symbols) {
 			// compute vector of possibile transitions
 			std::vector<std::reference_wrapper<const std::vector<TransitionInfo>>> tinfo;
-			for (const auto& stateset : { state.first, state.second }) {
-				for (const State* state : stateset) {
-					TransitionKey key(state, label, kind);
-					tinfo.push_back(post_map.at(key));
-				}
+			for (const State* state : to_post) {
+				TransitionKey key(state, label, kind);
+				tinfo.push_back(post_map.at(key));
 			}
 
 			// iterate over possibilities
 			for (AllCombinator combinator(tinfo); combinator.available(); combinator.next()) {
 				auto combination = combinator.get();
 				if (is_combination_enabled(combination)) {
-					stateset_t base_post, impl_post;
-					for (std::size_t index = 0; index < combination.size(); ++index) {
-						const State* next = combination.at(index).get().dst;
-						if (index < state.first.size()) {
-							base_post.insert(next);
-						} else {
-							impl_post.insert(next);
-						}
+					synthstate_t post;
+					for (const TransitionInfo& info : combination) {
+						post.insert(info.dst);
 					}
 
-					result.push_back({ std::move(base_post), std::move(impl_post) });
+					result.push_back(std::move(post));
 					if (is_definitely_final(result.back())) {
 						result.pop_back();
 					}
@@ -657,49 +632,49 @@ struct Synthesizer {
 		return reach;
 	}
 
-	stateset_t compute_closure(const stateset_t& set) {
-		stateset_t closure;
-		for (const State* state : set) {
-			for (auto [label, kind] : symbols) {
-				for (const TransitionInfo& info : post_map.at({ state, label, kind})) {
-					if (info.closure) {
-						closure.insert(info.dst);
+	synthstate_t compute_closure(const synthstate_t& set) {
+		synthstate_t closure(set);
+		bool updated;
+		do {
+			updated = false;
+			for (const State* state : closure) {
+				for (auto [label, kind] : symbols) {
+					for (const TransitionInfo& info : post_map.at({ state, label, kind})) {
+						if (info.closure) {
+							auto insertion = closure.insert(info.dst);
+							if (insertion.second) {
+								updated = true;
+							}
+						}
 					}
 				}
 			}
-		}
+		} while (updated);
 		return closure;
-	}
-
-	synthstate_t compute_closure(const synthstate_t& to_close) {
-		return { compute_closure(to_close.first), compute_closure(to_close.second) };
 	}
 
 	reachset_t synthesize_guarantees() {
 		// get reachabel synthstates
 		reachset_t reach = compute_reachability();
 		std::cout << "Computed fixed point of size: " << reach.size() << std::endl;
-		debug(reach, "REACH");
+		// debug(reach, "REACH");
 
 		// compute their closure
+		// we do closure as a last step since the post image will contain the closure
 		reachset_t result;
 		for (const auto& state : reach) {
 			result.insert(compute_closure(state));
 		}
 		std::cout << "Computed closure of size: " << result.size() << std::endl;
-		debug(result, "CLOSURE");
+		// debug(result, "CLOSURE");
 		return result;
 	}
 
-	std::string make_name(const synthstate_t& state) {
+	std::string make_name(const synthstate_t& set) {
 		std::set<std::string> state_names;
-		auto add_names = [&](const stateset_t& set) {
-			for (const auto& state : set) {
-				state_names.insert(state->name);
-			}
-		};
-		add_names(state.first);
-		add_names(state.second);
+		for (const auto& state : set) {
+			state_names.insert(state->name);
+		}
 		std::stringstream result;
 		result << "{ ";
 		bool first = true;
@@ -721,13 +696,10 @@ struct Synthesizer {
 		for (const auto& state : synthesis) {
 			std::string name = make_name(state);
 			std::cout << "  - " << name << std::endl;
-			make_states_final(*base_observer, state.first);
-			make_states_final(*impl_observer, state.second);
-			auto base_obs = cola::copy(*base_observer);
-			auto impl_obs = cola::copy(*impl_observer);
+			make_states_final(*blueprint, state);
+			auto obs = cola::copy(*blueprint);
 			std::vector<std::unique_ptr<Observer>> obs_vec;
-			obs_vec.push_back(std::move(base_obs));
-			obs_vec.push_back(std::move(impl_obs));
+			obs_vec.push_back(std::move(obs));
 			guarantee_table.add_guarantee(std::move(obs_vec), std::move(name));
 		}
 	}
@@ -737,15 +709,23 @@ struct Synthesizer {
 void prtypes::populate_guarantee_table_with_synthesized_guarantees(GuaranteeTable& guarantee_table) {
 	// TODO: ensure that the observers have the same variables? (done by observer_store?) ==> names might differ... add all names and force them to be equal in the SAT formula?
 	// TODO: ensure that the observers are negative specifications?
+	const Observer& base_observer = *guarantee_table.observer_store.base_observer;
+	std::set<const State*> active;
+	for (const auto& state : base_observer.states) {
+		if (state->initial) {
+			active.insert(state.get()); // this relies on knowledge about how the base observer looks like. BAD!
+		}
+	}
 
 	for (const auto& impl_observer : guarantee_table.observer_store.impl_observer) {
 		std::cout << std::endl << "#Generating cross-product observer..." << std::endl;
-		auto cross_product = CrossProducer({ *guarantee_table.observer_store.base_observer, *impl_observer }).make_cross_product();
-		std::cout << "#Generated cross-product observer. Number of states: " << cross_product->states.size() << std::endl;
+		auto [cross_product, active_states] = CrossProducer({ base_observer, *impl_observer }, active).make_cross_product();
+		std::cout << "#Generated cross-product observer. Number of states (active): " << cross_product->states.size() << " (" << active_states.size() << ")" << std::endl;
+		// cola::print(*impl_observer, std::cout);
+		// cola::print(*cross_product, std::cout);
 
-		std::cout << std::endl << "#Generating types for cross-product observer" << std::endl;
-		Synthesizer(*guarantee_table.observer_store.base_observer, *impl_observer).add_synthesized_guarantees(guarantee_table);
+		std::cout << "#Generating types for cross-product observer" << std::endl;
+		Synthesizer(std::move(cross_product), std::move(active_states)).add_synthesized_guarantees(guarantee_table);
+		// throw std::logic_error("--break--");
 	}
-
-	throw std::logic_error("not yet implemented");
 }

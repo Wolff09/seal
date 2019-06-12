@@ -181,13 +181,13 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 	// return Vata2::Nfa::is_lang_empty(intersection);
 	Vata2::Nfa::Word cex;
 	bool result = Vata2::Nfa::is_lang_empty_cex(intersection, &cex);
-	if (!result) {
-		// std::cout << "&& Does not entail validity, counterexample: ";
-		// for (const auto& sym : cex) {
-		// 	std::cout << " " << sym;
-		// }
-		// std::cout << std::endl;
-	}
+	// if (!result) {
+	// 	std::cout << "    ==> Does not entail validity, counterexample: ";
+	// 	for (const auto& sym : cex) {
+	// 		std::cout << " " << sym;
+	// 	}
+	// 	std::cout << std::endl;
+	// }
 	return result;
 }
 

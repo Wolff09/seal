@@ -51,6 +51,8 @@ namespace cola {
 	
 	void print(const Statement& statement, std::ostream& stream);
 
+	void print(const Observer& observer, std::ostream& stream); // prints .dot
+
 }
 
 #endif

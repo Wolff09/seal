@@ -467,3 +467,83 @@ void cola::print(const Statement& statement, std::ostream& stream) {
 	PrintVisitor visitor(stream);
 	statement.accept(visitor);
 }
+
+
+struct GuardToStringVisitor final : public ObserverVisitor {
+	std::stringstream result;
+	std::map<const ObserverVariable*, std::string> var2name;
+
+	GuardToStringVisitor(const Observer& observer) {
+		for (std::size_t index = 0; index < observer.variables.size(); ++index) {
+			var2name[observer.variables.at(index).get()] = "$" + std::to_string(index);
+		}
+	}
+
+	void visit(const ThreadObserverVariable& var) override { result << var2name.at(&var); }
+	void visit(const ProgramObserverVariable& var) override { result << var2name.at(&var); }
+	void visit(const SelfGuardVariable& /*var*/) override { result << "_t"; }
+	void visit(const ArgumentGuardVariable& var) override { result << var.decl.name; }
+	void visit(const TrueGuard& /*obj*/) override { result << "true"; }
+	void visit(const ConjunctionGuard& guard) override {
+		bool first = true;
+		for (const auto& conjunct : guard.conjuncts) {
+			if (first) {
+				first = false;
+			} else {
+				result << " ∧ ";
+			}
+			conjunct->accept(*this);
+		}
+	}
+	void visit(const EqGuard& guard) override {
+		guard.lhs.accept(*this);
+		result << " = ";
+		guard.rhs->accept(*this);
+	}
+	void visit(const NeqGuard& guard) override {
+		guard.lhs.accept(*this);
+		result << " ≠ ";
+		guard.rhs->accept(*this);
+	}
+	
+	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToStringVisitor::visit(const State&))"); }
+	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToStringVisitor::visit(const Transition&))"); }
+	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToStringVisitor::visit(const Observer&))"); }
+};
+
+std::string guard_to_string(const Observer& observer, const Guard& guard) {
+	GuardToStringVisitor visitor(observer);
+	guard.accept(visitor);
+	return visitor.result.str();
+}
+
+void cola::print(const Observer& observer, std::ostream& stream) {
+	std::map<const State*, std::string> state2id;
+	stream << "digraph observer {" << std::endl;
+	for (std::size_t index = 0; index < observer.states.size(); ++index) {
+		const State* state = observer.states.at(index).get();
+		std::string id = "s" + std::to_string(index);
+		state2id[state] = id;
+		std::string option = state->final ? ", shape=box" : "";
+		stream << "    " << id << " [label=\"" << state->name << "\"" << option << "];" << std::endl;
+	}
+	for (const auto& transition : observer.transitions) {
+		std::string src_id = state2id.at(&transition->src);
+		std::string dst_id = state2id.at(&transition->dst);
+		stream << "    " << src_id << " -> " << dst_id << " [label=\"";
+		switch (transition->kind) {
+			case Transition::INVOCATION: stream << "enter "; break;
+			case Transition::RESPONSE: stream << "exit "; break;
+		}
+		stream << transition->label.name << "(_t";
+		if (transition->kind == Transition::INVOCATION) {
+			for (const auto& arg : transition->label.args) {
+				stream << ", ";
+				stream << arg->name;
+			}
+		}
+		stream << "),\\n" << guard_to_string(observer, *transition->guard);
+		stream << "\"];" << std::endl;
+	}
+	stream << "}" << std::endl;
+}

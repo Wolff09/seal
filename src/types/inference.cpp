@@ -359,6 +359,9 @@ std::vector<Symbol> get_symbol_for_transition(const Transition& transition, cons
 VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, const VataAlphabet& vata_alphabet) {
 	VataNfa nfa;
 
+//	std::cout << "==================================================" << std::endl;
+//	std::cout << "#Translating observer" << std::endl;
+
 	// assign vata compatible ids to states of the observer
 	// vata nfa has no explicit notion of states (except initial/final), implicitly added by transitions
 	std::map<const State*, std::uintptr_t> state2vata;
@@ -368,11 +371,12 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 		state2vata[state.get()] = encoding;
 		if (state->initial) {
 			nfa.add_initial(encoding);
-//			std::cout << "  Init: " << encoding << std::endl;
+//			std::cout << "Translating: " << state->name << std::endl;
+			// std::cout << "  Init: " << encoding << std::endl;
 		}
 		if (state->final) {
 			nfa.add_final(encoding);
-//			std::cout << "  Final: " << encoding << std::endl;
+			// std::cout << "  Final: " << encoding << std::endl;
 		}
 	}
 
@@ -384,10 +388,12 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 		auto symbols = get_symbol_for_transition(*transition, alphabet);
 		for (const auto& sym : symbols) {
 			nfa.add_trans(src_state, sym.vata_id, dst_state);
-//			std::cout << "  " << src_state << "  ==[ " << sym.vata_id << " ]==>  " << dst_state << std::endl;
+			// std::cout << "  " << src_state << "  ==[ " << sym.vata_id << " ]==>  " << dst_state << std::endl;
+//			std::cout << "   " << src_state << "=" << transition->src.name << "  ==[ " << sym.vata_id << " ]==>  " << dst_state << "=" << transition->dst.name << std::endl;
 			outgoing_vata[&transition->src].insert(sym.vata_id);
 		}
 	}
+//	std::cout << "==================================================" << std::endl;
 
 	// make nfa complete by adding self-loops for "missing" transitions
 	auto missing_symbols = [&](const State& state) -> std::set<std::uintptr_t> {
