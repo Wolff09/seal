@@ -47,6 +47,7 @@ struct LeapConfig {
 	bool interactive, eager;
 	bool quiet, verbose;
 	bool output;
+	bool synthesize_types;
 } config;
 
 struct ParseUnit {
@@ -73,14 +74,8 @@ inline std::optional<std::reference_wrapper<const Function>> find_function(const
 	return std::nullopt;
 }
 
-template<typename T>
-inline std::vector<T> to_vec(T obj) {
-	std::vector<T> result;
-	result.push_back(std::move(obj));
-	return result;
-}
-
 static void read_input() {
+	// parse program
 	input.program = cola::parse(config.program_path);
 	Program& program = *input.program;
 
@@ -94,7 +89,7 @@ static void read_input() {
 	const Function& protect1 = *search_protect1;
 	const Function& protect2 = *search_protect2;
 	
-	// preprocessing
+	// preprocess program
 	std::cout << std::endl << "Preprocessing program... " << std::flush;
 	prtypes::preprocess(program, retire);
 	program.name += " (preprocessed)";
@@ -102,58 +97,65 @@ static void read_input() {
 	std::cout << "Preprocessed program: " << std::endl;
 	cola::print(program, std::cout);
 
-	// TODO: parse observer
-
-	// create stuff
-	std::cout << std::endl << "Computing simulation... " << std::flush;
+	// create SMR observers
+	// TODO: parse SMR impl observers
+	std::cout << std::endl << "Preparing SMR observers... " << std::flush;
 	input.store = std::make_unique<SmrObserverStore>(program, retire);
 	SmrObserverStore& store = *input.store;
-	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1)); // TODO: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<======================================================================== re-disable this
-	store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2)); // TODO: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<======================================================================== re-enable this
+	store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
 	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
-	input.table = std::make_unique<GuaranteeTable>(store);
-	GuaranteeTable& table = *input.table;
 	std::cout << "done" << std::endl;
-
-	// TODO: stop here if no type check is done?
-
-//	// adding guarantees
-//	auto add_guarantees = [&](const Function& func, const Function* trans=nullptr) {
-//		std::cout << std::endl << "Adding guarantees for " << func.name << "... " << std::flush;
-//		std::vector<std::unique_ptr<cola::Observer>> hp_guarantee_observers;
-//		if (trans) {
-//			hp_guarantee_observers = prtypes::make_hp_transfer_guarantee_observers(retire, func, *trans, func.name);
-//		} else {
-//			hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
-//		}
-//		table.add_guarantee(to_vec(std::move(hp_guarantee_observers.at(0))), "E1-" + func.name);
-//		table.add_guarantee(to_vec(std::move(hp_guarantee_observers.at(1))), "E2-" + func.name);
-//		table.add_guarantee(to_vec(std::move(hp_guarantee_observers.at(2))), "P-" + func.name);
-//		std::cout << "done" << std::endl;
-//		if (hp_guarantee_observers.size() > 3) {
-//			assert(hp_guarantee_observers.size() == 5);
-//			table.add_guarantee(to_vec(std::move(hp_guarantee_observers.at(3))), "Et-" + func.name);
-//			table.add_guarantee(to_vec(std::move(hp_guarantee_observers.at(4))), "Pt-" + func.name);
-//			// assert(guarantee_t.entails_validity);
-//		}
-//	};
-//	add_guarantees(protect1, &protect2);
-//	add_guarantees(protect2);
-//
-//	std::cout << "List of guarantees:" << std::endl;
-//	for (const auto& guarantee : table) {
-//		std::cout << "  - " << guarantee.name << ": (transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")" << std::endl;
-//	}
-
-	prtypes::populate_guarantee_table_with_synthesized_guarantees(table);
-
-
-	std::cout << std::endl << "List of guarantees:" << std::endl;
-	for (const auto& guarantee : table) {
-		std::cout << "  - " << "(transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")  for  " << guarantee.name << std::endl;
+	std::cout << "The SMR observer is the cross-product of: " << std::endl;
+	cola::print(*store.base_observer, std::cout);
+	for (const auto& observer : store.impl_observer) {
+		cola::print(*observer, std::cout);
 	}
 
-	// throw std::logic_error("---tmp break---");
+
+	if (!config.check_types) {
+		return;
+	}
+
+	// create guarantee table
+	input.table = std::make_unique<GuaranteeTable>(store);
+	GuaranteeTable& table = *input.table;
+	
+	if (config.synthesize_types) {
+		std::cout << std::endl << "Synthesizing types... " << std::flush;
+		prtypes::populate_guarantee_table_with_synthesized_guarantees(table);
+		std::cout << "done" << std::endl;
+
+	} else {
+		std::cout << std::endl << "Loading custom types... " << std::flush;
+		auto add_guarantees = [&](const Function& func, const Function* trans=nullptr) {
+			std::vector<std::unique_ptr<cola::Observer>> hp_guarantee_observers;
+			if (trans) {
+				hp_guarantee_observers = prtypes::make_hp_transfer_guarantee_observers(retire, func, *trans, func.name);
+			} else {
+				hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
+			}
+			table.add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
+			table.add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
+			table.add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);
+			std::cout << "done" << std::endl;
+			if (hp_guarantee_observers.size() > 3) {
+				assert(hp_guarantee_observers.size() == 5);
+				table.add_guarantee(std::move(hp_guarantee_observers.at(3)), "Et-" + func.name);
+				table.add_guarantee(std::move(hp_guarantee_observers.at(4)), "Pt-" + func.name);
+			}
+		};
+		add_guarantees(protect1, &protect2);
+		add_guarantees(protect2);
+	}
+
+	if (config.verbose) {
+		std::cout << std::endl << "List of guarantees "  << table.all_guarantees.size() <<  ":" << std::endl;
+		for (const auto& guarantee : table) {
+			std::cout << "  - " << "(transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")  for  " << guarantee.name << std::endl;
+		}
+	} else if (!config.quiet) {
+		std::cout << "Using " << table.all_guarantees.size() << " guarantees in the type system." << std::endl;
+	}
 }
 
 template<typename ErrorClass, typename... Targs>
@@ -241,6 +243,7 @@ int main(int argc, char** argv) {
 		// ValueArg<std::string> observer_arg("o", "observer", "Observer specification for SMR algorithm", false , NO_OBSERVER_PATH, "path", cmd);
 		// SwitchArg rewrite_switch("r", "rewrite", "Rewrite program and retry type check upon type errors", cmd, false);
 		SwitchArg keep_switch("s", "simple", "Simple type check; no rewriting&retrying (atomicity abstraction) upon type errors", cmd, false);
+		SwitchArg customtype_switch("c", "customtypes", "Do not synthesize typse, but use custom types", cmd, false);
 		SwitchArg type_switch("t", "checktypes", "Perform type check", cmd, false);
 		SwitchArg annotation_switch("a", "checkannotations", "Perform annotation check", cmd, false);
 		SwitchArg linearizability_switch("l", "checklinearizability", "Perform linearizability check", cmd, false);
@@ -255,6 +258,7 @@ int main(int argc, char** argv) {
 		config.program_path = program_arg.getValue();
 		config.check_types = type_switch.getValue();
 		config.rewrite_and_retry = !keep_switch.getValue();
+		config.synthesize_types = !customtype_switch.getValue();
 		config.check_annotations = annotation_switch.getValue();
 		config.check_linearizability = linearizability_switch.getValue();
 		config.interactive = interactive_switch.getValue();

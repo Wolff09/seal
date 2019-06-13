@@ -11,25 +11,16 @@ using namespace prtypes;
 
 
 std::unique_ptr<Guarantee> copy_guarantee(const Guarantee& guarantee) {
-	std::vector<std::unique_ptr<Observer>> observers;
-	for (const auto& observer : guarantee.crossproduct) {
-		observers.push_back(cola::copy(*observer));
-	}
-	auto result = std::make_unique<Guarantee>(guarantee.name, std::move(observers));
+	auto observer = cola::copy(*guarantee.observer);
+	auto result = std::make_unique<Guarantee>(guarantee.name, std::move(observer));
 	result->is_transient = guarantee.is_transient;
 	result->entails_validity = guarantee.entails_validity;
 	return result;
 }
 
-std::vector<std::unique_ptr<Observer>> make_crossproduct(std::unique_ptr<Observer> observer) {
-	std::vector<std::unique_ptr<Observer>> crossproduct;
-	crossproduct.push_back(std::move(observer));
-	return crossproduct;
-}
-
 std::unique_ptr<Guarantee> make_guarantee(const SmrObserverStore& store, std::string name, bool transient, bool valid) {
 	auto observer = prtypes::make_active_local_guarantee_observer(store.retire_function, name);
-	auto result = std::make_unique<Guarantee>(name, make_crossproduct(std::move(observer)));
+	auto result = std::make_unique<Guarantee>(name, std::move(observer));
 	result->is_transient = transient;
 	result->entails_validity = valid;
 	return result;
@@ -105,11 +96,9 @@ bool is_observer_transient(const Observer& observer) {
 }
 
 bool is_guarantee_transient(const Guarantee& guarantee) {
-	for (const auto& observer : guarantee.crossproduct) {
-		assert(!observer->negative_specification); // TODO: raise exception if not satisfied
-		if (!is_observer_transient(*observer)) {
-			return false;
-		}
+	assert(!guarantee.observer->negative_specification); // TODO: raise exception if not satisfied
+	if (!is_observer_transient(*guarantee.observer)) {
+		return false;
 	}
 	return true;
 }
@@ -159,12 +148,10 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 	
 	// get guarantee observer language, concate with free(*)
 	auto intersection = translator.nfa_for(guarantee);
-	// intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.observer));
-	intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.crossproduct.at(0))); // <<<<<<<<------------------------------- TODO: is this correct???
+	intersection = translator.concatenate_step(intersection, make_dummy_free_transition(*guarantee.observer));
 
 	// intersection with observer languages
 	auto intersect = [&](const Observer& observer) {
-//		std::cout << std::endl << "Translating observer" << std::endl;
 		auto automaton = translator.to_nfa(observer);
 		intersection = Vata2::Nfa::intersection(intersection, automaton);
 	};
@@ -191,13 +178,11 @@ bool entails_guarantee_validity(const SmrObserverStore& store, const Guarantee& 
 	return result;
 }
 
-void GuaranteeTable::add_guarantee(std::vector<std::unique_ptr<Observer>> crossproduct_observer, std::string name) {
-	for (const auto& observer : crossproduct_observer) {
-		raise_if_assumption_unsatisfied(*observer);
-	}
+void GuaranteeTable::add_guarantee(std::unique_ptr<Observer> observer, std::string name) {
+	raise_if_assumption_unsatisfied(*observer);
 
 	// create new guarantee
-	auto guarantee = std::make_unique<Guarantee>(name, std::move(crossproduct_observer));
+	auto guarantee = std::make_unique<Guarantee>(name, std::move(observer));
 	guarantee->is_transient = is_guarantee_transient(*guarantee);
 	guarantee->entails_validity = false;
 

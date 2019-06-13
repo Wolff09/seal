@@ -64,6 +64,13 @@ namespace prtypes {
 	};
 
 
+	struct TypeSynthesisError : public std::exception {
+		const std::string cause;
+		TypeSynthesisError(std::string cause_) : cause("Synthesis failed: " + std::move(cause_) + ".") {}
+		virtual const char* what() const noexcept { return cause.c_str(); }
+	};
+
+
 	template<typename ErrorType, typename... ErrorTypeArgs>
 	inline void raise_error(ErrorTypeArgs&&... args) {
 		throw ErrorType(std::forward<ErrorTypeArgs>(args)...);

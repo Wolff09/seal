@@ -2,6 +2,7 @@
 
 #include "cola/util.hpp"
 #include "cola/util.hpp"
+#include "types/error.hpp"
 #include "z3++.h"
 #include <map>
 #include <vector>
@@ -285,8 +286,34 @@ struct GuardCopyTransformer final : public ObserverVisitor {
 	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation of GuardTranslator::visit(const Observer&)"); }
 };
 
+struct ObserverVariableTypeVisitor final : public ObserverVisitor {
+	std::size_t result = 0;
+	void reset() { result = 0; }
+	void visit(const ThreadObserverVariable& /*obj*/) override { result = 1; }
+	void visit(const ProgramObserverVariable& var) override { result = var.decl->type.sort == Sort::PTR ? 2 : 3; }
+	void visit(const SelfGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const SelfGuardVariable&)"); }
+	void visit(const ArgumentGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const ArgumentGuardVariable&)"); }
+	void visit(const TrueGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const TrueGuard&)"); }
+	void visit(const ConjunctionGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const ConjunctionGuard&)"); }
+	void visit(const EqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const EqGuard&)"); }
+	void visit(const NeqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const NeqGuard&)"); }
+	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const State&)"); }
+	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const Transition&)"); }
+	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation of ObserverVariableTypeVisitor(const Observer&)"); }
+};
+
+bool do_types_match(const ObserverVariable& var, const ObserverVariable& other) {
+	ObserverVariableTypeVisitor visitor;
+	var.accept(visitor);
+	std::size_t var_type = visitor.result;
+	visitor.reset();
+	other.accept(visitor);
+	std::size_t other_type = visitor.result;
+	return var_type == other_type;
+}
+
 struct CrossProducer {
-	using crossstate_t = std::set<const State*>; // TODO: should be a set
+	using crossstate_t = std::set<const State*>;
 	using worklist_t = std::deque<State*>;
 
 	std::vector<std::reference_wrapper<const Observer>> observers;
@@ -308,9 +335,6 @@ struct CrossProducer {
 		auto [symbols, post_map] = make_post_map(context, solver, observers);
 		this->symbols = std::move(symbols);
 		this->post_map = std::move(post_map);
-
-		// TODO: ensure that all observers have the same type and layout of observer variables
-		// TODO: ensure that final states can only reach final states
 	}
 
 	void init_result() {
@@ -325,11 +349,24 @@ struct CrossProducer {
 			result->variables.push_back(std::move(copy));
 		}
 		for (const Observer& observer : observers) {
-			assert(observer.variables.size() == src.variables.size());
+			conditionally_raise_error<TypeSynthesisError>(!observer.negative_specification, "observers are incompatible for cross product (observers must be negative specifications)");
+			// check variables
+			conditionally_raise_error<TypeSynthesisError>(observer.variables.size() != src.variables.size(), "observers are incompatible for cross product (different number of observer variables)");
 			for (std::size_t index = 0; index < observer.variables.size(); ++index) {
-				assert(typeid(observer.variables.at(index).get()) == typeid(result->variables.at(index).get()));
+				conditionally_raise_error<TypeSynthesisError>(!do_types_match(*observer.variables.at(index), *result->variables.at(index)), "observers are incompatible for cross product (different observer variable layout)");
 				guardguy.add_mapping(*observer.variables.at(index).get(), *result->variables.at(index).get());
 			}
+			// check transitions
+			for (const auto& transition : observer.transitions) {
+				conditionally_raise_error<TypeSynthesisError>(transition->src.final && !transition->dst.final, "observers are incompatible for cross product (final states must not reach non-final states)");
+			}
+			// check states
+			bool seen_init = false;
+			for (const auto& state : observer.states) {
+				conditionally_raise_error<TypeSynthesisError>(seen_init && state->initial, "observers are incompatible for cross product (there must not be more than one initial state)");
+				seen_init |= state->initial;
+			}
+			conditionally_raise_error<TypeSynthesisError>(!seen_init, "observers are incompatible for cross product (there must at least one initial state)");
 		}
 
 		// add single final state
@@ -398,7 +435,6 @@ struct CrossProducer {
 	}
 
 	State* get_initial_state() {
-		// TODO: ensure that observers have at most one initial state
 		crossstate_t initial_state;
 		for (const Observer& observer : observers) {
 			for (const auto& state : observer.states) {
@@ -573,15 +609,6 @@ struct Synthesizer {
 		return { std::move(reach), std::move(worklist) };
 	}
 
-	bool is_definitely_final(const synthstate_t& set) {
-		for (const auto& state : set) {
-			if (!state->final) {
-				return false;
-			}
-		}
-		return true;
-	}
-
 	std::deque<synthstate_t> synthesis_post(const synthstate_t& to_post) {
 		std::deque<synthstate_t> result;
 
@@ -603,9 +630,6 @@ struct Synthesizer {
 					}
 
 					result.push_back(std::move(post));
-					if (is_definitely_final(result.back())) {
-						result.pop_back();
-					}
 				}
 			}
 		}
@@ -656,7 +680,6 @@ struct Synthesizer {
 	reachset_t synthesize_guarantees() {
 		// get reachabel synthstates
 		reachset_t reach = compute_reachability();
-		std::cout << "Computed fixed point of size: " << reach.size() << std::endl;
 		// debug(reach, "REACH");
 
 		// compute their closure
@@ -665,7 +688,6 @@ struct Synthesizer {
 		for (const auto& state : reach) {
 			result.insert(compute_closure(state));
 		}
-		std::cout << "Computed closure of size: " << result.size() << std::endl;
 		// debug(result, "CLOSURE");
 		return result;
 	}
@@ -692,23 +714,19 @@ struct Synthesizer {
 	void add_synthesized_guarantees(GuaranteeTable& guarantee_table) {
 		auto synthesis = synthesize_guarantees();
 
-		std::cout << "Adding guarantees:" << std::endl;
+		// std::cout << "Adding guarantees:" << std::endl;
 		for (const auto& state : synthesis) {
 			std::string name = make_name(state);
-			std::cout << "  - " << name << std::endl;
+			// std::cout << "  - " << name << std::endl;
 			make_states_final(*blueprint, state);
 			auto obs = cola::copy(*blueprint);
-			std::vector<std::unique_ptr<Observer>> obs_vec;
-			obs_vec.push_back(std::move(obs));
-			guarantee_table.add_guarantee(std::move(obs_vec), std::move(name));
+			guarantee_table.add_guarantee(std::move(obs), std::move(name));
 		}
 	}
 };
 
 
 void prtypes::populate_guarantee_table_with_synthesized_guarantees(GuaranteeTable& guarantee_table) {
-	// TODO: ensure that the observers have the same variables? (done by observer_store?) ==> names might differ... add all names and force them to be equal in the SAT formula?
-	// TODO: ensure that the observers are negative specifications?
 	const Observer& base_observer = *guarantee_table.observer_store.base_observer;
 	std::set<const State*> active;
 	for (const auto& state : base_observer.states) {
@@ -718,14 +736,11 @@ void prtypes::populate_guarantee_table_with_synthesized_guarantees(GuaranteeTabl
 	}
 
 	for (const auto& impl_observer : guarantee_table.observer_store.impl_observer) {
-		std::cout << std::endl << "#Generating cross-product observer..." << std::endl;
+		// std::cout << std::endl << "#Generating cross-product observer..." << std::endl;
 		auto [cross_product, active_states] = CrossProducer({ base_observer, *impl_observer }, active).make_cross_product();
-		std::cout << "#Generated cross-product observer. Number of states (active): " << cross_product->states.size() << " (" << active_states.size() << ")" << std::endl;
-		// cola::print(*impl_observer, std::cout);
+		// std::cout << "#Generated cross-product observer. Number of states (active): " << cross_product->states.size() << " (" << active_states.size() << ")" << std::endl;
 		// cola::print(*cross_product, std::cout);
 
-		std::cout << "#Generating types for cross-product observer" << std::endl;
 		Synthesizer(std::move(cross_product), std::move(active_states)).add_synthesized_guarantees(guarantee_table);
-		// throw std::logic_error("--break--");
 	}
 }

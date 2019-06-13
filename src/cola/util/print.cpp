@@ -519,13 +519,15 @@ std::string guard_to_string(const Observer& observer, const Guard& guard) {
 
 void cola::print(const Observer& observer, std::ostream& stream) {
 	std::map<const State*, std::string> state2id;
-	stream << "digraph observer {" << std::endl;
+	stream << "digraph observer { " << std::endl;
 	for (std::size_t index = 0; index < observer.states.size(); ++index) {
 		const State* state = observer.states.at(index).get();
 		std::string id = "s" + std::to_string(index);
 		state2id[state] = id;
-		std::string option = state->final ? ", shape=box" : "";
-		stream << "    " << id << " [label=\"" << state->name << "\"" << option << "];" << std::endl;
+		std::string option = "";
+		if (state->initial) option = ", shape=box";
+		if (state->final) option = ", shape=box, peripheries=2";
+		stream << "    " << id << " [label=\"" << state->name << "\"" << option << "]; " << std::endl;
 	}
 	for (const auto& transition : observer.transitions) {
 		std::string src_id = state2id.at(&transition->src);
@@ -543,7 +545,7 @@ void cola::print(const Observer& observer, std::ostream& stream) {
 			}
 		}
 		stream << "),\\n" << guard_to_string(observer, *transition->guard);
-		stream << "\"];" << std::endl;
+		stream << "\"]; " << std::endl;
 	}
-	stream << "}" << std::endl;
+	stream << "} " << std::endl;
 }

@@ -501,13 +501,7 @@ Translator::Translator(const Program& program_, const Iterable& guarantees_) : p
 
 	// init lookup map for base observers
 	auto compute_guaranatee_nfa = [&](const Guarantee& guarantee) {
-		assert(!guarantee.crossproduct.empty());
-		auto iterator = guarantee.crossproduct.begin();
-		VataNfa result = to_nfa(**iterator);
-		for (++iterator; iterator != guarantee.crossproduct.end(); ++iterator) {
-			result = Vata2::Nfa::intersection(result, to_nfa(**iterator));
-		}
-		return result;
+		return to_nfa(*guarantee.observer);
 	};
 	for (const Guarantee& guarantee : guarantees_) {
 //		std::cout << std::endl << "Translating " << guarantee.name << std::endl;
