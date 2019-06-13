@@ -1,6 +1,7 @@
 #include <memory>
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include "tclap/CmdLine.h"
 
 #include "cola/parse.hpp"
@@ -21,6 +22,34 @@
 using namespace TCLAP;
 using namespace cola;
 using namespace prtypes;
+
+using timepoint_t = std::chrono::steady_clock::time_point;
+using duration_t = std::chrono::milliseconds;
+
+static const duration_t ZERO_DURATION = std::chrono::milliseconds(0);
+
+timepoint_t get_time() {
+	return std::chrono::steady_clock::now();
+}
+
+duration_t get_elapsed(timepoint_t since) {
+	timepoint_t now = get_time();
+	return std::chrono::duration_cast<std::chrono::milliseconds>(now - since);
+}
+
+std::string to_ms(duration_t duration) {
+	return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()) + "ms";
+}
+
+std::string to_s(duration_t duration) {
+	auto count = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+	auto seconds = count / 1000;
+	auto milli = count - seconds;
+	while (milli >= 100) {
+		milli = milli / 10;
+	}
+	return std::to_string(seconds) + "." + std::to_string(milli) + "s";
+}
 
 
 struct IsRegularFileConstraint : public Constraint<std::string> {
@@ -62,6 +91,12 @@ struct AnalysisOutput {
 	AnalysisResult type_safe = UDEF;
 	AnalysisResult annotations_hold = UDEF;
 	AnalysisResult linearizable = UDEF;
+	duration_t time_synthesis = ZERO_DURATION;
+	duration_t time_types = ZERO_DURATION;
+	duration_t time_rewrite = ZERO_DURATION;
+	duration_t time_annotations = ZERO_DURATION;
+	duration_t time_linearizability = ZERO_DURATION;
+	std::size_t number_rewrites = 0;
 } output;
 
 
@@ -122,7 +157,9 @@ static void read_input() {
 	
 	if (config.synthesize_types) {
 		std::cout << std::endl << "Synthesizing types... " << std::flush;
+		timepoint_t begin = get_time();
 		prtypes::populate_guarantee_table_with_synthesized_guarantees(table);
+		output.time_synthesis = get_elapsed(begin);
 		std::cout << "done" << std::endl;
 
 	} else {
@@ -166,7 +203,10 @@ void try_fix(ErrorClass& err, Targs... args) {
 		cola::print(err.pc, std::cout);
 		std::cout << err.what() << std::endl;
 	} else {
-		try_fix_pointer_race(*input.program, *input.table, err, args...);
+		output.number_rewrites++;
+		auto begin = get_time();
+		prtypes::try_fix_pointer_race(*input.program, *input.table, err, args...);
+		output.time_rewrite += get_elapsed(begin);
 	}
 }
 
@@ -185,7 +225,9 @@ static void do_type_check() {
 	do {
 		std::cout << std::endl << "Checking typing..." << std::endl;
 		try {
-			type_safe = type_check(*input.program, *input.table);
+			auto begin = get_time();
+			type_safe = prtypes::type_check(*input.program, *input.table);
+			output.time_types += get_elapsed(begin);
 
 		} catch (UnsafeCallError err) {
 			try_fix(err);
@@ -215,7 +257,9 @@ static void do_type_check() {
 static void do_annotation_check() {
 	std::cout << std::endl << "Checking assertions... " << std::flush;
 	bool assertions_safe = false;
+	auto begin = get_time();
 	assertions_safe = discharge_assertions(*input.program, *input.table);
+	output.time_annotations = get_elapsed(begin);
 	std::cout << "done" << std::endl;
 	std::cout << "** Assertion check: " << (assertions_safe ? "succeeded" : "failed") << " **" << std::endl << std::endl;
 	if (assertions_safe) output.annotations_hold = SAFE;
@@ -224,11 +268,71 @@ static void do_annotation_check() {
 
 static void do_linearizability_check() {
 	std::cout << std::endl << "Checking linearizability under GC... " << std::flush;
+	auto begin = get_time();
 	bool linearizable = prtypes::check_linearizability(*input.program);
+	output.time_linearizability = get_elapsed(begin);
 	std::cout << "done" << std::endl;
 	std::cout << "** Linearizability check: " << (linearizable ? "succeeded" : "failed") << " **" << std::endl << std::endl;
 	if (linearizable) output.linearizable = SAFE;
 	else output.linearizable = FAIL;
+}
+
+static void print_gist() {
+	if (config.quiet) {
+		return;
+	}
+
+	auto gist_synthesis = [&]() -> std::string {
+		if (config.synthesize_types) {
+			return std::to_string(input.table->all_guarantees.size()) + " types in " + to_s(output.time_synthesis);
+		} else {
+			return "--skipped--";
+		}
+	};
+	auto gist_rewrite = [&]() -> std::string {
+		if (config.rewrite_and_retry) {
+			if (output.number_rewrites == 0) {
+				return "none";
+			} else {
+				return std::to_string(output.number_rewrites) + " rewrites in " + to_s(output.time_rewrite);
+			}
+		} else {
+			return "--skipped--";
+		}
+	};
+	auto gist_types = [&]() -> std::string {
+		if (config.check_types) {
+			std::string verdict = output.type_safe == SAFE ? "successful" : "failed";
+			return verdict + " after " + to_s(output.time_types);
+		} else {
+			return "--skipped--";
+		}
+	};
+	auto gist_annotations = [&]() -> std::string {
+		if (config.check_annotations && output.type_safe != FAIL) {
+			std::string verdict = output.annotations_hold == SAFE ? "successful" : "failed";
+			return verdict + " after " + to_s(output.time_annotations);
+		} else {
+			return "--skipped--";
+		}
+	};
+	auto gist_linearizability  = [&]() -> std::string {
+		if (config.check_linearizability && output.type_safe != FAIL && output.annotations_hold != FAIL) {
+			std::string verdict = output.linearizable == SAFE ? "successful" : "failed";
+			return verdict + " after " + to_s(output.time_linearizability);
+		} else {
+			return "--skipped--";
+		}
+	};
+
+	std::cout << std::endl << std::endl;
+	std::cout << "# Summary:" << std::endl;
+	std::cout << "# ========" << std::endl;
+	std::cout << "# Type Synthesis:         " << gist_synthesis() << std::endl;
+	std::cout << "# Type Check:             " << gist_types() << std::endl;
+	std::cout << "# Rewrites:               " << gist_rewrite() << std::endl;
+	std::cout << "# Annotation Check:       " << gist_annotations() << std::endl;
+	std::cout << "# Linearizability Check:  " << gist_linearizability() << std::endl;
 }
 
 int main(int argc, char** argv) {
@@ -313,6 +417,8 @@ int main(int argc, char** argv) {
 	if (config.check_linearizability && output.type_safe != FAIL && output.annotations_hold != FAIL) {
 		do_linearizability_check();
 	}
+
+	print_gist();
 
 	return 0;
 }

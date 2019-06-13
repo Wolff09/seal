@@ -55,19 +55,6 @@ namespace prtypes {
 		return result;
 	}
 
-	// TODO: does not work as intended
-	// inline bool equals (const TypeEnv& lhs, const TypeEnv& rhs) {
-	// 	static struct TypeEnvEqual {
-	// 		bool operator()(const TypeEnv::value_type& value, const TypeEnv::value_type& other) const {
-	// 			static TypeEnvComparator key_cmp;
-	// 			static GuaranteeSetComparator mapped_cmp;
-	// 			return !key_cmp(value.first, other.first) && !key_cmp(other.first, value.first)
-	// 			    && value.second.size() == other.second.size() && std::equal(value.second.begin(), value.second.end(), other.second.begin(), mapped_cmp);
-	// 		}
-	// 	} comparator;
-	// 	return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin(), comparator);
-	// }
-
 	template<typename Container, typename Key>
 	inline bool has_binding(const Container& container, const Key& key) {
 		return container.count(key) > 0;

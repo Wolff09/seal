@@ -17,7 +17,6 @@ static Vata2::Nfa::StringDict VATA_PARAMS = {{ "algo", "naive" }}; // algos: "na
 
 template<typename T>
 void copy_vector_contents(std::vector<T>& to, std::vector<T>& from) {
-	// TODO: throw std::logic_error("copy_vector_contents seems to broken.");
 	for (T elem : from) {
 		to.push_back(elem);
 	}
@@ -638,8 +637,7 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 	// assert(Vata2::Nfa::is_universal(from_nfa, translator.get_vata_alphabet(), VATA_PARAMS));
 	assert(!Vata2::Nfa::is_lang_empty(translator.get_wellformedness_nfa()));
 	assert(!Vata2::Nfa::is_lang_empty(from_nfa));
-	assert(!Vata2::Nfa::is_lang_empty(behavior)); // TODO: what to do about this?
-	// VataNfa behavior = from_nfa;
+	assert(!Vata2::Nfa::is_lang_empty(behavior));
 
 	GuaranteeSet result = std::move(baseline);
 	for (const auto& guarantee : guarantee_table) {
@@ -756,6 +754,7 @@ InferenceEngine::InferenceEngine(const Program& program, const GuaranteeTable& g
 	// init key_helper
 	guarantee_count = 0;
 	for (const auto& guarantee : guarantee_table) {
+		raise_if_assumption_unsatisfied(*guarantee.observer);
 		auto res = key_helper.insert({ &guarantee, guarantee_count++ });
 		if (!res.second) {
 			throw std::logic_error("Failed to create key_helper.");
@@ -763,8 +762,6 @@ InferenceEngine::InferenceEngine(const Program& program, const GuaranteeTable& g
 	}
 	assert(guarantee_count == guarantee_table.all_guarantees.size());
 	assert(guarantee_count == key_helper.size());
-
-	// TODO: ensure that the observers of all guarantees satisfy our 1thread1ptr assumption
 }
 
 GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {

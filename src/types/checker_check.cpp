@@ -195,7 +195,7 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 		assert(prtypes::has_binding(current_type_environment, rhs));
 		
 		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
-		sum.erase(guarantee_table.local_guarantee()); // TODO: correct?
+		sum.erase(guarantee_table.local_guarantee());
 		sum = inference.infer(sum);
 		current_type_environment.at(lhs) = sum;
 		current_type_environment.at(rhs) = sum;

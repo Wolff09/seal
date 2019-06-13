@@ -558,7 +558,7 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 		}
 	}
 	void visit(Program& node) {
-		// TODO: what about the initializer
+		// TODO: handle initializer
 		for (auto& function : node.functions) {
 			assert(function);
 			function->accept(*this);

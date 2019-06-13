@@ -154,8 +154,8 @@ std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::F
 	result->states.push_back(std::make_unique<State>(name_prefix + ".9", false, false));
 	result->states.push_back(std::make_unique<State>(name_prefix + ".10", false, false));
 	result->states.push_back(std::make_unique<State>(name_prefix + ".11", false, false));
-	result->states.push_back(std::make_unique<State>(name_prefix + ".12", false, false)); // TODO: should those states be final??
-	result->states.push_back(std::make_unique<State>(name_prefix + ".13", false, false)); // TODO: should those states be final??
+	result->states.push_back(std::make_unique<State>(name_prefix + ".12", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".13", false, false));
 
 	// protect observed
 	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(0), *result->states.at(1), protect_function, *result->variables.at(0), *result->variables.at(1)));
@@ -474,17 +474,6 @@ std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee
 	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(16), *obs_safe->states.at(14), transfer_protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(15), *obs_safe->states.at(0), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
 	obs_safe->transitions.push_back(mk_transition_invocation_self_neg(*obs_safe->states.at(16), *obs_safe->states.at(5), protect_function, *obs_safe->variables.at(0), *obs_safe->variables.at(1)));
-
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
-	// TODO: 
-	// ************************************************************************************************************************************* //
-	// ************************************************************************************************************************************* //
 
 	result.push_back(std::move(obs_prep));
 	result.push_back(std::move(obs_safe));

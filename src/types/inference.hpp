@@ -13,7 +13,7 @@
 
 namespace prtypes {
 
-	// TODO: we assume that observers have exactly 1 thread and 1 pointer observer variable
+	// NOTE: we assume that observers have exactly 1 thread and 1 pointer observer variable
 
 	using VataNfa = Vata2::Nfa::Nfa;
 	using VataAlphabet = Vata2::Nfa::EnumAlphabet;

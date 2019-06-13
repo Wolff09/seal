@@ -149,7 +149,7 @@ struct EqualFreeable {
 		for (const auto& decl : match.label.args) {
 			auto variable = unit.variable(prefix + decl->name);
 			auto other = unit.variable(otherPrefix + decl->name);
-			conjuncts.push_back(z3::implies(variable == ovar, other ==ovar)); // TODO: is this the correct direction
+			conjuncts.push_back(z3::implies(variable == ovar, other ==ovar));
 		}
 		return z3::mk_and(conjuncts);
 	}
