@@ -168,13 +168,13 @@ std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::F
 	result->transitions.push_back(mk_transition_response_self(*result->states.at(9), *result->states.at(11), protect_function, *result->variables.at(0)));
 
 	// protect unobserved
-	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(1), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(2), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(3), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
-	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(12), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
-	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(13), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(10), *result->states.at(6), protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(11), *result->states.at(7), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(1), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(12), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(13), *result->states.at(0), protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(8), *result->states.at(6), protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(9), *result->states.at(7), protect_function, *result->variables.at(0), *result->variables.at(1)));
 
@@ -189,14 +189,14 @@ std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::F
 	result->transitions.push_back(mk_transition_response_self(*result->states.at(13), *result->states.at(11), transfer_protect_function, *result->variables.at(0)));
 
 	// transfer unobserved
-	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(5), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(6), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(7), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(10), *result->states.at(2), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(11), *result->states.at(3), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(5), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(8), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(9), *result->states.at(0), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
-	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(10), *result->states.at(2), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(12), *result->states.at(2), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
-	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(11), *result->states.at(3), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 	result->transitions.push_back(mk_transition_invocation_self_neg(*result->states.at(13), *result->states.at(3), transfer_protect_function, *result->variables.at(0), *result->variables.at(1)));
 
 	// retire

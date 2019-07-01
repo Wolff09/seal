@@ -137,8 +137,9 @@ static void read_input() {
 	std::cout << std::endl << "Preparing SMR observers... " << std::flush;
 	input.store = std::make_unique<SmrObserverStore>(program, retire);
 	SmrObserverStore& store = *input.store;
+	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1));
+	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
 	store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
-	store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
 	std::cout << "done" << std::endl;
 	std::cout << "The SMR observer is the cross-product of: " << std::endl;
 	cola::print(*store.base_observer, std::cout);
@@ -182,7 +183,7 @@ static void read_input() {
 			}
 		};
 		add_guarantees(protect1, &protect2);
-		add_guarantees(protect2);
+		add_guarantees(protect2, &protect1);
 	}
 
 	if (config.verbose) {
