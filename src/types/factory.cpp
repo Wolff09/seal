@@ -19,6 +19,11 @@ inline std::unique_ptr<Transition> mk_transition_invocation_any_thread(const Sta
 	return std::make_unique<Transition>(src, dst, function, Transition::INVOCATION, std::move(guard));
 }
 
+inline std::unique_ptr<Transition> mk_transition_invocation_self(const State& src, const State& dst, const Function& func, const ObserverVariable& obsvar_thread) {
+	auto guard = std::make_unique<EqGuard>(obsvar_thread, std::make_unique<SelfGuardVariable>());
+	return std::make_unique<Transition>(src, dst, func, Transition::INVOCATION, std::move(guard));
+}
+
 inline std::unique_ptr<Transition> mk_transition_invocation_self(const State& src, const State& dst, const Function& func, const ObserverVariable& obsvar_thread, const ObserverVariable& obsvar_arg) {
 	auto guard_thr = std::make_unique<EqGuard>(obsvar_thread, std::make_unique<SelfGuardVariable>());
 	auto guard_arg = std::make_unique<EqGuard>(obsvar_arg, std::make_unique<ArgumentGuardVariable>(*func.args.at(0)));
@@ -125,7 +130,7 @@ std::unique_ptr<Observer> prtypes::make_hp_no_transfer_observer(const Function& 
 	return result;
 }
 
-std::unique_ptr<cola::Observer> prtypes::make_hp_transfer_observer(const cola::Function& retire_function, const cola::Function& protect_function, const cola::Function& transfer_protect_function, std::string id) {
+std::unique_ptr<Observer> prtypes::make_hp_transfer_observer(const Function& retire_function, const Function& protect_function, const Function& transfer_protect_function, std::string id) {
 	auto [free_function, ptrtype] = get_basics();
 	assert(takes_single_pointer(free_function));
 	assert(takes_single_pointer(retire_function));
@@ -296,13 +301,13 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_no_transfer_guarantee_ob
 	return result;
 }
 
-std::vector<std::unique_ptr<cola::Observer>> prtypes::make_hp_transfer_guarantee_observers(const cola::Function& retire_function, const cola::Function& protect_function, const cola::Function& transfer_protect_function, std::string id) {
+std::vector<std::unique_ptr<Observer>> prtypes::make_hp_transfer_guarantee_observers(const Function& retire_function, const Function& protect_function, const Function& transfer_protect_function, std::string id) {
 	auto [free_function, ptrtype] = get_basics();
 	assert(takes_single_pointer(free_function));
 	assert(takes_single_pointer(retire_function));
 	assert(takes_single_pointer(protect_function));
 
-	std::vector<std::unique_ptr<cola::Observer>> result = make_hp_no_transfer_guarantee_observers(retire_function, protect_function, id);
+	std::vector<std::unique_ptr<Observer>> result = make_hp_no_transfer_guarantee_observers(retire_function, protect_function, id);
 
 	auto obs_prep = std::make_unique<Observer>();
 	obs_prep->negative_specification = false;
@@ -515,4 +520,36 @@ std::unique_ptr<Observer> prtypes::make_last_free_observer(const Program& /*prog
 	// }
 
 	// return result;
+}
+
+std::unique_ptr<Observer> prtypes::make_ebr_observer(const Function& retire_function, const Function& enter_function, const Function& leave_function, std::string id) {
+	auto [free_function, ptrtype] = get_basics();
+	assert(takes_single_pointer(retire_function));
+	assert(enter_function.args.size() == 0);
+	assert(leave_function.args.size() == 0);
+	std::string name_prefix = "EBR" + id;
+
+	auto result = std::make_unique<Observer>();
+	result->negative_specification = true;
+
+	// variables
+	result->variables.push_back(std::make_unique<ThreadObserverVariable>(name_prefix + ":thread"));
+	result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
+
+	// states
+	result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".3", false, true));
+
+	// 'forward' transitions
+	result->transitions.push_back(mk_transition_response_self(*result->states.at(0), *result->states.at(1), leave_function, *result->variables.at(0)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(1), *result->states.at(2), retire_function, *result->variables.at(1)));
+	result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(2), *result->states.at(3), free_function, *result->variables.at(1)));
+
+	// 'backward' transitions
+	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(1), *result->states.at(0), enter_function, *result->variables.at(0)));
+	result->transitions.push_back(mk_transition_invocation_self(*result->states.at(2), *result->states.at(0), enter_function, *result->variables.at(0)));
+
+	return result;
 }

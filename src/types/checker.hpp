@@ -117,6 +117,7 @@ namespace prtypes {
 			bool inside_atomic = false;
 			const cola::Assert* current_assert;
 			std::vector<TypeEnv> break_envs;
+			std::unique_ptr<cola::VariableDeclaration> current_angel;
 
 			struct VariableOrDereferenceOrNull {
 				std::optional<const cola::VariableDeclaration*> var;

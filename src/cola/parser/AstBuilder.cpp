@@ -468,16 +468,17 @@ antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* con
 	return result;
 }
 
-antlrcpp::Any AstBuilder::visitAngelChoose(cola::CoLaParser::AngelChooseContext* context) {
-	throw std::logic_error("ANGel NOT YET PARSED");
+antlrcpp::Any AstBuilder::visitAngelChoose(cola::CoLaParser::AngelChooseContext* /*context*/) {
+	return (Command*) new AngelChoose();
 }
 
-antlrcpp::Any AstBuilder::visitAngelActive(cola::CoLaParser::AngelActiveContext* context) {
-	throw std::logic_error("ANGel NOT YET PARSED");
+antlrcpp::Any AstBuilder::visitAngelActive(cola::CoLaParser::AngelActiveContext* /*context*/) {
+	return (Command*) new AngelActive();
 }
 
 antlrcpp::Any AstBuilder::visitAngelContains(cola::CoLaParser::AngelContainsContext* context) {
-	throw std::logic_error("ANGel NOT YET PARSED");
+	const VariableDeclaration& decl = lookupVariable(context->name->getText());
+	return (Command*) new AngelContains(decl);
 }
 
 
@@ -633,7 +634,7 @@ antlrcpp::Any AstBuilder::visitCmdAssert(cola::CoLaParser::CmdAssertContext* con
 }
 
 antlrcpp::Any AstBuilder::visitCmdAngel(cola::CoLaParser::CmdAngelContext* context) {
-	throw std::logic_error("ANGel NOT YET PARSED");
+	return as_command(context->expr->accept(this).as<Command*>());
 }
 
 antlrcpp::Any AstBuilder::visitCmdCall(cola::CoLaParser::CmdCallContext* context) {

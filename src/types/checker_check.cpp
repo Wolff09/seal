@@ -288,15 +288,40 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Va
 
 
 void TypeChecker::check_angel_choose() {
-	throw std::logic_error("ANGEL TYPE CHECK NOT YET IMPLEMENTED");
+	conditionally_raise_error<TypeCheckError>(!!current_angel, "Only one angel allocation per function execution supported (don't put it into loops).");
+	current_angel = std::make_unique<VariableDeclaration>("§A§", guarantee_table.observer_store.retire_function.args.at(0)->type, false);
+	assert(!prtypes::has_binding(current_type_environment, *current_angel));
+	current_type_environment[*current_angel].clear();
+
+	debug_type_env(current_type_environment, "@angle(choose) post");
 }
 
 void TypeChecker::check_angel_active() {
-	throw std::logic_error("ANGEL TYPE CHECK NOT YET IMPLEMENTED");
+	conditionally_raise_error<TypeCheckError>(!current_angel, "Angel used but not allocated.");
+	assert(prtypes::has_binding(current_type_environment, *current_angel));
+
+	// debug_type_env(current_type_environment, "@angle(active) pre");
+
+	GuaranteeSet type = current_type_environment.at(*current_angel);
+	type.insert(guarantee_table.active_guarantee());
+	type = inference.infer(type);
+	current_type_environment.at(*current_angel) = type;
+
+	// debug_type_env(current_type_environment, "@angle(active) post");
 }
 
-void TypeChecker::check_angel_contains(const VariableDeclaration& /*ptr*/) {
-	throw std::logic_error("ANGEL TYPE CHECK NOT YET IMPLEMENTED");
+void TypeChecker::check_angel_contains(const VariableDeclaration& ptr) {
+	conditionally_raise_error<TypeCheckError>(!current_angel, "Angel used but not allocated.");
+	assert(prtypes::has_binding(current_type_environment, *current_angel));
+	assert(prtypes::has_binding(current_type_environment, ptr));
+
+	// debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) pre");
+
+	GuaranteeSet sum = prtypes::merge(current_type_environment.at(*current_angel), current_type_environment.at(ptr));
+	sum = inference.infer(sum);
+	current_type_environment.at(ptr) = sum;
+
+	// debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) post");
 }
 
 
@@ -526,6 +551,13 @@ void TypeChecker::check_while(const While& whl) {
 void TypeChecker::check_interface_function(const Function& function) {
 	std::cout << "[" << function.name << "]" << std::endl;
 	function.body->accept(*this);
+
+	// clean up
+	if (current_angel) {
+		assert(prtypes::has_binding(current_type_environment, *current_angel));
+		current_type_environment.erase(*current_angel);
+	}
+	current_angel.release();
 }
 
 void TypeChecker::check_program(const Program& program) {
