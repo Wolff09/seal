@@ -46,6 +46,9 @@ struct NameCollectorVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) override { /* do nothing */ }
 	void visit(const Assume& /*node*/) override { /* do nothing */ }
 	void visit(const Assert& /*node*/) override { /* do nothing */ }
+	void visit(const AngelChoose& /*node*/) override { /* do nothing */ }
+	void visit(const AngelActive& /*node*/) override { /* do nothing */ }
+	void visit(const AngelContains& /*node*/) override { /* do nothing */ }
 	void visit(const Return& /*node*/) override { /* do nothing */ }
 	void visit(const Malloc& /*node*/) override { /* do nothing */ }
 	void visit(const Assignment& /*node*/) override { /* do nothing */ }
@@ -127,6 +130,9 @@ struct LocalExpressionVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assignment&)"); }
@@ -183,6 +189,9 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 	void visit(Continue& /*node*/) { /* do nothing */ }
 	void visit(Assume& /*node*/) { /* do nothing */ }
 	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(AngelChoose& /*node*/) { /* do nothing */ }
+	void visit(AngelActive& /*node*/) { /* do nothing */ }
+	void visit(AngelContains& /*node*/) { /* do nothing */ }
 	void visit(Return& /*node*/) { /* do nothing */ }
 	void visit(Malloc& /*node*/) { /* do nothing */ }
 	void visit(Assignment& /*node*/) { /* do nothing */ }
@@ -348,6 +357,9 @@ struct AssignmentExpressionVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) override { throw std::logic_error("Unexpected invocation: AssignmentExpressionVisitor::visit(const Assignment&)"); }
@@ -424,6 +436,9 @@ struct InsertionLocationFinderVisitor final : public Visitor {
 	void visit(const Macro& node) override { if (on_path) { full_path.push_back(&node); } }
 	void visit(const CompareAndSwap& node) override { if (on_path) { full_path.push_back(&node); } }
 	void visit(const Assert& node) override { if (on_path) { full_path.push_back(&node); } }
+	void visit(const AngelChoose& /*node*/) override { throw std::logic_error("CANNOT HANDLE ANGELS WHEN FIXING RACES"); }
+	void visit(const AngelActive& /*node*/) override { throw std::logic_error("CANNOT HANDLE ANGELS WHEN FIXING RACES"); }
+	void visit(const AngelContains& /*node*/) override { throw std::logic_error("CANNOT HANDLE ANGELS WHEN FIXING RACES"); }
 	void visit(const Malloc& malloc) override {
 		if (variables.count(&malloc.lhs) > 0) {
 			on_path = true;
@@ -618,6 +633,9 @@ struct RightMovernessVisitor final : public Visitor {
 		}
 	}
 	void visit(const Assert& /*node*/) override { /* do nothing */ }
+	void visit(const AngelChoose& /*node*/) override { throw std::logic_error("CANNOT HANDLE ANGELS WHEN FIXING RACES"); }
+	void visit(const AngelActive& /*node*/) override { throw std::logic_error("CANNOT HANDLE ANGELS WHEN FIXING RACES"); }
+	void visit(const AngelContains& /*node*/) override { throw std::logic_error("CANNOT HANDLE ANGELS WHEN FIXING RACES"); }
 	void visit(const Return& /*node*/) override {
 		this->moves = false;
 	}

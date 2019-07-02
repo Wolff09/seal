@@ -1,0 +1,108 @@
+#name "Treiber's Stack EBR"
+#cavespec "stack_spec.cav"
+#instrumentation "container"
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* TOS;
+
+extern void retire(Node* ptr);
+extern void enterQ();
+extern void leaveQ();
+
+
+void init() {
+	TOS = NULL;
+}
+
+void push(data_t e) {
+	Node* top, node;
+
+	atomic {
+		angel(choose);
+		leaveQ();
+		angel(active);
+	}
+
+	node = malloc;
+	node->val = e;
+	node->next = NULL;
+
+	while (true) {
+		top = TOS;
+		angel(contains(top));
+		choose {
+			atomic {
+				assert(active(TOS));
+				assume(top == TOS);
+			}
+			node->next = top;
+			choose {
+				atomic {
+					assert(active(TOS));
+					assume(TOS == top);
+					TOS = node;
+					break;
+				}
+			}{
+				assume(TOS != top);
+			}
+		}{
+			assume(top != TOS);
+		}
+	}
+
+	enterQ();
+}
+
+data_t pop() {
+	Node* top, next;
+	data_t result;
+	bool flag;
+
+	atomic {
+		angel(choose);
+		leaveQ();
+		angel(active);
+	}
+
+	while (true) {
+		atomic {
+			top = TOS;
+			angel(contains(top));
+		}
+		if (top == NULL) {
+			result = EMPTY;
+			break;
+
+		} else {
+			choose {
+				atomic {
+					assert(active(TOS));
+					assume(top == TOS);
+				}
+				next = top->next;
+				angel(contains(next));
+				choose {
+					atomic {
+						assert(active(TOS));
+						assume(TOS == top);
+						retire(top);
+					}
+					result = top->val;
+					break;
+				}{
+					assume(TOS != top);
+				}
+			}{
+				assume(top != TOS);
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}

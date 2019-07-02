@@ -67,6 +67,7 @@ command : 'skip'                               #cmdSkip
         | lhs=Identifier '=' 'malloc'          #cmdMalloc
         | 'assume' '(' expr=expression ')'     #cmdAssume
         | 'assert' '(' expr=invariant ')'      #cmdAssert
+        | 'angel' '(' expr=angelexpr ')'       #cmdAngel
         | name=Identifier '(' argList ')'      #cmdCall // TODO: support enter/exit
         | 'continue'                           #cmdContinue
         | 'break'                              #cmdBreak
@@ -114,6 +115,10 @@ invariant : 'active' '(' expr=expression ')'  #invActive
           | expr=expression                   #invExpr
           ;
 
+angelexpr : 'choose'                            #angelChoose
+          | 'active'                            #angelActive
+          | 'contains' '(' name=Identifier ')'  #angelContains
+          ;
 
 /* Lexer rules */
 

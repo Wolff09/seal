@@ -42,6 +42,9 @@ namespace cola {
 	struct Continue;
 	struct Assume;
 	struct Assert;
+	struct AngelChoose;
+	struct AngelActive;
+	struct AngelContains;
 	struct Return;
 	struct Malloc;
 	struct Assignment;
@@ -82,6 +85,9 @@ namespace cola {
 		virtual void visit(const Continue& node) = 0;
 		virtual void visit(const Assume& node) = 0;
 		virtual void visit(const Assert& node) = 0;
+		virtual void visit(const AngelChoose& node) = 0;
+		virtual void visit(const AngelActive& node) = 0;
+		virtual void visit(const AngelContains& node) = 0;
 		virtual void visit(const Return& node) = 0;
 		virtual void visit(const Malloc& node) = 0;
 		virtual void visit(const Assignment& node) = 0;
@@ -120,6 +126,9 @@ namespace cola {
 		virtual void visit(Continue& node) = 0;
 		virtual void visit(Assume& node) = 0;
 		virtual void visit(Assert& node) = 0;
+		virtual void visit(AngelChoose& node) = 0;
+		virtual void visit(AngelActive& node) = 0;
+		virtual void visit(AngelContains& node) = 0;
 		virtual void visit(Return& node) = 0;
 		virtual void visit(Malloc& node) = 0;
 		virtual void visit(Assignment& node) = 0;
@@ -427,6 +436,20 @@ namespace cola {
 		Assert(std::unique_ptr<Invariant> inv_) : inv(std::move(inv_)) {
 			assert(inv);
 		}
+		ACCEPT_COLA_VISITOR
+	};
+
+	struct AngelChoose : public Command {
+		ACCEPT_COLA_VISITOR
+	};
+
+	struct AngelActive : public Command {
+		ACCEPT_COLA_VISITOR
+	};
+
+	struct AngelContains : public Command {
+		const VariableDeclaration& var;
+		AngelContains(const VariableDeclaration& var_) : var(var_) {}
 		ACCEPT_COLA_VISITOR
 	};
 

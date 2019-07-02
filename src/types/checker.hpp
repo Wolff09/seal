@@ -57,6 +57,9 @@ namespace prtypes {
 			void visit(const cola::Continue& node) override;
 			void visit(const cola::Assume& node) override;
 			void visit(const cola::Assert& node) override;
+			void visit(const cola::AngelChoose& node) override;
+			void visit(const cola::AngelActive& node) override;
+			void visit(const cola::AngelContains& node) override;
 			void visit(const cola::Return& node) override;
 			void visit(const cola::Malloc& node) override;
 			void visit(const cola::Assignment& node) override;
@@ -95,6 +98,9 @@ namespace prtypes {
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::Expression& lhs, const cola::Expression& rhs);
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, const cola::VariableDeclaration& rhs);
 			void check_assign_nonpointer(const cola::Assignment& node, const cola::VariableDeclaration& lhs, const cola::Dereference& rhs_deref, const cola::VariableDeclaration& rhs_var);
+			void check_angel_choose();
+			void check_angel_active();
+			void check_angel_contains(const cola::VariableDeclaration& ptr);
 			void check_atomic_begin();
 			void check_atomic_end();
 			void check_scope(const cola::Scope& node);

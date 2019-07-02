@@ -80,6 +80,9 @@ struct RemoveUselessScopeVisitor final : NonConstVisitor {
 	void visit(Continue& /*node*/) { /* do nothing */ }
 	void visit(Assume& /*node*/) { /* do nothing */ }
 	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(AngelChoose& /*node*/) { /* do nothing */ }
+	void visit(AngelActive& /*node*/) { /* do nothing */ }
+	void visit(AngelContains& /*node*/) { /* do nothing */ }
 	void visit(Return& /*node*/) { /* do nothing */ }
 	void visit(Malloc& /*node*/) { /* do nothing */ }
 	void visit(Assignment& /*node*/) { /* do nothing */ }

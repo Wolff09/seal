@@ -468,6 +468,18 @@ antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* con
 	return result;
 }
 
+antlrcpp::Any AstBuilder::visitAngelChoose(cola::CoLaParser::AngelChooseContext* context) {
+	throw std::logic_error("ANGel NOT YET PARSED");
+}
+
+antlrcpp::Any AstBuilder::visitAngelActive(cola::CoLaParser::AngelActiveContext* context) {
+	throw std::logic_error("ANGel NOT YET PARSED");
+}
+
+antlrcpp::Any AstBuilder::visitAngelContains(cola::CoLaParser::AngelContainsContext* context) {
+	throw std::logic_error("ANGel NOT YET PARSED");
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -618,6 +630,10 @@ antlrcpp::Any AstBuilder::visitCmdAssume(cola::CoLaParser::CmdAssumeContext* con
 antlrcpp::Any AstBuilder::visitCmdAssert(cola::CoLaParser::CmdAssertContext* context) {
 	auto inv = std::unique_ptr<Invariant>(context->expr->accept(this).as<Invariant*>());
 	return as_command(new Assert(std::move(inv)));
+}
+
+antlrcpp::Any AstBuilder::visitCmdAngel(cola::CoLaParser::CmdAngelContext* context) {
+	throw std::logic_error("ANGel NOT YET PARSED");
 }
 
 antlrcpp::Any AstBuilder::visitCmdCall(cola::CoLaParser::CmdCallContext* context) {

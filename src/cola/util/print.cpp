@@ -165,6 +165,9 @@ struct PrintExpressionVisitor final : public Visitor {
 	void visit(const Continue& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Continue&))"); }
 	void visit(const Assume& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Assume&))"); }
 	void visit(const Assert& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Assert&))"); }
+	void visit(const AngelChoose& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const AngelChoose&))"); }
+	void visit(const AngelActive& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const AngelActive&))"); }
+	void visit(const AngelContains& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const AngelContains&))"); }
 	void visit(const Return& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Return&))"); }
 	void visit(const Malloc& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Malloc&))"); }
 	void visit(const Assignment& /*com*/) { throw std::logic_error("Unexpected invocation (PrintExpressionVisitor::visit(const Assignment&))"); }
@@ -364,6 +367,21 @@ struct PrintVisitor final : public Visitor {
 		stream << indent << "assert(";
 		com.inv->accept(exprinter);
 		stream << ");" << std::endl;
+	}
+
+	void visit(const AngelChoose& com) {
+		print_annotation(com);
+		stream << indent << "#angel(choose);" << std::endl;
+	}
+
+	void visit(const AngelActive& com) {
+		print_annotation(com);
+		stream << indent << "#angel(active);" << std::endl;
+	}
+
+	void visit(const AngelContains& com) {
+		print_annotation(com);
+		stream << indent << "#angel(contains(" << com.var.name << "));" << std::endl;
 	}
 
 	void visit(const Return& com) {

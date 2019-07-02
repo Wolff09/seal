@@ -84,6 +84,7 @@ namespace cola {
 			antlrcpp::Any visitCmdMalloc(cola::CoLaParser::CmdMallocContext* context) override;
 			antlrcpp::Any visitCmdAssume(cola::CoLaParser::CmdAssumeContext* context) override;
 			antlrcpp::Any visitCmdAssert(cola::CoLaParser::CmdAssertContext* context) override;
+			antlrcpp::Any visitCmdAngel(cola::CoLaParser::CmdAngelContext* context) override;
 			antlrcpp::Any visitCmdCall(cola::CoLaParser::CmdCallContext* context) override;
 			antlrcpp::Any visitCmdContinue(cola::CoLaParser::CmdContinueContext* context) override;
 			antlrcpp::Any visitCmdBreak(cola::CoLaParser::CmdBreakContext* context) override;
@@ -116,6 +117,9 @@ namespace cola {
 			antlrcpp::Any visitExprNegation(cola::CoLaParser::ExprNegationContext* context) override;
 			antlrcpp::Any visitInvExpr(cola::CoLaParser::InvExprContext* context) override;
 			antlrcpp::Any visitInvActive(cola::CoLaParser::InvActiveContext* context) override;
+			antlrcpp::Any visitAngelChoose(cola::CoLaParser::AngelChooseContext* context) override;
+			antlrcpp::Any visitAngelActive(cola::CoLaParser::AngelActiveContext* context) override;
+			antlrcpp::Any visitAngelContains(cola::CoLaParser::AngelContainsContext* context) override;
 
 			antlrcpp::Any visitOption(cola::CoLaParser::OptionContext *context) override;
 	};

@@ -34,6 +34,9 @@ struct IsTrueConditionVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) override {}
 	void visit(const Assume& /*node*/) override {}
 	void visit(const Assert& /*node*/) override {}
+	void visit(const AngelChoose& /*node*/) override {}
+	void visit(const AngelActive& /*node*/) override {}
+	void visit(const AngelContains& /*node*/) override {}
 	void visit(const Return& /*node*/) override {}
 	void visit(const Malloc& /*node*/) override {}
 	void visit(const Assignment& /*node*/) override {}
@@ -147,6 +150,9 @@ struct RemoveConditionalsVisitor final : public NonConstVisitor {
 	void visit(Continue& /*node*/) { /* do nothing */ }
 	void visit(Assume& /*node*/) { /* do nothing */ }
 	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(AngelChoose& /*node*/) { /* do nothing */ }
+	void visit(AngelActive& /*node*/) { /* do nothing */ }
+	void visit(AngelContains& /*node*/) { /* do nothing */ }
 	void visit(Return& /*node*/) { /* do nothing */ }
 	void visit(Malloc& /*node*/) { /* do nothing */ }
 	void visit(Assignment& /*node*/) { /* do nothing */ }

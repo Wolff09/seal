@@ -52,6 +52,15 @@ struct CopyCommandVisitor final : public Visitor {
 	void visit(const Assert& node) override {
 		this->result = std::make_unique<Assert>(cola::copy(*node.inv));
 	}
+	void visit(const AngelChoose& /*node*/) override {
+		this->result = std::make_unique<AngelChoose>();
+	}
+	void visit(const AngelActive& /*node*/) override {
+		this->result = std::make_unique<AngelActive>();
+	}
+	void visit(const AngelContains& node) override {
+		this->result = std::make_unique<AngelContains>(node.var);
+	}
 	void visit(const Malloc& node) override {
 		this->result = std::make_unique<Malloc>(node.lhs);
 	}

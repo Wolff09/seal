@@ -42,6 +42,9 @@ struct ContainsPointerVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) override { throw std::logic_error("Unexpected invocation: ContainsPointerVisitor::visit(const Assignment&)"); }
@@ -87,6 +90,9 @@ struct IsBinaryExpressionVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) override { result = false; }
 	void visit(const Assume& /*node*/) override { result = false; }
 	void visit(const Assert& /*node*/) override { result = false; }
+	void visit(const AngelChoose& /*node*/) override { result = false; }
+	void visit(const AngelActive& /*node*/) override { result = false; }
+	void visit(const AngelContains& /*node*/) override { result = false; }
 	void visit(const Return& /*node*/) override { result = false; }
 	void visit(const Malloc& /*node*/) override { result = false; }
 	void visit(const Assignment& /*node*/) override { result = false; }
@@ -131,6 +137,9 @@ struct TypeCheckBaseVisitor : public Visitor {
 	virtual void visit(const Continue& /*node*/) override { /* do nothing */ }
 	virtual void visit(const Assume& /*node*/) override { /* do nothing */ }
 	virtual void visit(const Assert& /*node*/) override { /* do nothing */ }
+	virtual void visit(const AngelChoose& /*node*/) override { /* do nothing */ }
+	virtual void visit(const AngelActive& /*node*/) override { /* do nothing */ }
+	virtual void visit(const AngelContains& /*node*/) override { /* do nothing */ }
 	virtual void visit(const Return& /*node*/) override { /* do nothing */ }
 	virtual void visit(const Malloc& /*node*/) override { /* do nothing */ }
 	virtual void visit(const Assignment& /*node*/) override { /* do nothing */ }
@@ -391,6 +400,18 @@ void TypeChecker::visit(const Assert& assrt) {
 	assrt.inv->accept(*this);
 	this->current_assert = nullptr;
 	this->visit_command_end();
+}
+
+void TypeChecker::visit(const AngelChoose& /*angel*/) {
+	this->check_angel_choose();
+}
+
+void TypeChecker::visit(const AngelActive& /*angel*/) {
+	this->check_angel_active();
+}
+
+void TypeChecker::visit(const AngelContains& angel) {
+	this->check_angel_contains(angel.var);
 }
 
 void TypeChecker::visit(const InvariantExpression& invariant) {

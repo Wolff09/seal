@@ -136,6 +136,15 @@ struct MacroCopyVisitor final : public Visitor {
 	void visit(const Assert& node) {
 		result = std::make_unique<Assert>(copy_node<Invariant>(*node.inv));
 	}
+	void visit(const AngelChoose& /*node*/) {
+		raise_error<UnsupportedConstructError>("angels are not supported in inline functions");
+	}
+	void visit(const AngelActive& /*node*/) {
+		raise_error<UnsupportedConstructError>("angels are not supported in inline functions");
+	}
+	void visit(const AngelContains& /*node*/) {
+		raise_error<UnsupportedConstructError>("angels are not supported in inline functions");
+	}
 	void visit(const Return& /*node*/) {
 		raise_error<UnsupportedConstructError>("'return' is not supported in inline functions");
 	}
@@ -186,6 +195,9 @@ struct InliningVisitor final : public NonConstVisitor {
 	void visit(Continue& /*node*/) { /* do nothing */ }
 	void visit(Assume& /*node*/) { /* do nothing */ }
 	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(AngelChoose& /*node*/) { /* do nothing */ }
+	void visit(AngelActive& /*node*/) { /* do nothing */ }
+	void visit(AngelContains& /*node*/) { /* do nothing */ }
 	void visit(Return& /*node*/) { /* do nothing */ }
 	void visit(Malloc& /*node*/) { /* do nothing */ }
 	void visit(Assignment& /*node*/) { /* do nothing */ }
@@ -294,6 +306,9 @@ struct CollectDerefVisitor final : public Visitor {
 	void visit(const Break& /*node*/) { is_assume = false; }
 	void visit(const Continue& /*node*/) { is_assume = false; }
 	void visit(const Assert& /*node*/) { is_assume = false; }
+	void visit(const AngelChoose& /*node*/) { is_assume = false; }
+	void visit(const AngelActive& /*node*/) { is_assume = false; }
+	void visit(const AngelContains& /*node*/) { is_assume = false; }
 	void visit(const Return& /*node*/) { is_assume = false; }
 	void visit(const Malloc& /*node*/) { is_assume = false; }
 	void visit(const Assignment& /*node*/) { is_assume = false; }
@@ -355,6 +370,9 @@ struct LocalExpressionVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation: LocalExpressionVisitor::visit(const Assignment&)"); }
@@ -408,6 +426,9 @@ struct NeedsAtomicVisitor final : public Visitor {
 	void visit(const Skip& /*node*/) override { this->result = false; }
 	void visit(const Break& /*node*/) override { this->result = false; }
 	void visit(const Continue& /*node*/) override { this->result = false; }
+	void visit(const AngelChoose& /*node*/) override { this->result = false; } // TODO: correct?
+	void visit(const AngelActive& /*node*/) override { this->result = false; } // TODO: correct?
+	void visit(const AngelContains& /*node*/) override { this->result = false; } // TODO: correct?
 	void visit(const Assume& node) override {
 		if (is_expression_local(*node.expr)) {
 			this->result = false;
@@ -545,6 +566,9 @@ struct PreprocessingVisitor final : public NonConstVisitor {
 	void visit(Skip& /*node*/) { found_cmd = true; }
 	void visit(Assume& /*node*/) { found_cmd = true; }
 	void visit(Assert& /*node*/) { found_cmd = true; }
+	void visit(AngelChoose& /*node*/) { found_cmd = true; }
+	void visit(AngelActive& /*node*/) { found_cmd = true; }
+	void visit(AngelContains& /*node*/) { found_cmd = true; }
 	void visit(Return& /*node*/) { found_cmd = true; found_return = true; }
 	void visit(Malloc& /*node*/) { found_cmd = true; }
 	void visit(Assignment& /*node*/) { found_cmd = true; }

@@ -349,6 +349,9 @@ struct CallVisitor final : Visitor {
 	void visit(const Continue& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) override { throw std::logic_error("Unexpected invocation: CallVisitor::visit(const Assignment&)"); }

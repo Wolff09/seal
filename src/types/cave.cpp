@@ -87,6 +87,9 @@ struct DerefAssignmentVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) { deref_has_ended = deref_has_begun; }
 	void visit(const Assume& /*node*/) { deref_has_ended = deref_has_begun; }
 	void visit(const Assert& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const AngelChoose& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const AngelActive& /*node*/) { deref_has_ended = deref_has_begun; }
+	void visit(const AngelContains& /*node*/) { deref_has_ended = deref_has_begun; }
 	void visit(const Return& /*node*/) { deref_has_ended = deref_has_begun; }
 	void visit(const Malloc& /*node*/) { deref_has_ended = deref_has_begun; }
 	void visit(const Enter& /*node*/) { deref_has_ended = deref_has_begun; }
@@ -589,6 +592,10 @@ struct CaveOutputVisitor : public Visitor {
 			}
 		}
 	}
+
+	void visit(const AngelChoose& /*angel*/) { throw std::logic_error("CAVE INSTRUMENTATION FOR ANGELS NOT YET IMPLEMENTED"); }
+	void visit(const AngelActive& /*angel*/) { throw std::logic_error("CAVE INSTRUMENTATION FOR ANGELS NOT YET IMPLEMENTED"); }
+	void visit(const AngelContains& /*angel*/) { throw std::logic_error("CAVE INSTRUMENTATION FOR ANGELS NOT YET IMPLEMENTED"); }
 
 	void visit(const Malloc& malloc) {
 		stream << indent << var2cave(malloc.lhs) << " = new();" << std::endl;

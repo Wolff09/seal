@@ -138,6 +138,9 @@ struct IsVariableVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) override { result = nullptr; }
 	void visit(const Assume& /*node*/) override { result = nullptr; }
 	void visit(const Assert& /*node*/) override { result = nullptr; }
+	void visit(const AngelChoose& /*node*/) override { result = nullptr; }
+	void visit(const AngelActive& /*node*/) override { result = nullptr; }
+	void visit(const AngelContains& /*node*/) override { result = nullptr; }
 	void visit(const Return& /*node*/) override { result = nullptr; }
 	void visit(const Malloc& /*node*/) override { result = nullptr; }
 	void visit(const Assignment& /*node*/) override { result = nullptr; }

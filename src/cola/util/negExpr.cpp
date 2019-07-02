@@ -72,6 +72,9 @@ struct NegateExpressionVisitor final : public Visitor {
 	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Continue&))"); }
 	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Assume&))"); }
 	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Assert&))"); }
+	void visit(const AngelChoose& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const AngelChoose&))"); }
+	void visit(const AngelActive& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const AngelActive&))"); }
+	void visit(const AngelContains& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const AngelContains&))"); }
 	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Return&))"); }
 	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Malloc&))"); }
 	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation (NegateExpressionVisitor::visit(const Assignment&))"); }

@@ -70,6 +70,9 @@ struct CasFinderVisitor : public Visitor {
 	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation: CasFinderVisitor::visit(const Assignment&)"); }
@@ -114,6 +117,9 @@ struct CasConditionNeesTransformationVisitor : public Visitor {
 	void visit(const Continue& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Continue&)"); }
 	void visit(const Assume& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Assume&)"); }
 	void visit(const Assert& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Assert&)"); }
+	void visit(const AngelChoose& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const AngelChoose&)"); }
+	void visit(const AngelActive& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const AngelActive&)"); }
+	void visit(const AngelContains& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const AngelContains&)"); }
 	void visit(const Return& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Return&)"); }
 	void visit(const Malloc& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Malloc&)"); }
 	void visit(const Assignment& /*node*/) { throw std::logic_error("Unexpected invocation: CasConditionNeesTransformationVisitor::visit(const Assignment&)"); }
@@ -287,6 +293,9 @@ struct CasRemovalVisitor : public NonConstVisitor {
 		assert(!contains_cas(*node.expr));
 	}
 	void visit(Assert& /*node*/) { /* do nothing */ }
+	void visit(AngelChoose& /*node*/) { /* do nothing */ }
+	void visit(AngelActive& /*node*/) { /* do nothing */ }
+	void visit(AngelContains& /*node*/) { /* do nothing */ }
 	void visit(Return& /*node*/) { /* do nothing */ }
 	void visit(Malloc& /*node*/) { /* do nothing */ }
 	void visit(Assignment& /*node*/) { /* do nothing */ }

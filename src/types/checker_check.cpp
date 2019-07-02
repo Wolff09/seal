@@ -287,6 +287,19 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Va
 }
 
 
+void TypeChecker::check_angel_choose() {
+	throw std::logic_error("ANGEL TYPE CHECK NOT YET IMPLEMENTED");
+}
+
+void TypeChecker::check_angel_active() {
+	throw std::logic_error("ANGEL TYPE CHECK NOT YET IMPLEMENTED");
+}
+
+void TypeChecker::check_angel_contains(const VariableDeclaration& /*ptr*/) {
+	throw std::logic_error("ANGEL TYPE CHECK NOT YET IMPLEMENTED");
+}
+
+
 void TypeChecker::check_scope(const Scope& scope) {
 	// populate current_type_environment with empty guarantees for declared pointer variables
 	for (const auto& decl : scope.variables) {
