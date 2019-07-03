@@ -293,7 +293,7 @@ void TypeChecker::check_angel_choose() {
 	assert(!prtypes::has_binding(current_type_environment, *current_angel));
 	current_type_environment[*current_angel].clear();
 
-	debug_type_env(current_type_environment, "@angle(choose) post");
+	// debug_type_env(current_type_environment, "@angle(choose) post");
 }
 
 void TypeChecker::check_angel_active() {

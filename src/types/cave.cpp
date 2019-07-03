@@ -156,9 +156,16 @@ struct CaveOutputVisitor : public Visitor {
 	const Program* program;
 	std::set<std::string> opt_keys = { "cave" };
 	bool inside_atomic = false;
+	bool top_level_scope = false;
 	std::vector<const Assignment*> derefs_in_current_atomic;
+	std::unique_ptr<VariableDeclaration> angel_ptr, angel_flag_active, angel_flag_contains;
 
 	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), instrument(true), retire(&retire_function), retire_type(&get_retire_type(retire_function)), whitelist(whitelist) {
+		if (instrument) {
+			this->angel_ptr = std::make_unique<VariableDeclaration>("_ANGEL_PTR", *this->retire_type, false);
+			this->angel_flag_active = std::make_unique<VariableDeclaration>("_ANGEL_ACTIVE", Type::bool_type(), false);
+			this->angel_flag_contains = std::make_unique<VariableDeclaration>("_ANGEL_CONTAINS", Type::bool_type(), false);
+		}
 	}
 
 	CaveOutputVisitor(std::ostream& stream) : stream(stream), indent(stream), instrument(false), retire(nullptr), retire_type(nullptr), whitelist(nullptr) {
@@ -297,6 +304,19 @@ struct CaveOutputVisitor : public Visitor {
 		stream << indent << "}" << std::endl;
 	}
 
+	void print_expression_is_retired(std::string ptr_name) {
+		if (this->conf.INSTRUMENT_OBJECTS) {
+			stream << ptr_name << "->RETIRED_";
+		} else {
+			std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+			if (this->conf.INSTRUMENT_FLAG) {
+				stream << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_RETIRED_ && " << prefix << "INSTRUMENTATION_PTR_ == " << ptr_name;
+			} else {
+				stream << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_PTR_ == " << ptr_name;
+			}
+		}
+	}
+
 	void print_assert_macros() {
 		if (this->instrument) {
 			stream << indent << "class DummyFailHelper_ {" << std::endl;
@@ -319,16 +339,19 @@ struct CaveOutputVisitor : public Visitor {
 			stream << indent << "DummyFailHelper_ myNull_assertActive;" << std::endl;
 			stream << indent << "int myRes;" << std::endl;
 			stream << indent << "myNull_assertActive = NULL;" << std::endl;
-			if (this->conf.INSTRUMENT_OBJECTS) {
-				stream << indent << "if (ptr->RETIRED_) {" << std::endl;
-			} else {
-				std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
-				if (this->conf.INSTRUMENT_FLAG) {
-					stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_RETIRED_ && " << prefix << "INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
-				} else {
-					stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
-				}
-			}
+			stream << indent << "if (";
+			print_expression_is_retired("ptr");
+			stream << ") {" << std::endl;
+			// if (this->conf.INSTRUMENT_OBJECTS) {
+			// 	stream << indent << "if (ptr->RETIRED_) {" << std::endl;
+			// } else {
+			// 	std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+			// 	if (this->conf.INSTRUMENT_FLAG) {
+			// 		stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_RETIRED_ && " << prefix << "INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+			// 	} else {
+			// 		stream << indent << "if (" << prefix << "INSTRUMENTATION_PTR_ != NULL && " << prefix << "INSTRUMENTATION_PTR_ == ptr) {" << std::endl;
+			// 	}
+			// }
 			indent++;
 			stream << indent << "myRes = myNull_assertActive->field; // force verification failure" << std::endl;
 			indent--;
@@ -433,6 +456,17 @@ struct CaveOutputVisitor : public Visitor {
 		indent++;
 		for (const auto& decl : scope.variables) {
 			print_var_def(*decl);
+		}
+		if (this->top_level_scope) {
+			if (this->instrument) {
+				assert(this->angel_ptr);
+				assert(this->angel_flag_active);
+				assert(this->angel_flag_contains);
+				print_var_def(*this->angel_ptr);
+				print_var_def(*this->angel_flag_active);
+				print_var_def(*this->angel_flag_contains);
+			}
+			this->top_level_scope = false;
 		}
 		if (this->conf.INSTRUMENT_WITH_HINT && add_fix_me) {
 			stream << indent << "bool HINT_PROPHECY_;" << std::endl;
@@ -593,9 +627,36 @@ struct CaveOutputVisitor : public Visitor {
 		}
 	}
 
-	void visit(const AngelChoose& /*angel*/) { throw std::logic_error("CAVE INSTRUMENTATION FOR ANGELS NOT YET IMPLEMENTED"); }
-	void visit(const AngelActive& /*angel*/) { throw std::logic_error("CAVE INSTRUMENTATION FOR ANGELS NOT YET IMPLEMENTED"); }
-	void visit(const AngelContains& /*angel*/) { throw std::logic_error("CAVE INSTRUMENTATION FOR ANGELS NOT YET IMPLEMENTED"); }
+	void visit(const AngelChoose& /*angel*/) {
+		stream << indent << "atomic { // angle(choose)" << std::endl;
+		indent++;
+		stream << indent << var2cave(*this->angel_ptr) << " = *;" << std::endl;
+		stream << indent << var2cave(*this->angel_flag_contains) << " = false;" << std::endl;
+		stream << indent << var2cave(*this->angel_flag_active) << " = true;" << std::endl;
+		indent--;
+		stream << indent << "}" << std::endl;
+	}
+
+	void visit(const AngelActive& /*angel*/) {
+		stream << indent << "atomic { // angle(active)" << std::endl;
+		indent++;
+		// stream << indent << "if (" << var2cave(*this->angel_flag_contains) << ") { assertActive(" << var2cave(*this->angel_ptr) << "); }" << std::endl;
+		stream << indent << "if (";
+		print_expression_is_retired(this->angel_ptr->name);
+		stream << ") { " << var2cave(*this->angel_flag_active) << " = false; }" << std::endl;
+		stream << indent << "if (" << var2cave(*this->angel_flag_contains) << " && !" << var2cave(*this->angel_flag_active) << ") { fail(); }" << std::endl;
+		indent--;
+		stream << indent << "}" << std::endl;
+	}
+
+	void visit(const AngelContains& angel) {
+		stream << indent << "atomic { // angle(contains(" << angel.var.name << "))" << std::endl;
+		indent++;
+		stream << indent << "if (" << var2cave(*this->angel_ptr) << " == " << var2cave(angel.var) << ") { " << var2cave(*this->angel_flag_contains) << " = true; }" << std::endl;
+		stream << indent << "if (" << var2cave(*this->angel_flag_contains) << " && !" << var2cave(*this->angel_flag_active) << ") { fail(); }" << std::endl;
+		indent--;
+		stream << indent << "}" << std::endl;
+	}
 
 	void visit(const Malloc& malloc) {
 		stream << indent << var2cave(malloc.lhs) << " = new();" << std::endl;
@@ -727,8 +788,10 @@ struct CaveOutputVisitor : public Visitor {
 			print_requires(function);
 			assert(function.body);
 			add_fix_me = true;
+			top_level_scope = true;
 			function.body->accept(*this);
 			add_fix_me = false;
+			top_level_scope = false;
 			stream << std::endl;
 		}
 	}

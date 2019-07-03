@@ -90,6 +90,7 @@ data_t pop() {
 					atomic {
 						assert(active(TOS));
 						assume(TOS == top);
+						TOS = next;
 						retire(top);
 					}
 					result = top->val;
