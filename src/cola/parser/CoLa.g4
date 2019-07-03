@@ -117,6 +117,7 @@ invariant : 'active' '(' expr=expression ')'  #invActive
 
 angelexpr : 'choose'                            #angelChoose
           | 'active'                            #angelActive
+          | 'choose active'                     #angelChooseActive
           | 'contains' '(' name=Identifier ')'  #angelContains
           ;
 

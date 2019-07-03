@@ -371,7 +371,7 @@ struct PrintVisitor final : public Visitor {
 
 	void visit(const AngelChoose& com) {
 		print_annotation(com);
-		stream << indent << "#angel(choose);" << std::endl;
+		stream << indent << "#angel(choose" << (com.active ? " active" : "") << ");" << std::endl;
 	}
 
 	void visit(const AngelActive& com) {

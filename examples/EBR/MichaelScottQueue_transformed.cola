@@ -1,5 +1,5 @@
 #name "Michael&Scott's Queue"
-#cavespec "../queue_spec.cav"
+#cavespec "queue_spec.cav"
 #cave 'prover_opts imp_var = "CC_.Tail.next";'
 #instrumentation "container"
 
@@ -36,18 +36,39 @@ void enqueue(data_t value) {
 	while (true) {
 		tail = Tail;
 		angel(contains(tail));
-		next = tail->next;
 
-		if (tail == Tail) {
-			if (next != NULL) {
-				CAS(Tail, tail, next);
-
-			} else {
-				if (CAS(tail->next, NULL, node)) {
-					CAS(Tail, tail, node);
-					break;
-				}
+		choose {
+			atomic {
+				assert(active(Tail));
+				assume(tail == Tail);
 			}
+			next = tail->next;
+
+			choose {
+				atomic {
+					assert(active(Tail));
+					assume(tail == Tail);
+				}
+				if (next != NULL) {
+					atomic {
+						assert(active(Tail));
+						CAS(Tail, tail, next);
+					}
+
+				} else {
+					if (CAS(tail->next, NULL, node)) {
+						atomic {
+							assert(active(Tail));
+							CAS(Tail, tail, node);
+						}
+						break;
+					}
+				}
+			}{
+				skip;
+			}
+		}{
+			skip;
 		}
 	}
 
@@ -72,18 +93,26 @@ data_t dequeue() {
 		next = head->next;
 		angel(contains(next));
 
-		if (head == Head) {
+		choose {
+			atomic {
+				assert(active(Head));
+				assume(head == Head);
+			}
 			if (next == NULL) {
 				result = EMPTY;
 				break;
 
 			} else {
 				if (head == tail) {
-					CAS(Tail, tail, next);
+					atomic {
+						assert(active(Tail));
+						CAS(Tail, tail, next);
+					}
 
 				} else {
 					result = next->val;
 					atomic {
+						assert(active(Head));
 						if (CAS(Head, head, next)) {
 							retire(head); // moved left to avoid CAVE imprecision
 							flag = true;
@@ -97,6 +126,8 @@ data_t dequeue() {
 					}
 				}
 			}
+		}{
+			assume(head != Head);
 		}
 	}
 

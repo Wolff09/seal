@@ -469,11 +469,15 @@ antlrcpp::Any AstBuilder::visitInvActive(cola::CoLaParser::InvActiveContext* con
 }
 
 antlrcpp::Any AstBuilder::visitAngelChoose(cola::CoLaParser::AngelChooseContext* /*context*/) {
-	return (Command*) new AngelChoose();
+	return (Command*) new AngelChoose(false);
 }
 
 antlrcpp::Any AstBuilder::visitAngelActive(cola::CoLaParser::AngelActiveContext* /*context*/) {
 	return (Command*) new AngelActive();
+}
+
+antlrcpp::Any AstBuilder::visitAngelChooseActive(cola::CoLaParser::AngelChooseActiveContext* /*context*/) {
+	return (Command*) new AngelChoose(true);
 }
 
 antlrcpp::Any AstBuilder::visitAngelContains(cola::CoLaParser::AngelContainsContext* context) {

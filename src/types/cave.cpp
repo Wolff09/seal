@@ -101,6 +101,60 @@ struct DerefAssignmentVisitor final : public Visitor {
 };
 
 
+struct AngelVisitor final : Visitor {
+	bool result = false;
+	void visit(const VariableDeclaration& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const VariableDeclaration&)"); }
+	void visit(const Expression& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const Expression&)"); }
+	void visit(const BooleanValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const BooleanValue&)"); }
+	void visit(const NullValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const NullValue&)"); }
+	void visit(const EmptyValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const EmptyValue&)"); }
+	void visit(const MaxValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const MaxValue&)"); }
+	void visit(const MinValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const MinValue&)"); }
+	void visit(const NDetValue& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const NDetValue&)"); }
+	void visit(const VariableExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const VariableExpression&)"); }
+	void visit(const NegatedExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const NegatedExpression&)"); }
+	void visit(const BinaryExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const BinaryExpression&)"); }
+	void visit(const Dereference& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const Dereference&)"); }
+	void visit(const InvariantExpression& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const InvariantExpression&)"); }
+	void visit(const InvariantActive& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const InvariantActive&)"); }
+	void visit(const Program& /*node*/) override { throw std::logic_error("Unexpected invocation: AngelVisitor::visit(const Program&)"); }
+
+	void visit(const Sequence& node) override { node.first->accept(*this); node.second->accept(*this); }
+	void visit(const Scope& node) override { node.body->accept(*this); }
+	void visit(const Atomic& node) override { node.body->accept(*this); }
+	void visit(const Choice& node) override {
+		for (const auto& branch : node.branches) {
+			branch->accept(*this);
+		}
+	}
+	void visit(const IfThenElse& node) override { node.ifBranch->accept(*this); node.elseBranch->accept(*this); }
+	void visit(const Loop& node) override { node.body->accept(*this); }
+	void visit(const While& node) override { node.body->accept(*this); }
+	void visit(const Skip& /*node*/) override { /* do nothing */ }
+	void visit(const Break& /*node*/) override { /* do nothing */ }
+	void visit(const Continue& /*node*/) override { /* do nothing */ }
+	void visit(const Assume& /*node*/) override { /* do nothing */ }
+	void visit(const Assert& /*node*/) override { /* do nothing */ }
+	void visit(const AngelChoose& /*node*/) override { this->result = true; }
+	void visit(const AngelActive& /*node*/) override { this->result = true; }
+	void visit(const AngelContains& /*node*/) override { this->result = true; }
+	void visit(const Return& /*node*/) override { /* do nothing */ }
+	void visit(const Malloc& /*node*/) override { /* do nothing */ }
+	void visit(const Assignment& /*node*/) override { /* do nothing */ }
+	void visit(const Enter& /*node*/) override { /* do nothing */ }
+	void visit(const Exit& /*node*/) override { /* do nothing */ }
+	void visit(const Macro& /*node*/) override { /* do nothing */ }
+	void visit(const CompareAndSwap& /*node*/) override { /* do nothing */ }
+	void visit(const Function& node) override { if (node.body) { node.body->accept(*this); } }
+};
+
+bool contains_angels(const Function& function) {
+	AngelVisitor visitor;
+	function.accept(visitor);
+	return visitor.result;
+}
+
+
 struct CaveConfig {
 	bool INSTRUMENT_OBJECTS = true;
 	const bool INSTRUMENT_FLAG = false; // not supported (does not work)
@@ -155,16 +209,17 @@ struct CaveOutputVisitor : public Visitor {
 	bool needs_parents = false;
 	const Program* program;
 	std::set<std::string> opt_keys = { "cave" };
+	bool instrument_angels = false;
 	bool inside_atomic = false;
 	bool top_level_scope = false;
 	std::vector<const Assignment*> derefs_in_current_atomic;
-	std::unique_ptr<VariableDeclaration> angel_ptr, angel_flag_active, angel_flag_contains;
+	// std::unique_ptr<VariableDeclaration> angel_ptr, angel_flag_active, angel_flag_contains;
 
 	CaveOutputVisitor(std::ostream& stream, const Function& retire_function, const std::set<const Assert*>* whitelist) : stream(stream), indent(stream), instrument(true), retire(&retire_function), retire_type(&get_retire_type(retire_function)), whitelist(whitelist) {
 		if (instrument) {
-			this->angel_ptr = std::make_unique<VariableDeclaration>("_ANGEL_PTR", *this->retire_type, false);
-			this->angel_flag_active = std::make_unique<VariableDeclaration>("_ANGEL_ACTIVE", Type::bool_type(), false);
-			this->angel_flag_contains = std::make_unique<VariableDeclaration>("_ANGEL_CONTAINS", Type::bool_type(), false);
+			// this->angel_ptr = std::make_unique<VariableDeclaration>("_ANGEL_PTR", *this->retire_type, false);
+			// this->angel_flag_active = std::make_unique<VariableDeclaration>("_ANGEL_ACTIVE", Type::bool_type(), false);
+			// this->angel_flag_contains = std::make_unique<VariableDeclaration>("_ANGEL_CONTAINS", Type::bool_type(), false);
 		}
 	}
 
@@ -458,13 +513,13 @@ struct CaveOutputVisitor : public Visitor {
 			print_var_def(*decl);
 		}
 		if (this->top_level_scope) {
-			if (this->instrument) {
-				assert(this->angel_ptr);
-				assert(this->angel_flag_active);
-				assert(this->angel_flag_contains);
-				print_var_def(*this->angel_ptr);
-				print_var_def(*this->angel_flag_active);
-				print_var_def(*this->angel_flag_contains);
+			if (this->instrument_angels) {
+				// assert(this->angel_ptr);
+				// assert(this->angel_flag_active);
+				// assert(this->angel_flag_contains);
+				// print_var_def(*this->angel_ptr);
+				// print_var_def(*this->angel_flag_active);
+				// print_var_def(*this->angel_flag_contains);
 			}
 			this->top_level_scope = false;
 		}
@@ -627,35 +682,47 @@ struct CaveOutputVisitor : public Visitor {
 		}
 	}
 
-	void visit(const AngelChoose& /*angel*/) {
-		stream << indent << "atomic { // angle(choose)" << std::endl;
-		indent++;
-		stream << indent << var2cave(*this->angel_ptr) << " = *;" << std::endl;
-		stream << indent << var2cave(*this->angel_flag_contains) << " = false;" << std::endl;
-		stream << indent << var2cave(*this->angel_flag_active) << " = true;" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl;
+	void visit(const AngelChoose& angel) {
+		conditionally_raise_error<UnsupportedConstructError>(!angel.active, "Angel allocation must be active.");
+		conditionally_raise_error<UnsupportedConstructError>(this->conf.INSTRUMENT_OBJECTS, "Cannot instrument angels with instrumentation option 'object'; must be 'container'.");
+		conditionally_raise_error<UnsupportedConstructError>(this->conf.INSTRUMENT_FLAG, "Cannot instrument angels with 'INSTRUMENT_FLAG' set."); // because I'm lazy
+		if (instrument_angels) {
+			if (!this->inside_atomic) {
+				stream << indent << "atomic {" << std::endl;
+				indent++;
+			}
+			stream << indent << "assume(";
+			std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+			stream << prefix << "INSTRUMENTATION_PTR_ != NULL";
+			stream << "); // angel(choose)" << std::endl;
+			if (!this->inside_atomic) {
+				indent--;
+				stream << indent << "}" << std::endl;
+			}
+		}
 	}
 
 	void visit(const AngelActive& /*angel*/) {
-		stream << indent << "atomic { // angle(active)" << std::endl;
-		indent++;
-		// stream << indent << "if (" << var2cave(*this->angel_flag_contains) << ") { assertActive(" << var2cave(*this->angel_ptr) << "); }" << std::endl;
-		stream << indent << "if (";
-		print_expression_is_retired(this->angel_ptr->name);
-		stream << ") { " << var2cave(*this->angel_flag_active) << " = false; }" << std::endl;
-		stream << indent << "if (" << var2cave(*this->angel_flag_contains) << " && !" << var2cave(*this->angel_flag_active) << ") { fail(); }" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl;
+		raise_error<UnsupportedConstructError>("Active assertions on angels are not supported.");
 	}
 
 	void visit(const AngelContains& angel) {
-		stream << indent << "atomic { // angle(contains(" << angel.var.name << "))" << std::endl;
-		indent++;
-		stream << indent << "if (" << var2cave(*this->angel_ptr) << " == " << var2cave(angel.var) << ") { " << var2cave(*this->angel_flag_contains) << " = true; }" << std::endl;
-		stream << indent << "if (" << var2cave(*this->angel_flag_contains) << " && !" << var2cave(*this->angel_flag_active) << ") { fail(); }" << std::endl;
-		indent--;
-		stream << indent << "}" << std::endl;
+		conditionally_raise_error<UnsupportedConstructError>(this->conf.INSTRUMENT_OBJECTS, "Cannot instrument angels with instrumentation option 'object'; must be 'container'.");
+		conditionally_raise_error<UnsupportedConstructError>(this->conf.INSTRUMENT_FLAG, "Cannot instrument angels with 'INSTRUMENT_FLAG' set."); // because I'm lazy
+		if (instrument_angels) {
+			if (!this->inside_atomic) {
+				stream << indent << "atomic {" << std::endl;
+				indent++;
+			}
+			stream << indent << "if (";
+			std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
+			stream << prefix << "INSTRUMENTATION_PTR_ == " << angel.var.name;
+			stream << ") fail(); // angel(contains(" << angel.var.name << "))" << std::endl;
+			if (!this->inside_atomic) {
+				indent--;
+				stream << indent << "}" << std::endl;
+			}
+		}
 	}
 
 	void visit(const Malloc& malloc) {
@@ -775,7 +842,7 @@ struct CaveOutputVisitor : public Visitor {
 		} else {
 			print_delimiter(stream, function.name + "()");
 			assert(function.kind == Function::INTERFACE);
-			stream << indent << type2cave(function.return_type) << " " << function.name << "(";
+			stream << indent << type2cave(function.return_type) << " " << function.name << (this->instrument_angels ? "__ANGEL" : "") << "(";
 			bool first = true;
 			for (const auto& decl : function.args) {
 				if (!first) {
@@ -846,6 +913,12 @@ struct CaveOutputVisitor : public Visitor {
 		stream << std::endl;
 		for (const auto& function : program.functions) {
 			function->accept(*this);
+
+			if (this->instrument && contains_angels(*function)) {
+				this->instrument_angels = true;
+				function->accept(*this);
+				this->instrument_angels = false;
+			}
 		}
 	}
 };

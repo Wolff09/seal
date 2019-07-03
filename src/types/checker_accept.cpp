@@ -402,8 +402,8 @@ void TypeChecker::visit(const Assert& assrt) {
 	this->visit_command_end();
 }
 
-void TypeChecker::visit(const AngelChoose& /*angel*/) {
-	this->check_angel_choose();
+void TypeChecker::visit(const AngelChoose& angel) {
+	this->check_angel_choose(angel.active);
 }
 
 void TypeChecker::visit(const AngelActive& /*angel*/) {

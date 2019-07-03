@@ -440,6 +440,8 @@ namespace cola {
 	};
 
 	struct AngelChoose : public Command {
+		bool active;
+		AngelChoose(bool active=false) : active(active) {}
 		ACCEPT_COLA_VISITOR
 	};
 

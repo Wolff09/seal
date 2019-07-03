@@ -287,11 +287,15 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Va
 }
 
 
-void TypeChecker::check_angel_choose() {
+void TypeChecker::check_angel_choose(bool active) {
 	conditionally_raise_error<TypeCheckError>(!!current_angel, "Only one angel allocation per function execution supported (don't put it into loops).");
 	current_angel = std::make_unique<VariableDeclaration>("§A§", guarantee_table.observer_store.retire_function.args.at(0)->type, false);
 	assert(!prtypes::has_binding(current_type_environment, *current_angel));
 	current_type_environment[*current_angel].clear();
+
+	if (active) {
+		current_type_environment[*current_angel].insert(guarantee_table.active_guarantee());
+	}
 
 	// debug_type_env(current_type_environment, "@angle(choose) post");
 }

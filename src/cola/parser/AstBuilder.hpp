@@ -119,6 +119,7 @@ namespace cola {
 			antlrcpp::Any visitInvActive(cola::CoLaParser::InvActiveContext* context) override;
 			antlrcpp::Any visitAngelChoose(cola::CoLaParser::AngelChooseContext* context) override;
 			antlrcpp::Any visitAngelActive(cola::CoLaParser::AngelActiveContext* context) override;
+			antlrcpp::Any visitAngelChooseActive(cola::CoLaParser::AngelChooseActiveContext* context) override;
 			antlrcpp::Any visitAngelContains(cola::CoLaParser::AngelContainsContext* context) override;
 
 			antlrcpp::Any visitOption(cola::CoLaParser::OptionContext *context) override;
