@@ -1,4 +1,5 @@
-# project(name CXX)
+# project(seal CXX)
+set(TOOL_NAME seal)
 
 # built requirements
 cmake_minimum_required(VERSION 3.5)

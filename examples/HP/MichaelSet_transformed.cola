@@ -1,5 +1,6 @@
-#name "Michael's Set, simplified and manually transformed"
-#cavespec "set_spec.cav"
+#name "Michael's Set HP, simplified and manually transformed"
+#smr "HP"
+#cavespec "../set_spec.cav"
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
 #instrumentation "container"

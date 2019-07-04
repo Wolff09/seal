@@ -1,5 +1,6 @@
-#name "Vechev DCAS Set"
-#cavespec "set_spec.cav"
+#name "Vechev DCAS Set HP"
+#smr "HP"
+#cavespec "../set_spec.cav"
 // #cave 'prover_opts rem_sorted = "CC_.Head.next";'
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"

@@ -1,5 +1,6 @@
-#name "O'Hearn Set, manually transformed"
-#cavespec "set_spec.cav"
+#name "O'Hearn Set HP, manually transformed"
+#smr "HP"
+#cavespec "../set_spec.cav"
 #cave 'prover_opts imp_var = "CC_.Head.next";'
 #cavebound "key"
 #instrumentation "container"

@@ -1,5 +1,6 @@
-#name "Treiber's Stack"
-#cavespec "stack_spec.cav"
+#name "Treiber's Stack HP, manually transformed"
+#smr "HP"
+#cavespec "../stack_spec.cav"
 #instrumentation "container"
 
 struct Node {

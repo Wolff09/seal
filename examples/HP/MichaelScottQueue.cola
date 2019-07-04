@@ -1,5 +1,6 @@
-#name "Michael&Scott's Queue"
-#cavespec "queue_spec.cav"
+#name "Michael&Scott's Queue HP"
+#smr "HP"
+#cavespec "../queue_spec.cav"
 #cave 'prover_opts imp_var = "CC_.Tail.next";'
 #instrumentation "container"
 
