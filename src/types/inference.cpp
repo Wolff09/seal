@@ -721,6 +721,16 @@ void preprocess_inference(const GuaranteeTable& table, const GuaranteeSet& guara
 	if (guarantees.count(table.local_guarantee()) == 0) {
 		inference.erase(table.local_guarantee());
 	}
+	if (guarantees.count(table.active_guarantee()) == 0) {
+		inference.erase(table.active_guarantee());
+	}
+	if (prtypes::entails_valid(inference) && !prtypes::entails_valid(guarantees)) {
+		for (const auto& guarantee : table.all_guarantees) {
+			if (guarantee->entails_validity) {
+				inference.erase(*guarantee);
+			}
+		}
+	}
 
 	assert(prtypes::implies(prtypes::entails_valid(inference), prtypes::entails_valid(guarantees)));
 	assert(prtypes::implies(inference.count(table.local_guarantee()), guarantees.count(table.local_guarantee())));

@@ -142,8 +142,10 @@ struct MacroCopyVisitor final : public Visitor {
 	void visit(const AngelActive& /*node*/) {
 		raise_error<UnsupportedConstructError>("angels are not supported in inline functions");
 	}
-	void visit(const AngelContains& /*node*/) {
-		raise_error<UnsupportedConstructError>("angels are not supported in inline functions");
+	void visit(const AngelContains& node) {
+		VariableExpression expr(node.var); // tmp expression
+		auto expr_copy = copy_node<VariableExpression>(expr); // translate node.var properly
+		result = std::make_unique<AngelContains>(expr_copy->decl);
 	}
 	void visit(const Return& /*node*/) {
 		raise_error<UnsupportedConstructError>("'return' is not supported in inline functions");

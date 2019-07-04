@@ -1,0 +1,84 @@
+#name "Treiber's Stack EBR"
+#smr "EBR"
+#cavespec "../stack_spec.cav"
+#instrumentation "container"
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* TOS;
+
+extern void retire(Node* ptr);
+extern void enterQ();
+extern void leaveQ();
+
+
+void init() {
+	TOS = NULL;
+}
+
+void push(data_t e) {
+	Node* top, node;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	node = malloc;
+	node->val = e;
+	node->next = NULL;
+
+	while (true) {
+		top = TOS;
+		angel(member(top));
+		node->next = top;
+		if (CAS(TOS, top, node)) {
+			break;
+		}
+	}
+
+	enterQ();
+}
+
+data_t pop() {
+	Node* top, next;
+	data_t result;
+	bool flag;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	while (true) {
+		top = TOS;
+		if (top == NULL) {
+			result = EMPTY;
+			break;
+
+		} else {
+			angel(member(top));
+			next = top->next;
+			atomic {
+				if (CAS(TOS, top, next)) {
+					retire(top); // moved left to avoid CAVE imprecision
+					flag = true;
+				} else {
+					flag = false;
+				}
+			}
+			if (flag) {
+				result = top->val;
+				// retire(top);
+				break;
+			}
+
+		}
+	}
+
+	enterQ();
+	return result;
+}

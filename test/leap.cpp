@@ -79,10 +79,20 @@ struct LeapConfig {
 	bool synthesize_types;
 } config;
 
+enum SmrType { SMR_HP, SMR_EBR };
+
+std::string smr_to_string(SmrType type) {
+	switch(type) {
+		case SMR_HP: return "HP";
+		case SMR_EBR: return "EBR";
+	}
+}
+
 struct ParseUnit {
 	std::shared_ptr<Program> program;
 	std::unique_ptr<SmrObserverStore> store;
 	std::unique_ptr<GuaranteeTable> table;
+	SmrType smrType;
 } input;
 
 enum AnalysisResult { SAFE, FAIL, UDEF };
@@ -92,7 +102,8 @@ struct AnalysisOutput {
 	AnalysisResult annotations_hold = UDEF;
 	AnalysisResult linearizable = UDEF;
 	duration_t time_synthesis = ZERO_DURATION;
-	duration_t time_types = ZERO_DURATION;
+	duration_t time_types_last = ZERO_DURATION;
+	duration_t time_types_total = ZERO_DURATION;
 	duration_t time_rewrite = ZERO_DURATION;
 	duration_t time_annotations = ZERO_DURATION;
 	duration_t time_linearizability = ZERO_DURATION;
@@ -107,6 +118,34 @@ inline std::optional<std::reference_wrapper<const Function>> find_function(const
 		}
 	}
 	return std::nullopt;
+}
+
+inline SmrType get_smr_type(const Program& program) {
+	SmrType result = SMR_HP;
+	bool found_smr_option = false;
+	for (const auto& kvpair : program.options) {
+		if (kvpair.first == "smr") {
+			if (found_smr_option) {
+				throw std::logic_error("Option 'smr' specified multiple times. Only allowed once.");
+			}
+			found_smr_option = true;
+			if (kvpair.second == "HP") {
+				result = SMR_HP;
+			} else if (kvpair.second == "EBR") {
+				result = SMR_EBR;
+			} else {
+				std::cout << "Unrecognized SMR option." << std::endl;
+				throw std::logic_error("Given SMR algorithm '" + kvpair.second + "' unknown; must be 'HP' or 'EBR'.");
+			}
+		}
+	}
+	if (found_smr_option) {
+		std::cout << "Specified SMR algorithm: " << smr_to_string(result) << std::endl;
+	} else {
+		std::cout << "No SMR algorithm specified! Use option 'smr' to provide on of: 'HP' or 'EBR'." << std::endl;
+		throw std::logic_error("No SMR algorithm specified in the input program.'");
+	}
+	return result;
 }
 
 // static void read_input() { // HP
@@ -197,21 +236,50 @@ inline std::optional<std::reference_wrapper<const Function>> find_function(const
 // 	}
 // }
 
+static void create_hp_observer(const Program& /*program*/, const Function& /*retire*/) {
+	// store.add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
+	throw std::logic_error("Not yet implemented");
+}
+
+static void create_ebr_observer(const Program& program, const Function& retire) {
+	// query EBR functions
+	auto search_enter = find_function(program, "enterQ");
+	auto search_leave = find_function(program, "leaveQ");
+	assert(search_enter.has_value());
+	assert(search_leave.has_value());
+	const Function& enter = *search_enter;
+	const Function& leave = *search_leave;
+
+	// add observer
+	input.store->add_impl_observer(make_ebr_observer(retire, enter, leave));
+}
+
+static void create_smr_observer(const Program& program, const Function& retire) {
+	// TODO: parse SMR impl observers
+	std::cout << std::endl << "Preparing " << smr_to_string(input.smrType) << " SMR automaton... " << std::flush;
+	input.store = std::make_unique<SmrObserverStore>(program, retire);
+	switch (input.smrType) {
+		case SMR_HP: create_hp_observer(program, retire); break;
+		case SMR_EBR: create_ebr_observer(program, retire); break;
+	}
+	std::cout << "done" << std::endl;
+	std::cout << "The SMR observer is the cross-product of: " << std::endl;
+	cola::print(*input.store->base_observer, std::cout);
+	for (const auto& observer : input.store->impl_observer) {
+		cola::print(*observer, std::cout);
+	}
+}
+
 static void read_input() {
 	// parse program
 	input.program = cola::parse(config.program_path);
 	Program& program = *input.program;
+	input.smrType = get_smr_type(program);
 
-	// query HP functions
+	// query retire
 	auto search_retire = find_function(program, "retire");
-	auto search_enter = find_function(program, "enterQ");
-	auto search_leave = find_function(program, "leaveQ");
 	assert(search_retire.has_value());
-	assert(search_enter.has_value());
-	assert(search_leave.has_value());
 	const Function& retire = *search_retire;
-	const Function& enter = *search_enter;
-	const Function& leave = *search_leave;
 	
 	// preprocess program
 	std::cout << std::endl << "Preprocessing program... " << std::flush;
@@ -221,28 +289,18 @@ static void read_input() {
 	std::cout << "Preprocessed program: " << std::endl;
 	cola::print(program, std::cout);
 
-	// create SMR observers
-	// TODO: parse SMR impl observers
-	std::cout << std::endl << "Preparing SMR observers... " << std::flush;
-	input.store = std::make_unique<SmrObserverStore>(program, retire);
-	SmrObserverStore& store = *input.store;
-	store.add_impl_observer(make_ebr_observer(retire, enter, leave));
-	std::cout << "done" << std::endl;
-	std::cout << "The SMR observer is the cross-product of: " << std::endl;
-	cola::print(*store.base_observer, std::cout);
-	for (const auto& observer : store.impl_observer) {
-		cola::print(*observer, std::cout);
-	}
+	// init SMR
+	create_smr_observer(program, retire);
 
+	// create guarantee table
+	input.table = std::make_unique<GuaranteeTable>(*input.store);
+	GuaranteeTable& table = *input.table;
 
 	if (!config.check_types) {
 		return;
 	}
 
-	// create guarantee table
-	input.table = std::make_unique<GuaranteeTable>(store);
-	GuaranteeTable& table = *input.table;
-	
+	// add types
 	if (config.synthesize_types) {
 		std::cout << std::endl << "Synthesizing types... " << std::flush;
 		timepoint_t begin = get_time();
@@ -266,11 +324,12 @@ static void read_input() {
 
 template<typename ErrorClass, typename... Targs>
 void try_fix(ErrorClass& err, Targs... args) {
+	cola::print(err.pc, std::cout);
+	std::cout << err.what() << std::endl;
+
 	if (!config.rewrite_and_retry) {
 		// throw err;
-		std::cout << "Type error at statement: ";
-		cola::print(err.pc, std::cout);
-		std::cout << err.what() << std::endl;
+		std::cout << "(I was told to not fix it.)" << std::endl;
 	} else {
 		output.number_rewrites++;
 		auto begin = get_time();
@@ -293,18 +352,25 @@ static void do_type_check() {
 	bool type_safe;
 	do {
 		std::cout << std::endl << "Checking typing..." << std::endl;
+		auto begin = get_time();
 		try {
-			auto begin = get_time();
 			type_safe = prtypes::type_check(*input.program, *input.table);
-			output.time_types += get_elapsed(begin);
+			output.time_types_total += get_elapsed(begin);
+			output.time_types_last = get_elapsed(begin);
 
 		} catch (UnsafeCallError err) {
+			output.time_types_total += get_elapsed(begin);
+			output.time_types_last = get_elapsed(begin);
 			try_fix(err);
 
 		} catch (UnsafeDereferenceError err) {
+			output.time_types_total += get_elapsed(begin);
+			output.time_types_last = get_elapsed(begin);
 			try_fix(err);
 
 		} catch (UnsafeAssumeError err) {
+			output.time_types_total += get_elapsed(begin);
+			output.time_types_last = get_elapsed(begin);
 			bool reoffending = is_reoffending(err);
 			try_fix(err, reoffending);
 		}
@@ -372,7 +438,8 @@ static void print_gist() {
 	auto gist_types = [&]() -> std::string {
 		if (config.check_types) {
 			std::string verdict = output.type_safe == SAFE ? "successful" : "failed";
-			return verdict + " after " + to_s(output.time_types);
+			std::string addition = output.number_rewrites == 0 ? "" : " (total " + to_s(output.time_types_total) + ")";
+			return verdict + " after " + to_s(output.time_types_last) + addition;
 		} else {
 			return "--skipped--";
 		}

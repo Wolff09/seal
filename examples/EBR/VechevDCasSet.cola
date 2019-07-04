@@ -1,0 +1,170 @@
+#name "Vechev DCAS Set EBR"
+#smr "EBR"
+#cavespec "../set_spec.cav"
+#cave 'prover_opts imp_var = "CC_.Head.next";'
+#cavebound "key"
+#instrumentation "container"
+
+
+struct Node {
+	data_t val;
+	Node* next;
+}
+
+Node* Head;
+Node* Tail;
+
+extern void retire(Node* ptr);
+extern void enterQ();
+extern void leaveQ();
+
+
+void init() {
+	Tail = malloc;
+	Tail->next = NULL;
+	Tail->val = MAX_VAL;
+	Head = malloc;
+	Head->next = Tail;
+	Head->val = MIN_VAL;
+}
+
+
+inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
+	// k3: CAVE hack for necessary precision
+
+	curr = Head;
+	angel(member(curr));
+	k = MIN_VAL;
+	k3 = MIN_VAL;
+
+	while (true) { // do while (k < key)
+		pred = curr;
+		k3 = k;
+
+		curr = pred->next;
+		angel(member(curr));
+
+		choose {
+			assume(curr == pred->next);
+			assume(curr != NULL);
+			k = curr->val;
+		}{
+			curr = Head;
+			k = MIN_VAL;
+			k3 = MIN_VAL;
+			angel(member(curr));
+		}
+
+		if (k >= key) {
+			k3 = k3;
+			break;
+		}
+	}
+}
+
+
+bool contains(data_t key) {
+	Node* pred, curr;
+	data_t k, k3;
+	bool result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	locate(pred, curr, key, k, k3);
+
+	if (k == key) {
+		result = true;
+	} else {
+		result = false;
+	}
+
+	enterQ();
+	return result;
+}
+
+bool add(data_t key) {
+	Node* pred, curr, entry, tmpNode;
+	data_t k, k3;
+	bool result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	entry = malloc;
+	entry->val = key;
+
+	while (true) {
+		locate(pred, curr, key, k, k3);
+
+		if (k == key) {
+			result = false;
+			// retire(entry); // reclaim new node that was not added to the data structure
+			break;
+
+		} else {
+			entry->next = curr;
+			atomic {
+				if (curr == pred->next) {
+					pred->next = entry;
+					k3 = k3;
+					result = true;
+					break;
+				}
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}
+
+
+bool remove(data_t key) {
+	Node* pred, curr, next;
+	data_t k, k3;
+	Node* tmpNode;
+	bool tmpBool;
+	bool result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	while (true) {
+		locate(pred, curr, key, k, k3);
+
+		if (k > key) {
+			result = false;
+			break;
+
+		} else {
+			next = curr->next;
+			angel(member(next));
+			atomic {
+				choose {
+					assume(curr == pred->next);
+					assume(next == curr->next);
+
+					curr->next = NULL;
+					pred->next = next;
+					assert(active(curr));
+					retire(curr);
+					result = true;
+					break;
+
+				}{
+					skip;
+				}
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}

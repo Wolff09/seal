@@ -717,7 +717,7 @@ struct CaveOutputVisitor : public Visitor {
 			stream << indent << "if (";
 			std::string prefix = this->conf.INSTRUMENT_WRAP_SHARED ? "CC_->" : "";
 			stream << prefix << "INSTRUMENTATION_PTR_ == " << angel.var.name;
-			stream << ") fail(); // angel(contains(" << angel.var.name << "))" << std::endl;
+			stream << ") fail(); // angel(member(" << angel.var.name << "))" << std::endl;
 			if (!this->inside_atomic) {
 				indent--;
 				stream << indent << "}" << std::endl;

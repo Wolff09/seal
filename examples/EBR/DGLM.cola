@@ -1,7 +1,7 @@
-#name "Michael&Scott's Queue EBR"
+#name "DGLM Queue EBR"
 #smr "EBR"
 #cavespec "../queue_spec.cav"
-#cave "prover_opts imp_var = "CC_.Tail.next";"
+#cavelin 'prover_opts imp_var = "CC_.Tail.next";'
 #instrumentation "container"
 
 struct Node {
@@ -16,6 +16,7 @@ extern void retire(Node* ptr);
 extern void enterQ();
 extern void leaveQ();
 
+
 void init() {
 	Head = malloc;
 	Head->next = NULL;
@@ -25,19 +26,20 @@ void init() {
 void enqueue(data_t value) {
 	Node* tail, next, node;
 
+	node = malloc;
+	node->val = value;
+	node->next = NULL;
+
 	atomic {
 		angel(choose active);
 		leaveQ();
 	}
 
-	node = malloc;
-	node->val = value;
-	node->next = NULL;
-
 	while (true) {
 		tail = Tail;
 		angel(member(tail));
 		next = tail->next;
+		angel(member(next));
 
 		if (tail == Tail) {
 			if (next != NULL) {
@@ -68,8 +70,6 @@ data_t dequeue() {
 	while (true) {
 		head = Head;
 		angel(member(head));
-		tail = Tail;
-		angel(member(tail));
 		next = head->next;
 		angel(member(next));
 
@@ -79,23 +79,29 @@ data_t dequeue() {
 				break;
 
 			} else {
-				if (head == tail) {
-					CAS(Tail, tail, next);
-
-				} else {
-					result = next->val;
+				result = next->val;
+				atomic {
+					if (CAS(Head, head, next)) {
+						flag = true;
+					} else {
+						flag = false;
+					}
+				}
+				if (flag) {
+					choose {
+						tail = Tail;
+						angel(member(tail));
+						assume(head == tail);
+						CAS(Tail, tail, next);
+					}{
+						tail = Tail;
+						assume(head != tail);
+					}
 					atomic {
-						if (CAS(Head, head, next)) {
-							retire(head); // moved left to avoid CAVE imprecision
-							flag = true;
-						} else {
-							flag = false;
-						}
+						assert(active(head));
+						retire(head);
 					}
-					if (flag) {
-						// retire(head);
-						break;
-					}
+					break;
 				}
 			}
 		}

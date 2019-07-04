@@ -1,0 +1,198 @@
+#name "O'Hearn Set"
+#smr "EBR"
+#cavespec "../set_spec.cav"
+#cave 'prover_opts imp_var = "CC_.Head.next";'
+#cavebound "key"
+#instrumentation "container"
+
+
+struct Node {
+	data_t val;
+	bool marked;
+	Node* next;
+}
+
+Node* Head;
+
+extern void retire(Node* ptr);
+extern void enterQ();
+extern void leaveQ();
+
+
+void init() {
+	Head = malloc;
+	Head->next = NULL;
+	Head->marked = false;
+}
+
+
+inline void locate(Node* pred, Node* curr, Node* next, data_t key, data_t k, data_t k3) {
+	// k3: CAVE hack for necessary precision
+
+	curr = Head;
+	angel(member(curr));
+	k = MIN_VAL;
+	k3 = MIN_VAL;
+
+	while (true) { // do while (k < key)
+		pred = curr;
+		k3 = k;
+
+		curr = pred->next;
+		angel(member(curr));
+
+		choose {
+			atomic {
+				assume(pred->marked == false);
+				assume(curr == pred->next);
+			}
+
+			if (curr != NULL) {
+				k = curr->val;
+			} else {
+				k = MAX_VAL;
+				break;
+			}
+		}{
+			// retry
+			curr = Head;
+			angel(member(curr));
+			k = MIN_VAL;
+			k3 = MIN_VAL;
+		}
+
+		if (curr->marked == false) {
+			if (k >= key) {
+				break;
+			}
+		} else {
+			next = curr->next;
+			atomic {
+				assume(pred->marked == false);
+				assume(curr == pred->next);
+				pred->next = next;
+				assert(active(curr));
+				retire(curr);
+			}
+
+			// retry
+			curr = Head;
+			angel(member(curr));
+			k = MIN_VAL;
+			k3 = MIN_VAL;
+		}
+	}
+}
+
+
+bool contains(data_t key) {
+	Node* pred, curr, next;
+	data_t k, k3;
+	bool result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	locate(pred, curr, next, key, k, k3);
+
+	if (k == key) {
+		result = true;
+	} else {
+		result = false;
+	}
+
+	enterQ();
+	return result;
+}
+
+
+bool add(data_t key) {
+	Node* pred, curr, next, entry;
+	data_t k, k3;
+	bool result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	entry = malloc;
+	entry->val = key;
+	entry->marked = false;
+
+	while (true) {
+		locate(pred, curr, next, key, k, k3);
+
+		if (k == key) {
+			result = false;
+			// retire(entry); // reclaim new node that was not added to the data structure
+			break;
+
+		} else {
+			entry->next = curr;
+			atomic {
+				choose {
+					assume(pred->marked == false);
+					assume(curr == pred->next);
+
+					pred->next = entry;
+					k3 = k;
+					result = true;
+					break;
+				}{
+					skip; // retry
+				}
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}
+
+bool remove(data_t key) {
+	Node* pred, curr, next;
+	data_t k, k3;
+	bool result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	while (true) {
+		locate(pred, curr, next, key, k, k3);
+
+		if (k > key) {
+			result = false;
+			break;
+
+		} else {
+			next = curr->next;
+			angel(member(next));
+			choose {
+				atomic {
+					assume(curr->marked == false);
+					assume(next == curr->next);
+					curr->marked = true;
+				}
+				atomic {
+					assume(pred->marked == false);
+					assume(curr == pred->next);
+					pred->next = next;
+					assert(active(curr));
+					retire(curr);
+				}
+				result = true;
+				break;
+			}{
+				skip; // retry
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}

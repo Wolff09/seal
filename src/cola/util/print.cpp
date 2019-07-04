@@ -381,7 +381,7 @@ struct PrintVisitor final : public Visitor {
 
 	void visit(const AngelContains& com) {
 		print_annotation(com);
-		stream << indent << "#angel(contains(" << com.var.name << "));" << std::endl;
+		stream << indent << "#angel(member(" << com.var.name << "));" << std::endl;
 	}
 
 	void visit(const Return& com) {
