@@ -1,5 +1,9 @@
 # -*- coding: latin-1 -*-
 
+##############################################
+###### Needs to be placed in /build/bin ######
+##############################################
+
 import subprocess
 
 
@@ -21,15 +25,21 @@ def get_info(gist, i):
 	cell_time = cells[1]
 	return "{:>10}".format(cell_time) + "  " + cell_result
 
+def get_synthesis_info(gist):
+	cells = get_cell(gist, 1)
+	cells = cells.split(':')
+	cell_time = cells[1]
+	return "{:>9}".format(cell_time)
+
 def get_type_info(gist):
 	number_guarantees = get_cell(gist, 0)
-	return get_info(gist, 1) + "  (" + "{:>3}".format(number_guarantees) + ")"
+	return get_info(gist, 2) + "  " + "{:>5}".format("(" + number_guarantees + ")")
 
 def get_annotation_info(gist):
-	return get_info(gist, 2)
+	return get_info(gist, 3)
 
 def get_linearizability_info(gist):
-	return get_info(gist, 3)
+	return get_info(gist, 4)
 
 def run_test(filename):
 	process_synth = subprocess.Popen(['./seal', '-gt', filename], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -41,11 +51,11 @@ def run_test(filename):
 	gist_hand = out_hand.splitlines()[-1]
 	# print out_hand
 
-	print "{:<50}".format(filename), "   |   ", get_type_info(gist_synth), "   |   ", get_type_info(gist_hand), "   |   ", get_annotation_info(gist_hand), "   |   ", get_linearizability_info(gist_hand)
+	print "{:<60}".format(filename), "   |   ", get_synthesis_info(gist_synth), "   |   ", get_type_info(gist_synth), "   |   ", get_type_info(gist_hand), "   |   ", get_annotation_info(gist_hand), "   |   ", get_linearizability_info(gist_hand)
 
 def print_head(smr):
-	print "{:<50}    |  {:>22}    |  {:>22}    |  {:>15}    |  {:>15} ".format(smr + " Program", "hand-crafted Types", "synthesized Types", "Annotations", "Linearizability")
-	print "------------------------------------------------------+----------------------------+----------------------------+---------------------+------------------"
+	print "{:<60}    |    {:>9}    |  {:>22}    |  {:>22}    |  {:>15}    |  {:>15} ".format(smr + " Program", "Synthesis", "synthesized Types", "hand-crafted Types", "Annotations", "Linearizability")
+	print "----------------------------------------------------------------+-----------------+----------------------------+----------------------------+---------------------+------------------"
 
 def main():
 	# HP
@@ -58,9 +68,6 @@ def main():
 	run_test("../../examples/HP/VechevCasSet_transformed.cola")
 	run_test("../../examples/HP/OHearnSet_transformed.cola")
 	run_test("../../examples/HP/MichaelSet_transformed.cola")
-
-	print ""
-	print ""
 
 	# # EBR
 	# print_head("EBR")
