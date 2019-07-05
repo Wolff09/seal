@@ -654,6 +654,13 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 		auto infer = translator.nfa_for(guarantee);
 		if (nfa_inclusion(translator, behavior, infer)) {
 			result.insert(guarantee);
+
+			// get guarantees that are implied by the one just added
+			auto search = guarantee_table.inclusion_map.find(guarantee);
+			if (search != guarantee_table.inclusion_map.end()) {
+				const GuaranteeSet& included_in = search->second;
+				result.insert(included_in.begin(), included_in.end());
+			}
 		}
 	}
 	return result;

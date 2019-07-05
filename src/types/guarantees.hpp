@@ -24,6 +24,23 @@ namespace prtypes {
 	};
 
 
+	struct GuaranteeSetComparator {
+		bool operator() (const std::reference_wrapper<const Guarantee>& lhs, const std::reference_wrapper<const Guarantee>& rhs) const {
+			return &(lhs.get()) < &(rhs.get());
+		}
+	};
+
+	struct TypeEnvComparator {
+		bool operator() (const std::reference_wrapper<const cola::VariableDeclaration>& lhs, const std::reference_wrapper<const cola::VariableDeclaration>& rhs) const {
+			return &(lhs.get()) < &(rhs.get());
+		}
+	};
+
+	using GuaranteeSet = std::set<std::reference_wrapper<const Guarantee>, GuaranteeSetComparator>;
+
+	using TypeEnv = std::map<std::reference_wrapper<const cola::VariableDeclaration>, GuaranteeSet, TypeEnvComparator>;
+
+
 	struct GuaranteeTableIterator final : public std::input_iterator_tag {
 		using iterator_t = std::vector<std::unique_ptr<Guarantee>>::const_iterator;
 		iterator_t iterator;
@@ -44,38 +61,21 @@ namespace prtypes {
 	};
 
 	struct GuaranteeTable final {
+		std::map<std::reference_wrapper<const Guarantee>, GuaranteeSet, GuaranteeSetComparator> inclusion_map;
 		std::vector<std::unique_ptr<Guarantee>> all_guarantees;
 		const SmrObserverStore& observer_store;
 		
 		GuaranteeTable(const SmrObserverStore& observer_store);
 		const Guarantee& active_guarantee() const;
 		const Guarantee& local_guarantee() const;
-		void add_guarantee(std::unique_ptr<cola::Observer> observer, std::string name);
-		void add_guarantee(std::unique_ptr<cola::Observer> observer) {
-			this->add_guarantee(std::move(observer), "G-" + std::to_string(this->all_guarantees.size()));
+		std::vector<std::reference_wrapper<const Guarantee>> add_guarantee(std::unique_ptr<cola::Observer> observer, std::string name);
+		std::vector<std::reference_wrapper<const Guarantee>> add_guarantee(std::unique_ptr<cola::Observer> observer) {
+			return this->add_guarantee(std::move(observer), "G-" + std::to_string(this->all_guarantees.size()));
 		}
 
 		GuaranteeTableIterator begin() const { return GuaranteeTableIterator(all_guarantees.cbegin()); }
 		GuaranteeTableIterator end() const { return GuaranteeTableIterator(all_guarantees.cend()); }
 	};
-
-
-	struct GuaranteeSetComparator {
-		bool operator() (const std::reference_wrapper<const Guarantee>& lhs, const std::reference_wrapper<const Guarantee>& rhs) const {
-			return &(lhs.get()) < &(rhs.get());
-		}
-	};
-
-	struct TypeEnvComparator {
-		bool operator() (const std::reference_wrapper<const cola::VariableDeclaration>& lhs, const std::reference_wrapper<const cola::VariableDeclaration>& rhs) const {
-			return &(lhs.get()) < &(rhs.get());
-		}
-	};
-
-
-	using GuaranteeSet = std::set<std::reference_wrapper<const Guarantee>, GuaranteeSetComparator>;
-
-	using TypeEnv = std::map<std::reference_wrapper<const cola::VariableDeclaration>, GuaranteeSet, TypeEnvComparator>;
 
 } // namespace prtypes
 

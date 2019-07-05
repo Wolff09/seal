@@ -647,25 +647,6 @@ struct Synthesizer {
 		return result;
 	}
 
-	reachset_t compute_reachability() {
-		auto [reach, worklist] = initialize_synthesis();
-
-		while (!worklist.empty()) {
-			synthstate_t synthstate = std::move(worklist.front());
-			worklist.pop_front();
-
-			auto post = synthesis_post(synthstate);
-			for (auto synthpost : post) {
-				auto insertion = reach.insert(synthpost);
-				if (insertion.second) {
-					worklist.push_back(synthpost);
-				}
-			}
-		}
-
-		return reach;
-	}
-
 	synthstate_t compute_closure(const synthstate_t& set) {
 		synthstate_t closure(set);
 		bool updated;
@@ -685,6 +666,25 @@ struct Synthesizer {
 			}
 		} while (updated);
 		return closure;
+	}
+
+	reachset_t compute_reachability() {
+		auto [reach, worklist] = initialize_synthesis();
+
+		while (!worklist.empty()) {
+			synthstate_t synthstate = std::move(worklist.front());
+			worklist.pop_front();
+
+			auto post = synthesis_post(synthstate);
+			for (auto& synthpost : post) {
+				auto insertion = reach.insert(synthpost);
+				if (insertion.second) {
+					worklist.push_back(std::move(synthpost));
+				}
+			}
+		}
+
+		return reach;
 	}
 
 	reachset_t synthesize_guarantees() {
@@ -722,15 +722,39 @@ struct Synthesizer {
 	}
 
 	void add_synthesized_guarantees(GuaranteeTable& guarantee_table) {
-		auto synthesis = synthesize_guarantees();
+		const auto synthesis = synthesize_guarantees();
 
-		std::cout << "Adding guarantees:" << std::endl;
+		// std::cout << "Adding guarantees:" << std::endl;
+		std::deque<std::pair<const Guarantee*, const synthstate_t*>> guarantees_with_states;
 		for (const auto& state : synthesis) {
 			std::string name = make_name(state);
-			std::cout << "  - " << name << std::endl;
+			// std::cout << "  - " << name << std::endl;
 			make_states_final(*blueprint, state);
 			auto obs = cola::copy(*blueprint);
-			guarantee_table.add_guarantee(std::move(obs), std::move(name));
+			auto guarantees = guarantee_table.add_guarantee(std::move(obs), std::move(name));
+			for (const Guarantee& guarantee : guarantees) {
+				guarantees_with_states.push_back({ &guarantee, &state });
+			}
+		}
+
+		// std::cout << "Adding inclusion relations:" << std::endl;
+		auto is_include = [](const synthstate_t& smaller, const synthstate_t& bigger) {
+			for (const auto& state : smaller) {
+				if (bigger.count(state) == 0) {
+					return false;
+				}
+			}
+			return true;
+		};
+		for (const auto& pair : guarantees_with_states) {
+			GuaranteeSet included_in;
+			for (const auto& other_pair : guarantees_with_states) {
+				if (is_include(*pair.second, *other_pair.second)) {
+					included_in.insert(*other_pair.first);
+				}
+			}
+			// std::cout << "inclusion for: " << pair.first->name << " = " << included_in.size() << std::endl;
+			guarantee_table.inclusion_map[*pair.first] = std::move(included_in);
 		}
 	}
 };
