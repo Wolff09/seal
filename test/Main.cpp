@@ -186,14 +186,7 @@ static void create_smr_observer(const Program& program, const Function& retire) 
 }
 
 static void add_custom_hp_guarantees(const Program& program, const Function& retire) {
-	// query HP functions
-	auto search_protect1 = find_function(program, "protect1");
-	auto search_protect2 = find_function(program, "protect2");
-	assert(search_protect1.has_value());
-	assert(search_protect2.has_value());
-	const Function& protect1 = *search_protect1;
-	const Function& protect2 = *search_protect2;
-
+	auto [protect1, protect2] = lookup_functions(program, "protect1", "protect2");
 	auto add_guarantees = [&](const Function& func, const Function* trans=nullptr) {
 		std::vector<std::unique_ptr<cola::Observer>> hp_guarantee_observers;
 		if (trans) {
@@ -201,21 +194,29 @@ static void add_custom_hp_guarantees(const Program& program, const Function& ret
 		} else {
 			hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
 		}
-		input.table->add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
-		input.table->add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
-		input.table->add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);
-		if (hp_guarantee_observers.size() > 3) {
-			assert(hp_guarantee_observers.size() == 5);
-			input.table->add_guarantee(std::move(hp_guarantee_observers.at(3)), "Et-" + func.name);
-			input.table->add_guarantee(std::move(hp_guarantee_observers.at(4)), "Pt-" + func.name);
+		for (std::size_t index = 0; index < hp_guarantee_observers.size(); ++index) {
+			input.table->add_guarantee(std::move(hp_guarantee_observers.at(index)), "E" + std::to_string(index + 1) + "-" + func.name);
 		}
+		// input.table->add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
+		// input.table->add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
+		// input.table->add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);
+		// if (hp_guarantee_observers.size() > 3) {
+		// 	assert(hp_guarantee_observers.size() == 5);
+		// 	input.table->add_guarantee(std::move(hp_guarantee_observers.at(3)), "Et-" + func.name);
+		// 	input.table->add_guarantee(std::move(hp_guarantee_observers.at(4)), "Pt-" + func.name);
+		// }
 	};
 	add_guarantees(protect1, &protect2);
 	add_guarantees(protect2, &protect1);
 }
 
-static void add_custom_ebr_guarantees(const Program& /*program*/, const Function& /*retire*/) {
-	throw std::logic_error("Not yet implemented (custom EBR guarantees)");
+static void add_custom_ebr_guarantees(const Program& program, const Function& retire) {
+	// throw std::logic_error("Not yet implemented (custom EBR guarantees)");
+	auto [enter, leave] = lookup_functions(program, "enterQ", "leaveQ");
+	auto ebr_guarantee_observers = prtypes::make_ebr_guarantee_observers(retire, enter, leave);
+	for (std::size_t index = 0; index < ebr_guarantee_observers.size(); ++index) {
+		input.table->add_guarantee(std::move(ebr_guarantee_observers.at(index)), "E" + std::to_string(index + 1));
+	}
 }
 
 static void add_custom_guarantees(const Program& program, const Function& retire) {

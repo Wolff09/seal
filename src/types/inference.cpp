@@ -10,7 +10,7 @@
 using namespace cola;
 using namespace prtypes;
 
-
+#define INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID true
 static Vata2::Nfa::StringDict VATA_PARAMS = {{ "algo", "naive" }}; // algos: "naive" and "antichains"
 
 //===================== helper
@@ -648,6 +648,11 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 		if (result.count(guarantee) > 0) {
 			continue;
 		}
+		#if INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID
+			if (!guarantee.entails_validity && prtypes::entails_valid(result)) {
+				continue;
+			}
+		#endif
 
 		// inference by nfa language inclusion
 //		std::cout << "  checkinf inference for: " << guarantee.name << std::endl;

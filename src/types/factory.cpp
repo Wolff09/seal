@@ -553,3 +553,58 @@ std::unique_ptr<Observer> prtypes::make_ebr_observer(const Function& retire_func
 
 	return result;
 }
+
+std::vector<std::unique_ptr<Observer>> prtypes::make_ebr_guarantee_observers(const Function& retire_function, const Function& enter_function, const Function& leave_function, std::string id) {
+	auto basics = get_basics();
+	const Function& free_function = basics.first;
+	const Type& ptrtype = basics.second;
+	assert(takes_single_pointer(retire_function));
+	assert(enter_function.args.size() == 0);
+	assert(leave_function.args.size() == 0);
+	std::string name_prefix = "EBR" + id;
+
+	auto mk_obs = [&](std::vector<std::size_t> final_states) -> std::unique_ptr<Observer> {
+		auto result = std::make_unique<Observer>();
+		result->negative_specification = false;
+
+		// variables
+		result->variables.push_back(std::make_unique<ThreadObserverVariable>(name_prefix + ":thread"));
+		result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
+
+		// states
+		result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
+		result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, false));
+		result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, false));
+		result->states.push_back(std::make_unique<State>(name_prefix + ".3", false, false));
+		result->states.push_back(std::make_unique<State>(name_prefix + ".4", false, false));
+		result->states.push_back(std::make_unique<State>(name_prefix + ".5", false, true));
+
+		for (auto index : final_states) {
+			result->states.at(index)->final = true;
+		}
+
+		// 'forward' transitions
+		result->transitions.push_back(mk_transition_response_self(*result->states.at(0), *result->states.at(1), leave_function, *result->variables.at(0)));
+		result->transitions.push_back(mk_transition_response_self(*result->states.at(2), *result->states.at(3), leave_function, *result->variables.at(0)));
+		result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(1), *result->states.at(4), retire_function, *result->variables.at(1)));
+		result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(3), *result->states.at(4), retire_function, *result->variables.at(1)));
+		result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(0), *result->states.at(2), retire_function, *result->variables.at(1)));
+		result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(2), *result->states.at(0), free_function, *result->variables.at(1)));
+		result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(3), *result->states.at(1), free_function, *result->variables.at(1)));
+		result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(4), *result->states.at(5), free_function, *result->variables.at(1)));
+
+		// 'backward' transitions
+		result->transitions.push_back(mk_transition_invocation_self(*result->states.at(1), *result->states.at(0), enter_function, *result->variables.at(0)));
+		result->transitions.push_back(mk_transition_invocation_self(*result->states.at(3), *result->states.at(2), enter_function, *result->variables.at(0)));
+		result->transitions.push_back(mk_transition_invocation_self(*result->states.at(4), *result->states.at(2), enter_function, *result->variables.at(0)));
+
+		return result;
+	};
+
+	std::vector<std::unique_ptr<Observer>> result;
+	result.push_back(mk_obs({1,3,4,5}));
+	result.push_back(mk_obs({1,4,5}));
+	// result.push_back(mk_obs({4,5}));
+	// result.push_back(mk_obs({5}));
+	return result;
+}

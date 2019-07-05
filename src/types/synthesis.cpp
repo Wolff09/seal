@@ -619,31 +619,43 @@ struct Synthesizer {
 		return { std::move(reach), std::move(worklist) };
 	}
 
-	std::deque<synthstate_t> synthesis_post(const synthstate_t& to_post) {
+	template<typename T>
+	inline void synthesis_post_cmd(T& container, const synthstate_t& to_post, const Function* label, Transition::Kind kind) {
+		assert(label);
 		std::deque<synthstate_t> result;
 
-		for (auto [label, kind] : symbols) {
-			// compute vector of possibile transitions
-			std::vector<std::reference_wrapper<const std::vector<TransitionInfo>>> tinfo;
-			for (const State* state : to_post) {
-				TransitionKey key(state, label, kind);
-				tinfo.push_back(post_map.at(key));
-			}
-
-			// iterate over possibilities
-			for (AllCombinator combinator(tinfo); combinator.available(); combinator.next()) {
-				auto combination = combinator.get();
-				if (is_combination_enabled(combination)) {
-					synthstate_t post;
-					for (const TransitionInfo& info : combination) {
-						post.insert(info.dst);
-					}
-
-					result.push_back(std::move(post));
-				}
-			}
+		// compute vector of possibile transitions
+		std::vector<std::reference_wrapper<const std::vector<TransitionInfo>>> tinfo;
+		for (const State* state : to_post) {
+			TransitionKey key(state, label, kind);
+			tinfo.push_back(post_map.at(key));
 		}
 
+		// iterate over possibilities
+		for (AllCombinator combinator(tinfo); combinator.available(); combinator.next()) {
+			auto combination = combinator.get();
+			if (is_combination_enabled(combination)) {
+				synthstate_t post;
+				for (const TransitionInfo& info : combination) {
+					post.insert(info.dst);
+				}
+
+				container.push_back(std::move(post));
+			}
+		}
+	}
+
+	std::deque<synthstate_t> synthesis_post_cmd(const synthstate_t& to_post, const Function* label, Transition::Kind kind) {
+		std::deque<synthstate_t> result;
+		synthesis_post_cmd(result, to_post, label, kind);
+		return result;
+	}
+
+	std::deque<synthstate_t> synthesis_post(const synthstate_t& to_post) {
+		std::deque<synthstate_t> result;
+		for (auto [label, kind] : symbols) {
+			synthesis_post_cmd(result, to_post, label, kind);
+		}
 		return result;
 	}
 
@@ -725,7 +737,7 @@ struct Synthesizer {
 		const auto synthesis = synthesize_guarantees();
 
 		// std::cout << "Adding guarantees:" << std::endl;
-		std::deque<std::pair<const Guarantee*, const synthstate_t*>> guarantees_with_states;
+		std::map<const Guarantee*, const synthstate_t*> guarantee2states;
 		for (const auto& state : synthesis) {
 			std::string name = make_name(state);
 			// std::cout << "  - " << name << std::endl;
@@ -733,12 +745,13 @@ struct Synthesizer {
 			auto obs = cola::copy(*blueprint);
 			auto guarantees = guarantee_table.add_guarantee(std::move(obs), std::move(name));
 			for (const Guarantee& guarantee : guarantees) {
-				guarantees_with_states.push_back({ &guarantee, &state });
+				guarantee2states.insert({ &guarantee, &state });
 			}
 		}
 
-		// std::cout << "Adding inclusion relations:" << std::endl;
-		auto is_include = [](const synthstate_t& smaller, const synthstate_t& bigger) {
+		auto is_include = [](const synthstate_t& smaller, const synthstate_t& bigger, bool proper=false) {
+			if (smaller.size() > bigger.size()) return false;
+			if (proper && smaller.size() == bigger.size()) return false;
 			for (const auto& state : smaller) {
 				if (bigger.count(state) == 0) {
 					return false;
@@ -746,9 +759,38 @@ struct Synthesizer {
 			}
 			return true;
 		};
-		for (const auto& pair : guarantees_with_states) {
+
+		// prune guarantees that are smaller than some valid guarantee
+		// std::cout << std::endl << "Pruning guarantees:" << std::endl;
+		std::set<const Guarantee*> keep;
+		for (const auto& pair : guarantee2states) {
+			keep.insert(pair.first);
+		}
+		for (const Guarantee* guarantee : keep) {
+			if (guarantee->entails_validity && guarantee != &guarantee_table.active_guarantee() && guarantee != &guarantee_table.local_guarantee()) {
+				// std::cout << "Found valid guarantee: " << guarantee->name << std::endl;
+				for (const Guarantee* other : keep) {
+					if (!other->entails_validity && is_include(*guarantee2states.at(other), *guarantee2states.at(guarantee), true)) {
+						// std::cout << "   -> pruning: " << other->name << std::endl;
+						keep.erase(other);
+					}
+				}
+			}
+		}
+		std::vector<std::unique_ptr<Guarantee>> all_guarantees = std::move(guarantee_table.all_guarantees);
+		guarantee_table.all_guarantees.clear();
+		for (auto& guarantee : all_guarantees) {
+			if (keep.count(guarantee.get()) != 0) {
+				guarantee_table.all_guarantees.push_back(std::move(guarantee));
+			} else {
+				guarantee2states.erase(guarantee.get());
+			}
+		}
+
+		// std::cout << "Adding inclusion relations:" << std::endl;
+		for (const auto& pair : guarantee2states) {
 			GuaranteeSet included_in;
-			for (const auto& other_pair : guarantees_with_states) {
+			for (const auto& other_pair : guarantee2states) {
 				if (is_include(*pair.second, *other_pair.second)) {
 					included_in.insert(*other_pair.first);
 				}
@@ -776,5 +818,20 @@ void prtypes::populate_guarantee_table_with_synthesized_guarantees(GuaranteeTabl
 		// cola::print(*cross_product, std::cout);
 
 		Synthesizer(std::move(cross_product), std::move(active_states)).add_synthesized_guarantees(guarantee_table);
+	}
+
+	// sort guarantee table such that valid guarantees appear first
+	std::vector<std::unique_ptr<Guarantee>> valid;
+	std::vector<std::unique_ptr<Guarantee>> nonvalid;
+	for (auto& guarantee : guarantee_table.all_guarantees) {
+		bool is_valid = guarantee->entails_validity || guarantee.get() == &guarantee_table.active_guarantee() || guarantee.get() == &guarantee_table.local_guarantee();
+		(is_valid ? valid : nonvalid).push_back(std::move(guarantee));
+	}
+	guarantee_table.all_guarantees.clear();
+	std::array<std::reference_wrapper<decltype(valid)>, 2> vectors = { valid, nonvalid };
+	for (decltype(valid)& container : vectors) {
+		for (auto& guarantee : container) {
+			guarantee_table.all_guarantees.push_back(std::move(guarantee));
+		}
 	}
 }
