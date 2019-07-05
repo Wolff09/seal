@@ -554,11 +554,21 @@ struct CrossProducer {
 	}
 };
 
-
 struct Synthesizer {
 	using stateset_t = std::set<const State*>;
 	using synthstate_t = stateset_t;
-	using reachset_t = std::set<synthstate_t>;
+	struct synthstate_compare {
+	    bool operator() (const synthstate_t& lhs, const synthstate_t& rhs) const {
+	    	if (lhs.size() < rhs.size()) {
+	    		return true;
+	    	} else if (lhs.size() > rhs.size()) {
+	    		return false;
+	    	} else {
+	    		return lhs < rhs;
+	    	}
+	    }
+	};
+	using reachset_t = std::set<synthstate_t, synthstate_compare>;
 	using worklist_t = std::deque<synthstate_t>;
 
 	std::unique_ptr<Observer> blueprint;
@@ -714,10 +724,10 @@ struct Synthesizer {
 	void add_synthesized_guarantees(GuaranteeTable& guarantee_table) {
 		auto synthesis = synthesize_guarantees();
 
-		// std::cout << "Adding guarantees:" << std::endl;
+		std::cout << "Adding guarantees:" << std::endl;
 		for (const auto& state : synthesis) {
 			std::string name = make_name(state);
-			// std::cout << "  - " << name << std::endl;
+			std::cout << "  - " << name << std::endl;
 			make_states_final(*blueprint, state);
 			auto obs = cola::copy(*blueprint);
 			guarantee_table.add_guarantee(std::move(obs), std::move(name));

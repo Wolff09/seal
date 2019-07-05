@@ -59,6 +59,9 @@ def main():
 	run_test("../../examples/HP/OHearnSet_transformed.cola")
 	run_test("../../examples/HP/MichaelSet_transformed.cola")
 
+	print ""
+	print ""
+
 	# # EBR
 	# print_head("EBR")
 	# run_test("../../examples/EBR/TreiberStack.cola")

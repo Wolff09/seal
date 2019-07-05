@@ -121,6 +121,7 @@ bool add(data_t key) {
 	entry = malloc;
 	entry->val = key;
 	entry->marked = false;
+	angel(member(entry)); // should be done by Local Guarantee
 
 	while (true) {
 		locate(pred, curr, next, key, k, k3);
