@@ -72,6 +72,7 @@ struct LeapConfig {
 	bool rewrite_and_retry;
 	bool interactive, eager;
 	bool quiet, verbose;
+	bool print_gist;
 	bool output;
 	bool synthesize_types;
 } config;
@@ -368,19 +369,19 @@ static void do_linearizability_check() {
 	else output.linearizable = FAIL;
 }
 
-static void print_gist() {
+static void print_summary() {
 	if (config.quiet) {
 		return;
 	}
 
-	auto gist_synthesis = [&]() -> std::string {
+	auto summary_synthesis = [&]() -> std::string {
 		if (config.synthesize_types) {
 			return std::to_string(input.table->all_guarantees.size()) + " types in " + to_s(output.time_synthesis);
 		} else {
 			return "--skipped--";
 		}
 	};
-	auto gist_rewrite = [&]() -> std::string {
+	auto summary_rewrite = [&]() -> std::string {
 		if (config.rewrite_and_retry) {
 			if (output.number_rewrites == 0) {
 				return "none";
@@ -391,7 +392,7 @@ static void print_gist() {
 			return "--skipped--";
 		}
 	};
-	auto gist_types = [&]() -> std::string {
+	auto summary_types = [&]() -> std::string {
 		if (config.check_types) {
 			std::string verdict = output.type_safe == SAFE ? "successful" : "failed";
 			std::string addition = output.number_rewrites == 0 ? "" : " (total " + to_s(output.time_types_total) + ")";
@@ -400,7 +401,7 @@ static void print_gist() {
 			return "--skipped--";
 		}
 	};
-	auto gist_annotations = [&]() -> std::string {
+	auto summary_annotations = [&]() -> std::string {
 		if (config.check_annotations && output.type_safe != FAIL) {
 			std::string verdict = output.annotations_hold == SAFE ? "successful" : "failed";
 			return verdict + " after " + to_s(output.time_annotations);
@@ -408,7 +409,7 @@ static void print_gist() {
 			return "--skipped--";
 		}
 	};
-	auto gist_linearizability  = [&]() -> std::string {
+	auto summary_linearizability  = [&]() -> std::string {
 		if (config.check_linearizability && output.type_safe != FAIL && output.annotations_hold != FAIL) {
 			std::string verdict = output.linearizable == SAFE ? "successful" : "failed";
 			return verdict + " after " + to_s(output.time_linearizability);
@@ -420,11 +421,36 @@ static void print_gist() {
 	std::cout << std::endl << std::endl;
 	std::cout << "# Summary:" << std::endl;
 	std::cout << "# ========" << std::endl;
-	std::cout << "# Type Synthesis:         " << gist_synthesis() << std::endl;
-	std::cout << "# Type Check:             " << gist_types() << std::endl;
-	std::cout << "# Rewrites:               " << gist_rewrite() << std::endl;
-	std::cout << "# Annotation Check:       " << gist_annotations() << std::endl;
-	std::cout << "# Linearizability Check:  " << gist_linearizability() << std::endl;
+	std::cout << "# Type Synthesis:         " << summary_synthesis() << std::endl;
+	std::cout << "# Type Check:             " << summary_types() << std::endl;
+	std::cout << "# Rewrites:               " << summary_rewrite() << std::endl;
+	std::cout << "# Annotation Check:       " << summary_annotations() << std::endl;
+	std::cout << "# Linearizability Check:  " << summary_linearizability() << std::endl;
+}
+
+void print_gist() {
+	if (!config.print_gist) {
+		return;
+	}
+	auto mk_status = [](bool enabled, AnalysisResult result, duration_t time) -> std::string {
+		if (!enabled) {
+			return "-:-";
+		}
+		std::string verdict;
+		switch (result) {
+			case SAFE: verdict = "1"; break;
+			case FAIL: verdict = "0"; break;
+			case UDEF: verdict = "?"; break;
+		}
+		return verdict + ":" + to_s(time);;
+	};
+	std::cout << std::endl << std::endl;
+	std::cout << "#gist=";
+	std::cout << input.table->all_guarantees.size() << ";";
+	std::cout << mk_status(config.synthesize_types, SAFE, output.time_synthesis) << ";";
+	std::cout << mk_status(config.check_types, output.type_safe, output.time_types_last) << ";";
+	std::cout << mk_status(config.check_annotations, output.annotations_hold, output.time_annotations) << ";";
+	std::cout << mk_status(config.check_linearizability, output.linearizable, output.time_linearizability) << std::endl;
 }
 
 int main(int argc, char** argv) {
@@ -447,6 +473,7 @@ int main(int argc, char** argv) {
 		SwitchArg eager_switch("e", "eager", "Eagerly checks annotations before adding them", cmd, false);
 		SwitchArg quiet_switch("q", "quiet", "Disables most output", cmd, false);
 		SwitchArg verbose_switch("v", "verbose", "Verbose output", cmd, false);
+		SwitchArg gist_switch("g", "gist", "Print machine readable gist at very end", cmd, false);
 		ValueArg<std::string> output_arg("o", "output", "Output file for transformed program", false , "", "path", cmd);
 		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyse", true, "", is_file_constraint.get(), cmd);
 
@@ -461,6 +488,7 @@ int main(int argc, char** argv) {
 		config.eager = eager_switch.getValue();
 		config.quiet = quiet_switch.getValue();
 		config.verbose = verbose_switch.getValue();
+		config.print_gist = gist_switch.getValue();
 		config.output_path = output_arg.getValue();
 		config.output = output_arg.isSet();
 
@@ -510,7 +538,7 @@ int main(int argc, char** argv) {
 		do_linearizability_check();
 	}
 
+	print_summary();
 	print_gist();
-
 	return 0;
 }
