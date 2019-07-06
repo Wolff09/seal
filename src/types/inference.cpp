@@ -2,6 +2,7 @@
 #include "vata2/nfa.hh"
 #include "cola/ast.hpp"
 #include "types/util.hpp"
+#include "types/config.hpp"
 #include <vector>
 #include <sstream>
 #include <memory>
@@ -10,7 +11,6 @@
 using namespace cola;
 using namespace prtypes;
 
-#define INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID true
 static Vata2::Nfa::StringDict VATA_PARAMS = {{ "algo", "naive" }}; // algos: "naive" and "antichains"
 
 //===================== helper

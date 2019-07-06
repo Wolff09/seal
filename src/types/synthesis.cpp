@@ -3,6 +3,7 @@
 #include "cola/util.hpp"
 #include "cola/util.hpp"
 #include "types/error.hpp"
+#include "types/config.hpp"
 #include "z3++.h"
 #include <map>
 #include <vector>
@@ -760,32 +761,41 @@ struct Synthesizer {
 			return true;
 		};
 
-		// prune guarantees that are smaller than some valid guarantee
-		// std::cout << std::endl << "Pruning guarantees:" << std::endl;
-		std::set<const Guarantee*> keep;
-		for (const auto& pair : guarantee2states) {
-			keep.insert(pair.first);
-		}
-		for (const Guarantee* guarantee : keep) {
-			if (guarantee->entails_validity && guarantee != &guarantee_table.active_guarantee() && guarantee != &guarantee_table.local_guarantee()) {
-				// std::cout << "Found valid guarantee: " << guarantee->name << std::endl;
-				for (const Guarantee* other : keep) {
-					if (!other->entails_validity && is_include(*guarantee2states.at(other), *guarantee2states.at(guarantee), true)) {
-						// std::cout << "   -> pruning: " << other->name << std::endl;
-						keep.erase(other);
+		#if SYNTHESIS_PRUNE_GUARANTEES_BY_INCLUSION
+			// find guarantees to prune: those that are smaller than some valid guarantee
+			// std::cout << std::endl << "Pruning guarantees:" << std::endl;
+			std::set<const Guarantee*> keep;
+			for (const auto& pair : guarantee2states) {
+				keep.insert(pair.first);
+			}
+			for (const Guarantee* guarantee : keep) {
+				if (guarantee->entails_validity) {
+					// std::cout << "Found valid guarantee: " << guarantee->name << std::endl;
+					for (const auto& pair : guarantee2states) {
+						const Guarantee* other = pair.first;
+						if (is_include(*guarantee2states.at(other), *guarantee2states.at(guarantee), true)) {
+							// std::cout << "   -> pruning: " << other->name << std::endl;
+							keep.erase(other);
+						}
 					}
 				}
 			}
-		}
-		std::vector<std::unique_ptr<Guarantee>> all_guarantees = std::move(guarantee_table.all_guarantees);
-		guarantee_table.all_guarantees.clear();
-		for (auto& guarantee : all_guarantees) {
-			if (keep.count(guarantee.get()) != 0) {
-				guarantee_table.all_guarantees.push_back(std::move(guarantee));
-			} else {
-				guarantee2states.erase(guarantee.get());
+			
+			// make sure active/local are retained
+			keep.insert(&guarantee_table.active_guarantee());
+			keep.insert(&guarantee_table.local_guarantee());
+
+			// remove guarantees
+			std::vector<std::unique_ptr<Guarantee>> all_guarantees = std::move(guarantee_table.all_guarantees);
+			guarantee_table.all_guarantees.clear();
+			for (auto& guarantee : all_guarantees) {
+				if (keep.count(guarantee.get()) != 0) {
+					guarantee_table.all_guarantees.push_back(std::move(guarantee));
+				} else {
+					guarantee2states.erase(guarantee.get());
+				}
 			}
-		}
+		#endif
 
 		// std::cout << "Adding inclusion relations:" << std::endl;
 		for (const auto& pair : guarantee2states) {
