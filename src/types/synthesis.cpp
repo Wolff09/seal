@@ -623,7 +623,6 @@ struct Synthesizer {
 	template<typename T>
 	inline void synthesis_post_cmd(T& container, const synthstate_t& to_post, const Function* label, Transition::Kind kind) {
 		assert(label);
-		std::deque<synthstate_t> result;
 
 		// compute vector of possibile transitions
 		std::vector<std::reference_wrapper<const std::vector<TransitionInfo>>> tinfo;
@@ -690,6 +689,7 @@ struct Synthesizer {
 
 			auto post = synthesis_post(synthstate);
 			for (auto& synthpost : post) {
+				// synthpost = compute_closure(synthpost);
 				auto insertion = reach.insert(synthpost);
 				if (insertion.second) {
 					worklist.push_back(std::move(synthpost));
@@ -739,6 +739,8 @@ struct Synthesizer {
 
 		// std::cout << "Adding guarantees:" << std::endl;
 		std::map<const Guarantee*, const synthstate_t*> guarantee2states;
+		// guarantee2states[&guarantee_table.active_guarantee()] = &active_states;
+		// guarantee2states[&guarantee_table.local_guarantee()] = &active_states;
 		for (const auto& state : synthesis) {
 			std::string name = make_name(state);
 			// std::cout << "  - " << name << std::endl;
