@@ -1,4 +1,4 @@
-#name "Michael's Set EBR"
+#name "Vechev CAS Set EBR, manually transformed"
 #smr "EBR"
 #cavespec "../set_spec.cav"
 #cave 'prover_opts imp_var = "CC_.Head.next";'
@@ -13,6 +13,7 @@ struct Node {
 }
 
 Node* Head;
+Node* Tail;
 
 extern void retire(Node* ptr);
 extern void enterQ();
@@ -20,13 +21,18 @@ extern void leaveQ();
 
 
 void init() {
+	Tail = malloc;
+	Tail->next = NULL;
+	Tail->marked = false;
+	Tail->val = MAX_VAL;
 	Head = malloc;
-	Head->next = NULL;
+	Head->next = Tail;
 	Head->marked = false;
+	Head->val = MIN_VAL;
 }
 
 
-inline void locate(Node* pred, Node* curr, Node* next, data_t key, data_t k, data_t k3) {
+inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 	// k3: CAVE hack for necessary precision
 
 	curr = Head;
@@ -39,54 +45,34 @@ inline void locate(Node* pred, Node* curr, Node* next, data_t key, data_t k, dat
 		k3 = k;
 
 		curr = pred->next;
-		angel(member(curr));
+		// angel(member(curr));
 
 		choose {
 			atomic {
 				assume(pred->marked == false);
-				assume(curr == pred->next);
+				// assume(curr == pred->next);
+				curr = pred->next; // atomicity abstraction
+				angel(member(curr)); // atomicity abstraction
+				k3 = k3;
 			}
 
-			if (curr != NULL) {
-				k = curr->val;
-			} else {
-				k = MAX_VAL;
-				break;
-			}
+			k = curr->val;
 		}{
-			// retry
 			curr = Head;
 			angel(member(curr));
 			k = MIN_VAL;
 			k3 = MIN_VAL;
 		}
 
-		if (curr->marked == false) {
-			if (k >= key) {
-				break;
-			}
-		} else {
-			next = curr->next;
-			atomic {
-				assume(pred->marked == false);
-				assume(curr == pred->next);
-				pred->next = next;
-				assert(active(curr));
-				retire(curr);
-			}
-
-			// retry
-			curr = Head;
-			angel(member(curr));
-			k = MIN_VAL;
-			k3 = MIN_VAL;
+		if (k >= key) {
+			break;
 		}
 	}
 }
 
 
 bool contains(data_t key) {
-	Node* pred, curr, next;
+	Node* pred, curr;
 	data_t k, k3;
 	bool result;
 
@@ -95,7 +81,7 @@ bool contains(data_t key) {
 		leaveQ();
 	}
 
-	locate(pred, curr, next, key, k, k3);
+	locate(pred, curr, key, k, k3);
 
 	if (k == key) {
 		result = true;
@@ -107,9 +93,8 @@ bool contains(data_t key) {
 	return result;
 }
 
-
 bool add(data_t key) {
-	Node* pred, curr, next, entry;
+	Node* pred, curr, entry;
 	data_t k, k3;
 	bool result;
 
@@ -121,10 +106,9 @@ bool add(data_t key) {
 	entry = malloc;
 	entry->val = key;
 	entry->marked = false;
-	angel(member(entry)); // should be done by Local Guarantee
 
 	while (true) {
-		locate(pred, curr, next, key, k, k3);
+		locate(pred, curr, key, k, k3);
 
 		if (k == key) {
 			result = false;
@@ -137,9 +121,8 @@ bool add(data_t key) {
 				choose {
 					assume(pred->marked == false);
 					assume(curr == pred->next);
-
 					pred->next = entry;
-					k3 = k;
+					k3 = k3;
 					result = true;
 					break;
 				}{
@@ -153,6 +136,7 @@ bool add(data_t key) {
 	return result;
 }
 
+
 bool remove(data_t key) {
 	Node* pred, curr, next;
 	data_t k, k3;
@@ -164,7 +148,7 @@ bool remove(data_t key) {
 	}
 
 	while (true) {
-		locate(pred, curr, next, key, k, k3);
+		locate(pred, curr, key, k, k3);
 
 		if (k > key) {
 			result = false;
@@ -172,12 +156,14 @@ bool remove(data_t key) {
 
 		} else {
 			next = curr->next;
-			angel(member(next));
+			// angel(member(next));
 			choose {
 				atomic {
 					assume(curr->marked == false);
-					assume(next == curr->next);
+					// assume(next == curr->next);
+					next = curr->next; // atomicity abstraction
 					curr->marked = true;
+					k3 = k3;
 				}
 				atomic {
 					assume(pred->marked == false);
@@ -185,6 +171,7 @@ bool remove(data_t key) {
 					pred->next = next;
 					assert(active(curr));
 					retire(curr);
+					k3 = k3;
 				}
 				result = true;
 				break;
