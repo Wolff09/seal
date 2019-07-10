@@ -123,7 +123,7 @@ bool add(data_t key) {
 					assume(curr == pred->next);
 
 					pred->next = entry;
-					k3 = k;
+					k3 = k3;
 					result = true;
 					break;
 				}{
