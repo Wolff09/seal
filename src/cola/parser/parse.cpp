@@ -9,6 +9,8 @@
 #include "CoLaParser.h"
 #include "cola/ast.hpp"
 #include "cola/parser/AstBuilder.hpp"
+#include "cola/observer.hpp"
+#include "cola/parser/ObserverBuilder.hpp"
 
 using namespace antlr4;
 using namespace cola;
@@ -26,15 +28,16 @@ std::string get_path(std::string filename) {
 	}
 }
 
-std::shared_ptr<Program> cola::parse(std::string filename) {
+
+std::shared_ptr<Program> cola::parse_program(std::string filename) {
 	std::ifstream file(filename);
-	auto result = parse(file);
+	auto result = parse_program(file);
 	result->options["_path"] = get_path(filename);
-	std::cout << get_path(filename) << std::endl;
+	// std::cout << get_path(filename) << std::endl;
 	return result;
 }
 
-std::shared_ptr<Program> cola::parse(std::istream& input) {
+std::shared_ptr<Program> cola::parse_program(std::istream& input) {
 	ANTLRInputStream antlr(input);
 	CoLaLexer lexer(&antlr);
 	CommonTokenStream tokens(&lexer);
@@ -48,4 +51,26 @@ std::shared_ptr<Program> cola::parse(std::istream& input) {
 	}
 
 	return AstBuilder::buildFrom(programContext);
+}
+
+
+std::shared_ptr<Observer> cola::parse_observer(std::string filename, const Program& program) {
+	std::ifstream file(filename);
+	return parse_observer(file, program);
+}
+
+std::shared_ptr<Observer> cola::parse_observer(std::istream& input, const Program& program) {
+	ANTLRInputStream antlr(input);
+	CoLaLexer lexer(&antlr);
+	CommonTokenStream tokens(&lexer);
+
+	CoLaParser parser(&tokens);
+	auto observerContext = parser.observer();
+
+	if (parser.getNumberOfSyntaxErrors() != 0) {
+		// TODO: proper error class
+		throw std::logic_error("Parsing errors ==> aborting.");
+	}
+
+	return ObserverBuilder::buildFrom(observerContext, program);
 }

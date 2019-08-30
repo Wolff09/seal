@@ -59,6 +59,7 @@ include_directories(${antlr4cpp_include_dirs})
 set(SOURCES
 	# parser
 	parser/AstBuilder.cpp
+	parser/ObserverBuilder.cpp
 	parser/parse.cpp
 
 	# transform

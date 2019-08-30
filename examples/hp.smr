@@ -1,0 +1,14 @@
+observer: HazardPointer[negative];
+
+variables:
+thread T;
+pointer P;
+
+states:
+s1(init)[initial];
+s2(sowas);
+s3(jo)[final];
+
+transitions:
+s1 -- enter protect1(T, P) >> s2;
+s2 -- free(*, P) >> s3;

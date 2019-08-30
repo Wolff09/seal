@@ -50,11 +50,15 @@ std::string to_s(duration_t duration) {
 
 
 struct IsRegularFileConstraint : public Constraint<std::string> {
+	std::string id = "path";
 	std::string description() const override { return "path to regular file"; }
- 	std::string shortID() const override { return "path"; }
+ 	std::string shortID() const override { return this->id; }
  	bool check(const std::string& path) const override {
  		std::ifstream stream(path.c_str());
     	return stream.good();
+ 	}
+ 	IsRegularFileConstraint(std::string more_verbose="") {
+ 		this->id += more_verbose;
  	}
 };
 
@@ -170,19 +174,28 @@ static void create_ebr_observer(const Program& program, const Function& retire) 
 }
 
 static void create_smr_observer(const Program& program, const Function& retire) {
-	// TODO: parse SMR impl observers
-	std::cout << std::endl << "Preparing " << smr_to_string(input.smrType) << " SMR automaton... " << std::flush;
+	std::cout << std::endl << "Preparing SMR automaton..." << std::flush;
+	auto obs = cola::parse_observer(config.observer_path, program);
 	input.store = std::make_unique<SmrObserverStore>(program, retire);
-	switch (input.smrType) {
-		case SMR_HP: create_hp_observer(program, retire); break;
-		case SMR_EBR: create_ebr_observer(program, retire); break;
-	}
 	std::cout << "done" << std::endl;
 	std::cout << "The SMR observer is the cross-product of: " << std::endl;
 	cola::print(*input.store->base_observer, std::cout);
 	for (const auto& observer : input.store->impl_observer) {
 		cola::print(*observer, std::cout);
 	}
+
+	// std::cout << std::endl << "Preparing " << smr_to_string(input.smrType) << " SMR automaton... " << std::flush;
+	// input.store = std::make_unique<SmrObserverStore>(program, retire);
+	// switch (input.smrType) {
+	// 	case SMR_HP: create_hp_observer(program, retire); break;
+	// 	case SMR_EBR: create_ebr_observer(program, retire); break;
+	// }
+	// std::cout << "done" << std::endl;
+	// std::cout << "The SMR observer is the cross-product of: " << std::endl;
+	// cola::print(*input.store->base_observer, std::cout);
+	// for (const auto& observer : input.store->impl_observer) {
+	// 	cola::print(*observer, std::cout);
+	// }
 }
 
 static void add_custom_hp_guarantees(const Program& program, const Function& retire) {
@@ -230,7 +243,7 @@ static void add_custom_guarantees(const Program& program, const Function& retire
 
 static void read_input() {
 	// parse program
-	input.program = cola::parse(config.program_path);
+	input.program = cola::parse_program(config.program_path);
 	Program& program = *input.program;
 	input.smrType = get_smr_type(program);
 
@@ -459,7 +472,8 @@ int main(int argc, char** argv) {
 	// parse command line arguments
 	try {
 		CmdLine cmd("LEAP verification tool for lock-free data structures", ' ', "0.9");
-		auto is_file_constraint = std::make_unique<IsRegularFileConstraint>();
+		auto is_program_constraint = std::make_unique<IsRegularFileConstraint>("_to_program");
+		auto is_observer_constraint = std::make_unique<IsRegularFileConstraint>("_to_smr");
 
 		// path to file containing observer definition
 		// static const std::string NO_OBSERVER_PATH = "<none>";
@@ -476,10 +490,12 @@ int main(int argc, char** argv) {
 		SwitchArg verbose_switch("v", "verbose", "Verbose output", cmd, false);
 		SwitchArg gist_switch("g", "gist", "Print machine readable gist at very end", cmd, false);
 		ValueArg<std::string> output_arg("o", "output", "Output file for transformed program", false , "", "path", cmd);
-		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyse", true, "", is_file_constraint.get(), cmd);
+		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyse", true, "", is_program_constraint.get(), cmd);
+		UnlabeledValueArg<std::string> observer_arg("observer", "Input observer file for SMR specification", true, "", is_observer_constraint.get(), cmd);
 
 		cmd.parse( argc, argv );
 		config.program_path = program_arg.getValue();
+		config.observer_path = observer_arg.getValue();
 		config.check_types = type_switch.getValue();
 		config.rewrite_and_retry = !keep_switch.getValue();
 		config.synthesize_types = !customtype_switch.getValue();

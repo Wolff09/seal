@@ -543,9 +543,13 @@ void cola::print(const Observer& observer, std::ostream& stream) {
 		std::string id = "s" + std::to_string(index);
 		state2id[state] = id;
 		std::string option = "";
-		if (state->initial) option = ", shape=box";
-		if (state->final) option = ", shape=box, peripheries=2";
+		// if (state->initial) option = ", shape=box";
+		if (state->final) option = ", peripheries=2";
 		stream << "    " << id << " [label=\"" << state->name << "\"" << option << "]; " << std::endl;
+		if (state->initial) {
+			stream << "    _ [shape = point] ; " << std::endl;
+			stream << "    _ -> " << id << " ; " << std::endl;
+		}
 	}
 	for (const auto& transition : observer.transitions) {
 		std::string src_id = state2id.at(&transition->src);

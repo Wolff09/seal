@@ -122,7 +122,20 @@ namespace cola {
 			antlrcpp::Any visitAngelChooseActive(cola::CoLaParser::AngelChooseActiveContext* context) override;
 			antlrcpp::Any visitAngelContains(cola::CoLaParser::AngelContainsContext* context) override;
 
-			antlrcpp::Any visitOption(cola::CoLaParser::OptionContext *context) override;
+			antlrcpp::Any visitOption(cola::CoLaParser::OptionContext* context) override;
+
+
+			antlrcpp::Any visitObserver(cola::CoLaParser::ObserverContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverDefinition(cola::CoLaParser::ObserverDefinitionContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverVariableList(cola::CoLaParser::ObserverVariableListContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverVariable(cola::CoLaParser::ObserverVariableContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverStateList(cola::CoLaParser::ObserverStateListContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverState(cola::CoLaParser::ObserverStateContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverTransitionList(cola::CoLaParser::ObserverTransitionListContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverTransition(cola::CoLaParser::ObserverTransitionContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverGuardTrue(cola::CoLaParser::ObserverGuardTrueContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverGuardIdentifierEq(cola::CoLaParser::ObserverGuardIdentifierEqContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverGuardIdentifierNeq(cola::CoLaParser::ObserverGuardIdentifierNeqContext* /*context*/) override { throw std::logic_error("not implemented"); }
 	};
 
 } // namespace cola

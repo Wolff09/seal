@@ -6,13 +6,18 @@
 #include <string>
 #include <memory>
 #include "cola/ast.hpp"
+#include "cola/observer.hpp"
 
 
 namespace cola {
 
-	std::shared_ptr<Program> parse(std::string filename);
+	std::shared_ptr<Program> parse_program(std::string filename);
 
-	std::shared_ptr<Program> parse(std::istream& input);
+	std::shared_ptr<Program> parse_program(std::istream& input);
+
+	std::shared_ptr<Observer> parse_observer(std::string filename, const Program& program);
+
+	std::shared_ptr<Observer> parse_observer(std::istream& input, const Program& program);
 
 } // namespace cola
 

@@ -485,43 +485,6 @@ std::vector<std::unique_ptr<Observer>> prtypes::make_hp_transfer_guarantee_obser
 	return result;
 }
 
-std::unique_ptr<Observer> prtypes::make_last_free_observer(const Program& /*program*/, std::string /*name_prefix*/) {
-	throw std::logic_error("not implemented");
-	// auto [free_function, ptrtype] = get_basics();
-	// assert(takes_single_pointer(free_function));
-
-	// auto result = std::make_unique<Observer>();
-	// result->negative_specification = false;
-
-	// // variables
-	// result->variables.push_back(std::make_unique<ThreadObserverVariable>(name_prefix + ":thread"));
-	// result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
-
-	// // states
-	// result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
-	// result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, true));
-	// result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, false));
-
-	// // free transitions
-	// result->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(0), *result->states.at(1), free_function, *result->variables.at(1)));
-
-	// // subsequent transitions
-	// auto add_trans = [&](const Function& label, Transition::Kind kind) {
-	// 	result->transitions.push_back(std::make_unique<Transition>(*result->states.at(1), *result->states.at(2), label, kind, std::make_unique<TrueGuard>()));
-	// };
-	// add_trans(free_function, Transition::INVOCATION);
-	// // add_trans(free_function, Transition::RESPONSE); // free has only invocations by design
-	// for (const auto& function : program.functions) {
-	// 	if (function->kind == Function::SMR) {
-	// 		for (auto kind : { Transition::INVOCATION, Transition::RESPONSE }) {
-	// 			add_trans(*function, kind);
-	// 		}
-	// 	}
-	// }
-
-	// return result;
-}
-
 std::unique_ptr<Observer> prtypes::make_ebr_observer(const Function& retire_function, const Function& enter_function, const Function& leave_function, std::string id) {
 	auto [free_function, ptrtype] = get_basics();
 	assert(takes_single_pointer(retire_function));

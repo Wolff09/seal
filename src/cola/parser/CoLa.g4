@@ -1,7 +1,7 @@
 grammar CoLa;
 
 
-/* Parser rules */
+/* Parser rules: programs */
 
 program : opts* struct_decl* var_decl* function* EOF ;
 
@@ -120,6 +120,23 @@ angelexpr : 'choose'                            #angelChoose
           | 'choose active'                     #angelChooseActive
           | 'member' '(' name=Identifier ')'  #angelContains
           ;
+
+
+/* Parser rules: observers */
+
+observer   : obs_def var_list state_list trans_list EOF ;
+obs_def    : 'observer' ':' name=Identifier ('[' (positive='positive' | negative='negative') ']')? ';'                                                            #observerDefinition ;
+var_list   : 'variables' ':' obs_var*                                                                                                                             #observerVariableList ;
+obs_var    : (thread='thread' | pointer='pointer') name=Identifier ';'                                                                                            #observerVariable ;
+state_list : 'states' ':' state*                                                                                                                                  #observerStateList ;
+state      : name=Identifier ('(' verbose=Identifier ')')? ('[' initial='initial' ']')? ('[' final='final' ']')? ';'                                              #observerState ;
+trans_list : 'transitions' ':' transition*                                                                                                                        #observerTransitionList ;
+transition : src=Identifier '--' (enter='enter' | exit='exit')? name=Identifier '(' thisguard=guard_expr (',' argsguard+=guard_expr)* ')' '>>' dst=Identifier ';' #observerTransition ;
+guard_expr : '*'                                                                                                                                                  #observerGuardTrue
+           | name=Identifier                                                                                                                                      #observerGuardIdentifierEq
+           | '!' name=Identifier                                                                                                                                  #observerGuardIdentifierNeq
+           ;
+
 
 /* Lexer rules */
 
