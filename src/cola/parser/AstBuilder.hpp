@@ -125,7 +125,7 @@ namespace cola {
 			antlrcpp::Any visitOption(cola::CoLaParser::OptionContext* context) override;
 
 
-			antlrcpp::Any visitObserver(cola::CoLaParser::ObserverContext* /*context*/) override { throw std::logic_error("not implemented"); }
+			antlrcpp::Any visitObserverList(cola::CoLaParser::ObserverListContext* /*context*/) override { throw std::logic_error("not implemented"); }
 			antlrcpp::Any visitObserverDefinition(cola::CoLaParser::ObserverDefinitionContext* /*context*/) override { throw std::logic_error("not implemented"); }
 			antlrcpp::Any visitObserverVariableList(cola::CoLaParser::ObserverVariableListContext* /*context*/) override { throw std::logic_error("not implemented"); }
 			antlrcpp::Any visitObserverVariable(cola::CoLaParser::ObserverVariableContext* /*context*/) override { throw std::logic_error("not implemented"); }

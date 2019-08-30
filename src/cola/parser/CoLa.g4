@@ -124,8 +124,8 @@ angelexpr : 'choose'                            #angelChoose
 
 /* Parser rules: observers */
 
-observer   : obs_def var_list state_list trans_list EOF ;
-obs_def    : 'observer' ':' name=Identifier ('[' (positive='positive' | negative='negative') ']')? ';'                                                            #observerDefinition ;
+observer   : obs_def+ EOF                                                                                                                                         #observerList ;
+obs_def    : 'observer' name=Identifier ('[' (positive='positive' | negative='negative') ']')? '{' var_list state_list trans_list '}'                             #observerDefinition ;
 var_list   : 'variables' ':' obs_var*                                                                                                                             #observerVariableList ;
 obs_var    : (thread='thread' | pointer='pointer') name=Identifier ';'                                                                                            #observerVariable ;
 state_list : 'states' ':' state*                                                                                                                                  #observerStateList ;

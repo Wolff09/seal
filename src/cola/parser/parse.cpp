@@ -54,12 +54,12 @@ std::shared_ptr<Program> cola::parse_program(std::istream& input) {
 }
 
 
-std::shared_ptr<Observer> cola::parse_observer(std::string filename, const Program& program) {
+std::vector<std::unique_ptr<Observer>> cola::parse_observer(std::string filename, const Program& program) {
 	std::ifstream file(filename);
 	return parse_observer(file, program);
 }
 
-std::shared_ptr<Observer> cola::parse_observer(std::istream& input, const Program& program) {
+std::vector<std::unique_ptr<Observer>> cola::parse_observer(std::istream& input, const Program& program) {
 	ANTLRInputStream antlr(input);
 	CoLaLexer lexer(&antlr);
 	CommonTokenStream tokens(&lexer);

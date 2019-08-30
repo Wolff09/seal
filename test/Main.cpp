@@ -163,26 +163,31 @@ inline SmrType get_smr_type(const Program& program) {
 	return result;
 }
 
-static void create_hp_observer(const Program& program, const Function& retire) {
-	auto [protect1, protect2] = lookup_functions(program, "protect1", "protect2");
-	input.store->add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
-}
+// static void create_hp_observer(const Program& program, const Function& retire) {
+// 	auto [protect1, protect2] = lookup_functions(program, "protect1", "protect2");
+// 	input.store->add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
+// }
 
-static void create_ebr_observer(const Program& program, const Function& retire) {
-	auto [enter, leave] = lookup_functions(program, "enterQ", "leaveQ");
-	input.store->add_impl_observer(make_ebr_observer(retire, enter, leave));
-}
+// static void create_ebr_observer(const Program& program, const Function& retire) {
+// 	auto [enter, leave] = lookup_functions(program, "enterQ", "leaveQ");
+// 	input.store->add_impl_observer(make_ebr_observer(retire, enter, leave));
+// }
 
 static void create_smr_observer(const Program& program, const Function& retire) {
 	std::cout << std::endl << "Preparing SMR automaton..." << std::flush;
-	auto obs = cola::parse_observer(config.observer_path, program);
+	auto observers = cola::parse_observer(config.observer_path, program);
 	input.store = std::make_unique<SmrObserverStore>(program, retire);
+	for (auto& observer : observers) {
+		input.store->add_impl_observer(std::move(observer));
+	}
 	std::cout << "done" << std::endl;
 	std::cout << "The SMR observer is the cross-product of: " << std::endl;
 	cola::print(*input.store->base_observer, std::cout);
 	for (const auto& observer : input.store->impl_observer) {
 		cola::print(*observer, std::cout);
 	}
+
+	exit(0);
 
 	// std::cout << std::endl << "Preparing " << smr_to_string(input.smrType) << " SMR automaton... " << std::flush;
 	// input.store = std::make_unique<SmrObserverStore>(program, retire);

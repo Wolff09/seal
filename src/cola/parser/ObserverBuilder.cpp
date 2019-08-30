@@ -7,10 +7,10 @@ using namespace cola;
 
 
 
-std::shared_ptr<Observer> ObserverBuilder::buildFrom(CoLaParser::ObserverContext* parseTree, const Program& program) {
+std::vector<std::unique_ptr<Observer>> ObserverBuilder::buildFrom(CoLaParser::ObserverContext* parseTree, const Program& program) {
 	ObserverBuilder builder(program);
 	parseTree->accept(&builder);
-	return builder._observer;
+	return std::move(builder._observer_list);
 }
 
 
@@ -79,17 +79,20 @@ ObserverBuilder::ObserverBuilder(const Program& program) {
 }
 
 
-antlrcpp::Any ObserverBuilder::visitObserver(CoLaParser::ObserverContext* context) {
-	_observer = std::make_unique<Observer>();
-	context->obs_def()->accept(this);
-	context->var_list()->accept(this);
-	context->state_list()->accept(this);
-	context->trans_list()->accept(this);
+antlrcpp::Any ObserverBuilder::visitObserverList(CoLaParser::ObserverListContext* context) {
+	for (const auto& observerContext : context->obs_def()) {
+		observerContext->accept(this);
+	}
 	return nullptr;
 }
 
 antlrcpp::Any ObserverBuilder::visitObserverDefinition(CoLaParser::ObserverDefinitionContext* context) {
 	// TODO: use observer name
+
+	// parse observer
+	auto new_observer = std::make_unique<Observer>();
+	_observer = new_observer.get();
+
 	if (context->positive && !context->negative) {
 		_observer->negative_specification = false;
 	} else if (!context->positive && context->negative) {
@@ -97,6 +100,18 @@ antlrcpp::Any ObserverBuilder::visitObserverDefinition(CoLaParser::ObserverDefin
 	} else {
 		throw std::logic_error("Parsing error: observer is positive and negative.");
 	}
+	context->var_list()->accept(this);
+	context->state_list()->accept(this);
+	context->trans_list()->accept(this);
+	_observer_list.push_back(std::move(new_observer));
+
+	// reset
+	_observer = nullptr;
+	_name2state.clear();
+	_name2threadvar.clear();
+	_name2ptrvar.clear();
+	_current_arg = nullptr;
+
 	return nullptr;
 }
 

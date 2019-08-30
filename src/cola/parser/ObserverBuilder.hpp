@@ -14,7 +14,8 @@ namespace cola {
 
 	class ObserverBuilder : public cola::CoLaVisitor { // TODO: should this be a private subclass to avoid misuse?
 		private:
-			std::shared_ptr<Observer> _observer = nullptr;
+			std::vector<std::unique_ptr<Observer>> _observer_list;
+			Observer* _observer = nullptr;
 			std::unordered_map<std::string, State&> _name2state;
 			std::unordered_map<std::string, ThreadObserverVariable&> _name2threadvar;
 			std::unordered_map<std::string, ProgramObserverVariable&> _name2ptrvar;
@@ -47,11 +48,11 @@ namespace cola {
 			
 
 		public:
-			static std::shared_ptr<Observer> buildFrom(cola::CoLaParser::ObserverContext* parseTree, const Program& program);
+			static std::vector<std::unique_ptr<Observer>> buildFrom(cola::CoLaParser::ObserverContext* parseTree, const Program& program);
 
 			ObserverBuilder(const Program& program);
 
-			antlrcpp::Any visitObserver(cola::CoLaParser::ObserverContext* context) override;
+			antlrcpp::Any visitObserverList(cola::CoLaParser::ObserverListContext* context) override;
 			antlrcpp::Any visitObserverDefinition(cola::CoLaParser::ObserverDefinitionContext* context) override;
 			antlrcpp::Any visitObserverVariableList(cola::CoLaParser::ObserverVariableListContext* context) override;
 			antlrcpp::Any visitObserverVariable(cola::CoLaParser::ObserverVariableContext* context) override;

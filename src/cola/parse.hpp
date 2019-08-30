@@ -15,9 +15,9 @@ namespace cola {
 
 	std::shared_ptr<Program> parse_program(std::istream& input);
 
-	std::shared_ptr<Observer> parse_observer(std::string filename, const Program& program);
+	std::vector<std::unique_ptr<Observer>> parse_observer(std::string filename, const Program& program);
 
-	std::shared_ptr<Observer> parse_observer(std::istream& input, const Program& program);
+	std::vector<std::unique_ptr<Observer>> parse_observer(std::istream& input, const Program& program);
 
 } // namespace cola
 
