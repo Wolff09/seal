@@ -31,10 +31,12 @@ namespace prtypes {
 		}
 		void visit(const cola::ThreadObserverVariable& var) {
 			assert(contains_var(var));
+			prtypes::conditionally_raise_error<std::logic_error>(!contains_var(var), "Unexpected failure in ObserverAssumptionCheckVisitor.");
 			++count_thread;
 		}
 		void visit(const cola::ProgramObserverVariable& var) {
 			assert(contains_var(var));
+			prtypes::conditionally_raise_error<std::logic_error>(!contains_var(var), "Unexpected failure in ObserverAssumptionCheckVisitor.");
 			++count_address;
 			if (label_is_free) {
 				if (comparison_neq) {
