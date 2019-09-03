@@ -1,0 +1,21 @@
+observer EpochBasedReclamation [negative] {
+
+	variables:
+		thread T;
+		pointer P;	
+
+	states:
+		s1(EBR_init)[initial];
+		s2(EBR_protected);
+		s3(EBR_retired);
+		s4(EBR_fail)[final];
+
+	transitions:
+		s1 -- exit leaveQ(T) >> s2;
+		s2 -- enter retire(*, P) >> s3;
+		s3 -- free(*, P) >> s4;
+
+		s2 -- enter enterQ(T) >> s1;
+		s3 -- enter enterQ(T) >> s1;
+
+}

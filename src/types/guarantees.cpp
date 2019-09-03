@@ -186,14 +186,16 @@ std::vector<std::reference_wrapper<const Guarantee>> GuaranteeTable::add_guarant
 	auto guarantee = std::make_unique<Guarantee>(name, std::move(observer));
 	guarantee->is_transient = is_guarantee_transient(*guarantee);
 	guarantee->entails_validity = false;
+	// std::cout << "Adding: " << guarantee->name << std::endl;
 	result.push_back(*guarantee.get());
 
 	// add a copy of guarantee if it entails validity
 	if (entails_guarantee_validity(observer_store, *guarantee)) {
 		auto safe_guarantee = copy_guarantee(*guarantee);
-		safe_guarantee->name += "-SAFE";
+		safe_guarantee->name += "#SAFE";
 		safe_guarantee->entails_validity = true;
 		result.push_back(*safe_guarantee.get());
+		// std::cout << "Adding safe: " << safe_guarantee->name << std::endl;
 		this->all_guarantees.push_back(std::move(safe_guarantee));
 	}
 

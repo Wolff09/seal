@@ -58,8 +58,8 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 }
 
 void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
-//	std::cout << std::endl << std::endl << ">>>>>> ENTER: "; cola::print(enter, std::cout);
-//	debug_type_env(this->current_type_environment);
+	// std::cout << std::endl << std::endl << ">>>>>> ENTER: "; cola::print(enter, std::cout);
+	// debug_type_env(this->current_type_environment);
 
 	// check safe
 	SimulationEngine::VariableDeclarationSet invalid;
@@ -90,14 +90,14 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	}
 	this->current_type_environment = std::move(result);
 
-//	std::cout << "done";
-//	debug_type_env(this->current_type_environment);
-//	std::cout << "<<<<<<" << std::endl << std::endl;
+	// std::cout << "done";
+	// debug_type_env(this->current_type_environment);
+	// std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_exit(const Exit& exit) {
-//	std::cout << std::endl << std::endl << ">>>>>> EXIT: "; cola::print(exit, std::cout);
-//	debug_type_env(this->current_type_environment);
+	// std::cout << std::endl << std::endl << ">>>>>> EXIT: "; cola::print(exit, std::cout);
+	// debug_type_env(this->current_type_environment);
 
 	TypeEnv result;
 	for (const auto& [decl, guarantees] : this->current_type_environment) {
@@ -106,9 +106,9 @@ void TypeChecker::check_exit(const Exit& exit) {
 	}
 	this->current_type_environment = std::move(result);
 
-//	std::cout << "done";
-//	debug_type_env(this->current_type_environment);
-//	std::cout << "<<<<<<" << std::endl << std::endl;
+	// std::cout << "done";
+	// debug_type_env(this->current_type_environment);
+	// std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& var) {
@@ -215,12 +215,19 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 	}
 }
 
-void TypeChecker::check_assert_active(const Assert& /*assert*/, const VariableDeclaration& ptr) {
+void TypeChecker::check_assert_active(const Assert& /*assertion*/, const VariableDeclaration& ptr) {
+	// std::cout << std::endl << std::endl << ">>>>>> ASSERT ACTIVE: "; cola::print(assertion, std::cout);
+	// debug_type_env(this->current_type_environment);
+
 	assert(prtypes::has_binding(current_type_environment, ptr));
 	GuaranteeSet guarantees = std::move(current_type_environment.at(ptr));
 	guarantees.insert(guarantee_table.active_guarantee());
 	guarantees = inference.infer(guarantees);
 	current_type_environment.at(ptr) = std::move(guarantees);
+
+	// std::cout << "done";
+	// debug_type_env(this->current_type_environment);
+	// std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_assert_active(const Assert& /*assert*/, const Dereference& /*deref*/, const VariableDeclaration& /*ptr*/) {

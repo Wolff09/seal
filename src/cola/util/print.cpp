@@ -487,11 +487,11 @@ void cola::print(const Statement& statement, std::ostream& stream) {
 }
 
 
-struct GuardToStringVisitor final : public ObserverVisitor {
+struct GuardToDotStringVisitor final : public ObserverVisitor {
 	std::stringstream result;
 	std::map<const ObserverVariable*, std::string> var2name;
 
-	GuardToStringVisitor(const Observer& observer) {
+	GuardToDotStringVisitor(const Observer& observer) {
 		for (std::size_t index = 0; index < observer.variables.size(); ++index) {
 			var2name[observer.variables.at(index).get()] = "$" + std::to_string(index);
 		}
@@ -524,13 +524,13 @@ struct GuardToStringVisitor final : public ObserverVisitor {
 		guard.rhs->accept(*this);
 	}
 	
-	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToStringVisitor::visit(const State&))"); }
-	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToStringVisitor::visit(const Transition&))"); }
-	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToStringVisitor::visit(const Observer&))"); }
+	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToDotStringVisitor::visit(const State&))"); }
+	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToDotStringVisitor::visit(const Transition&))"); }
+	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (GuardToDotStringVisitor::visit(const Observer&))"); }
 };
 
-std::string guard_to_string(const Observer& observer, const Guard& guard) {
-	GuardToStringVisitor visitor(observer);
+std::string guard_to_dot_string(const Observer& observer, const Guard& guard) {
+	GuardToDotStringVisitor visitor(observer);
 	guard.accept(visitor);
 	return visitor.result.str();
 }
@@ -566,7 +566,7 @@ void cola::print(const Observer& observer, std::ostream& stream) {
 				stream << arg->name;
 			}
 		}
-		stream << "),\\n" << guard_to_string(observer, *transition->guard);
+		stream << "),\\n" << guard_to_dot_string(observer, *transition->guard);
 		stream << "\"]; " << std::endl;
 	}
 	stream << "} " << std::endl;

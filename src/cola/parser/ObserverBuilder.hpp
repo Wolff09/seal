@@ -27,24 +27,6 @@ namespace cola {
 			const Function& find_function(std::string name);
 			const ThreadObserverVariable& find_threadvar(std::string name);
 			const ProgramObserverVariable& find_ptrvar(std::string name);
-
-			// using VariableMap = std::unordered_map<std::string, std::unique_ptr<VariableDeclaration>>;
-			// using FunctionMap = std::unordered_map<std::string, Function&>;
-			// std::shared_ptr<Observer> _observer = nullptr;
-			// VariableMap _variables;
-			// FunctionMap _functions;
-
-			// void pushScope();
-			// std::vector<std::unique_ptr<VariableDeclaration>> popScope();
-			// void addVariable(std::unique_ptr<VariableDeclaration> variable);
-			// bool isVariableDeclared(std::string variableName);
-			// const VariableDeclaration& lookupVariable(std::string variableName);
-			// bool isTypeDeclared(std::string typeName);
-			// const Type& lookupType(std::string typeName);
-			// std::unique_ptr<Statement> mk_stmt_from_list(std::vector<cola::CoLaParser::StatementContext*> stmts);
-			// std::unique_ptr<Statement> mk_stmt_from_list(std::vector<Statement*> stmts); // claims ownership of stmts
-			// Statement* as_command(Statement* stmt, AnnotatedStatement* cmd);
-			// Statement* as_command(AnnotatedStatement* stmt) { return as_command(stmt, stmt); }
 			
 
 		public:

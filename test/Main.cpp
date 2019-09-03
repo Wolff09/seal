@@ -71,7 +71,7 @@ static void fail_if(bool condition, CmdLine& cmd, std::string description="undef
 
 
 struct LeapConfig {
-	std::string program_path, observer_path, output_path;
+	std::string program_path, observer_path, output_path, customtypes_path;
 	bool check_types, check_annotations, check_linearizability;
 	bool rewrite_and_retry;
 	bool interactive, eager;
@@ -163,16 +163,6 @@ inline SmrType get_smr_type(const Program& program) {
 	return result;
 }
 
-// static void create_hp_observer(const Program& program, const Function& retire) {
-// 	auto [protect1, protect2] = lookup_functions(program, "protect1", "protect2");
-// 	input.store->add_impl_observer(make_hp_transfer_observer(retire, protect1, protect2));
-// }
-
-// static void create_ebr_observer(const Program& program, const Function& retire) {
-// 	auto [enter, leave] = lookup_functions(program, "enterQ", "leaveQ");
-// 	input.store->add_impl_observer(make_ebr_observer(retire, enter, leave));
-// }
-
 static void create_smr_observer(const Program& program, const Function& retire) {
 	std::cout << std::endl << "Preparing SMR automaton..." << std::flush;
 	auto observers = cola::parse_observer(config.observer_path, program);
@@ -181,67 +171,18 @@ static void create_smr_observer(const Program& program, const Function& retire) 
 		input.store->add_impl_observer(std::move(observer));
 	}
 	std::cout << "done" << std::endl;
-	std::cout << "The SMR observer is the cross-product of: " << std::endl;
+	std::cout << "The SMR observer is the cross-product of (.dot): " << std::endl;
 	cola::print(*input.store->base_observer, std::cout);
 	for (const auto& observer : input.store->impl_observer) {
 		cola::print(*observer, std::cout);
 	}
-
-	exit(0);
-
-	// std::cout << std::endl << "Preparing " << smr_to_string(input.smrType) << " SMR automaton... " << std::flush;
-	// input.store = std::make_unique<SmrObserverStore>(program, retire);
-	// switch (input.smrType) {
-	// 	case SMR_HP: create_hp_observer(program, retire); break;
-	// 	case SMR_EBR: create_ebr_observer(program, retire); break;
-	// }
-	// std::cout << "done" << std::endl;
-	// std::cout << "The SMR observer is the cross-product of: " << std::endl;
-	// cola::print(*input.store->base_observer, std::cout);
-	// for (const auto& observer : input.store->impl_observer) {
-	// 	cola::print(*observer, std::cout);
-	// }
 }
 
-static void add_custom_hp_guarantees(const Program& program, const Function& retire) {
-	auto [protect1, protect2] = lookup_functions(program, "protect1", "protect2");
-	auto add_guarantees = [&](const Function& func, const Function* trans=nullptr) {
-		std::vector<std::unique_ptr<cola::Observer>> hp_guarantee_observers;
-		if (trans) {
-			hp_guarantee_observers = prtypes::make_hp_transfer_guarantee_observers(retire, func, *trans, func.name);
-		} else {
-			hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
-		}
-		for (std::size_t index = 0; index < hp_guarantee_observers.size(); ++index) {
-			input.table->add_guarantee(std::move(hp_guarantee_observers.at(index)), "E" + std::to_string(index + 1) + "-" + func.name);
-		}
-		// input.table->add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
-		// input.table->add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
-		// input.table->add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);
-		// if (hp_guarantee_observers.size() > 3) {
-		// 	assert(hp_guarantee_observers.size() == 5);
-		// 	input.table->add_guarantee(std::move(hp_guarantee_observers.at(3)), "Et-" + func.name);
-		// 	input.table->add_guarantee(std::move(hp_guarantee_observers.at(4)), "Pt-" + func.name);
-		// }
-	};
-	add_guarantees(protect1, &protect2);
-	add_guarantees(protect2, &protect1);
-}
-
-static void add_custom_ebr_guarantees(const Program& program, const Function& retire) {
-	// throw std::logic_error("Not yet implemented (custom EBR guarantees)");
-	auto [enter, leave] = lookup_functions(program, "enterQ", "leaveQ");
-	auto ebr_guarantee_observers = prtypes::make_ebr_guarantee_observers(retire, enter, leave);
-	for (std::size_t index = 0; index < ebr_guarantee_observers.size(); ++index) {
-		input.table->add_guarantee(std::move(ebr_guarantee_observers.at(index)), "E" + std::to_string(index + 1));
-	}
-}
-
-static void add_custom_guarantees(const Program& program, const Function& retire) {
+static void add_custom_guarantees(const Program& program, const Function& /*retire*/) {
 	std::cout << std::endl << "Loading custom types... " << std::flush;
-	switch (input.smrType) {
-		case SMR_HP: add_custom_hp_guarantees(program, retire); break;
-		case SMR_EBR: add_custom_ebr_guarantees(program, retire); break;
+	auto guarantees = cola::parse_observer(config.customtypes_path, program);
+	for (auto& guarantee : guarantees) {
+		input.table->add_guarantee(std::move(guarantee));
 	}
 	std::cout << "done" << std::endl;
 }
@@ -292,6 +233,7 @@ static void read_input() {
 		std::cout << std::endl << "List of guarantees "  << table.all_guarantees.size() <<  ":" << std::endl;
 		for (const auto& guarantee : table) {
 			std::cout << "  - " << "(transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")  for  " << guarantee.name << std::endl;
+			cola::print(*guarantee.observer, std::cout);
 		}
 	} else if (!config.quiet) {
 		std::cout << "Using " << table.all_guarantees.size() << " guarantees in the type system." << std::endl;
@@ -485,7 +427,7 @@ int main(int argc, char** argv) {
 		// ValueArg<std::string> observer_arg("o", "observer", "Observer specification for SMR algorithm", false , NO_OBSERVER_PATH, "path", cmd);
 		// SwitchArg rewrite_switch("r", "rewrite", "Rewrite program and retry type check upon type errors", cmd, false);
 		SwitchArg keep_switch("s", "simple", "Simple type check; no rewriting&retrying (atomicity abstraction) upon type errors", cmd, false);
-		SwitchArg customtype_switch("c", "customtypes", "Do not synthesize typse, but use custom types", cmd, false);
+		// SwitchArg customtype_switch("c", "customtypes", "Do not synthesize typse, but use custom types", cmd, false);
 		SwitchArg type_switch("t", "checktypes", "Perform type check", cmd, false);
 		SwitchArg annotation_switch("a", "checkannotations", "Perform annotation check", cmd, false);
 		SwitchArg linearizability_switch("l", "checklinearizability", "Perform linearizability check", cmd, false);
@@ -494,6 +436,7 @@ int main(int argc, char** argv) {
 		SwitchArg quiet_switch("q", "quiet", "Disables most output", cmd, false);
 		SwitchArg verbose_switch("v", "verbose", "Verbose output", cmd, false);
 		SwitchArg gist_switch("g", "gist", "Print machine readable gist at very end", cmd, false);
+		ValueArg<std::string> customtype_arg("c", "customtypes", "Do not synthesize typse, instead use custom types provided by file", false , "", "path", cmd);
 		ValueArg<std::string> output_arg("o", "output", "Output file for transformed program", false , "", "path", cmd);
 		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyse", true, "", is_program_constraint.get(), cmd);
 		UnlabeledValueArg<std::string> observer_arg("observer", "Input observer file for SMR specification", true, "", is_observer_constraint.get(), cmd);
@@ -503,7 +446,6 @@ int main(int argc, char** argv) {
 		config.observer_path = observer_arg.getValue();
 		config.check_types = type_switch.getValue();
 		config.rewrite_and_retry = !keep_switch.getValue();
-		config.synthesize_types = !customtype_switch.getValue();
 		config.check_annotations = annotation_switch.getValue();
 		config.check_linearizability = linearizability_switch.getValue();
 		config.interactive = interactive_switch.getValue();
@@ -513,6 +455,8 @@ int main(int argc, char** argv) {
 		config.print_gist = gist_switch.getValue();
 		config.output_path = output_arg.getValue();
 		config.output = output_arg.isSet();
+		config.synthesize_types = !customtype_arg.isSet();
+		config.customtypes_path = customtype_arg.getValue();
 
 		if (!config.check_types && !config.check_annotations && !config.check_linearizability) {
 			config.check_types = config.check_annotations = config.check_linearizability = true;

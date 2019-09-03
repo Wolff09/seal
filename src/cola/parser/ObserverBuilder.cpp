@@ -66,7 +66,7 @@ const ProgramObserverVariable& ObserverBuilder::find_ptrvar(std::string name) {
 }
 
 const ThreadObserverVariable& ObserverBuilder::find_threadvar(std::string name) {
-	return find(_name2threadvar, name, "undefined pointer variable");
+	return find(_name2threadvar, name, "undefined thread variable");
 }
 
 
@@ -89,6 +89,13 @@ antlrcpp::Any ObserverBuilder::visitObserverList(CoLaParser::ObserverListContext
 antlrcpp::Any ObserverBuilder::visitObserverDefinition(CoLaParser::ObserverDefinitionContext* context) {
 	// TODO: use observer name
 
+	// reset from previous runs
+	_observer = nullptr;
+	_current_arg = nullptr;
+	_name2state.clear();
+	_name2threadvar.clear();
+	_name2ptrvar.clear();
+
 	// parse observer
 	auto new_observer = std::make_unique<Observer>();
 	_observer = new_observer.get();
@@ -104,13 +111,6 @@ antlrcpp::Any ObserverBuilder::visitObserverDefinition(CoLaParser::ObserverDefin
 	context->state_list()->accept(this);
 	context->trans_list()->accept(this);
 	_observer_list.push_back(std::move(new_observer));
-
-	// reset
-	_observer = nullptr;
-	_name2state.clear();
-	_name2threadvar.clear();
-	_name2ptrvar.clear();
-	_current_arg = nullptr;
 
 	return nullptr;
 }
@@ -171,11 +171,34 @@ antlrcpp::Any ObserverBuilder::visitObserverTransitionList(CoLaParser::ObserverT
 	return nullptr;
 }
 
-template<typename T>
-std::unique_ptr<Guard> guard_from_raw(T* ptr) {
+struct TrueGuardChecker final : public ObserverVisitor {
+	bool result = false;
+	void visit(const ThreadObserverVariable& /*obj*/) override { /* do nothing */ }
+	void visit(const ProgramObserverVariable& /*obj*/) override { /* do nothing */ }
+	void visit(const SelfGuardVariable& /*obj*/) override { /* do nothing */ }
+	void visit(const ArgumentGuardVariable& /*obj*/) override { /* do nothing */ }
+	void visit(const TrueGuard& /*obj*/) override { result = true; }
+	void visit(const ConjunctionGuard& /*obj*/) override { /* do nothing */ }
+	void visit(const EqGuard& /*obj*/) override { /* do nothing */ }
+	void visit(const NeqGuard& /*obj*/) override { /* do nothing */ }
+	void visit(const State& /*obj*/) override { /* do nothing */ }
+	void visit(const Transition& /*obj*/) override { /* do nothing */ }
+	void visit(const Observer& /*obj*/) override { /* do nothing */ }
+};
+
+inline bool is_true_guard(const Guard& guard) {
+	TrueGuardChecker visitor;
+	guard.accept(visitor);
+	return visitor.result;
+}
+
+template<typename C, typename T>
+void add_raw_guard(C& container, T* ptr) {
 	std::unique_ptr<Guard> result;
 	result.reset(ptr);
-	return result;
+	if (!is_true_guard(*result)) {
+		container.push_back(std::move(result));
+	}
 }
 
 antlrcpp::Any ObserverBuilder::visitObserverTransition(CoLaParser::ObserverTransitionContext* context) {
@@ -183,11 +206,21 @@ antlrcpp::Any ObserverBuilder::visitObserverTransition(CoLaParser::ObserverTrans
 	const auto& dst = find_state(context->dst->getText());
 	const auto& label = find_function(context->name->getText());
 
+	// TODO: prevent free from having enter/exit
+	// TODO: prevent free from having implicit this?
 	Transition::Kind kind = Transition::INVOCATION;
 	if (context->enter && !context->exit) {
 		kind = Transition::INVOCATION;
+		if (context->argsguard.size() != label.args.size()) {
+			throw std::logic_error("Parsing error: function '" + label.name + "' has " + std::to_string(label.args.size()) + " parameters but " + std::to_string(context->argsguard.size()) + " were provided.");
+		}
+
 	} else if (!context->enter && context->exit) {
 		kind = Transition::RESPONSE;
+		if (context->argsguard.size() != 0) {
+			throw std::logic_error("Parsing error: 'exit' definition for function '" + label.name + "' specifies paramters.");
+		}
+
 	} else if (!context->enter && !context->exit) {
 		if (&label != &free_function()) {
 			throw std::logic_error("Parsing error: missing enter/exit in transition.");
@@ -197,17 +230,17 @@ antlrcpp::Any ObserverBuilder::visitObserverTransition(CoLaParser::ObserverTrans
 	}
 
 	// create guard
+	_current_arg = nullptr; // sets parsing of first argument to implicit this
 	std::vector<std::unique_ptr<Guard>> conjuncts;
-	_current_arg = nullptr;
-	conjuncts.push_back(guard_from_raw(context->thisguard->accept(this).as<Guard*>()));
-	if (context->argsguard.size() != label.args.size()) {
-		throw std::logic_error("Parsing error: function '" + label.name + "' has " + std::to_string(label.args.size()) + " parameters but " + std::to_string(context->argsguard.size()) + " were provided.");
-	}
+	add_raw_guard(conjuncts, context->thisguard->accept(this).as<Guard*>());
 	auto iterator = label.args.cbegin();
 	for (const auto& guardContext : context->argsguard) {
 		_current_arg = iterator->get();
-		conjuncts.push_back(guard_from_raw(guardContext->accept(this).as<Guard*>()));
+		add_raw_guard(conjuncts, guardContext->accept(this).as<Guard*>());
 		iterator++;
+	}
+	if (conjuncts.size() == 0) {
+		conjuncts.push_back(std::make_unique<TrueGuard>());
 	}
 
 	_observer->transitions.push_back(std::make_unique<Transition>(src, dst, label, kind, std::make_unique<ConjunctionGuard>(std::move(conjuncts))));

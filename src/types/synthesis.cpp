@@ -737,6 +737,14 @@ struct Synthesizer {
 	void add_synthesized_guarantees(GuaranteeTable& guarantee_table) {
 		const auto synthesis = synthesize_guarantees();
 
+		#if SYNTHESIS_PRUNE_GUARANTEES_BY_INCLUSION
+			// ensure that previously added guarantees survive the pruning process
+			std::set<const Guarantee*> previous;
+			for (const auto& guarantee : guarantee_table.all_guarantees) {
+				previous.insert(guarantee.get());
+			}
+		#endif
+
 		// std::cout << "Adding guarantees:" << std::endl;
 		std::map<const Guarantee*, const synthstate_t*> guarantee2states;
 		// guarantee2states[&guarantee_table.active_guarantee()] = &active_states;
@@ -775,6 +783,9 @@ struct Synthesizer {
 					// std::cout << "Found valid guarantee: " << guarantee->name << std::endl;
 					for (const auto& pair : guarantee2states) {
 						const Guarantee* other = pair.first;
+						if (other->entails_validity) {
+							continue; // do not prune valid guarantees
+						}
 						if (is_include(*guarantee2states.at(other), *guarantee2states.at(guarantee), true)) {
 							// std::cout << "   -> pruning: " << other->name << std::endl;
 							keep.erase(other);
@@ -782,10 +793,11 @@ struct Synthesizer {
 					}
 				}
 			}
-			
+
 			// make sure active/local are retained
 			keep.insert(&guarantee_table.active_guarantee());
 			keep.insert(&guarantee_table.local_guarantee());
+			keep.insert(previous.begin(), previous.end());
 
 			// remove guarantees
 			std::vector<std::unique_ptr<Guarantee>> all_guarantees = std::move(guarantee_table.all_guarantees);

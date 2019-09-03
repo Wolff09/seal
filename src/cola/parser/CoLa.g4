@@ -167,7 +167,9 @@ Or  : '||' ;
 
 Neg : '!' ;
 
-Identifier : [a-zA-Z][a-zA-Z0-9]* ;
+Identifier : Letter ( ('-' | '_')* (Letter | '0'..'9') )* ;
+fragment Letter : [a-zA-Z] ;
+// Identifier : [a-zA-Z][a-zA-Z0-9_]* ;
 
 String : '"' ~[\r\n]* '"'
        | '\'' ~[\r\n]* '\'' ;
