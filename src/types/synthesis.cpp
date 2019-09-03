@@ -338,8 +338,21 @@ struct CrossProducer {
 		this->post_map = std::move(post_map);
 	}
 
+	std::string make_obs_name() {
+		std::string result = "";
+		bool first = true;
+		for (const Observer& observer : observers) {
+			if (!first) {
+				result += "-x-";
+			}
+			first = false;
+			result += observer.name;
+		}
+		return result;
+	}
+
 	void init_result() {
-		result = std::make_unique<Observer>();
+		result = std::make_unique<Observer>(make_obs_name());
 		result_active.clear();
 
 		// add variables
@@ -771,6 +784,35 @@ struct Synthesizer {
 			return true;
 		};
 
+		// auto is_unconnected = [&](const Guarantee& guarantee) -> bool {
+		// 	const synthstate_t& original = *guarantee2states.at(&guarantee);
+		// 	for (const State* state : original) {
+		// 		bool reachable = false;
+		// 		for (const State* other : original) {
+		// 			if (state == other) {
+		// 				continue;
+		// 			}
+		// 			for (const auto& elem : post_map) {
+		// 				if (elem.first.dst == state) {
+		// 					for (const auto& tinfo : elem.second) {
+		// 						if (tinfo.dst == other) {
+		// 							reachable = true;
+		// 							break;
+		// 						}
+		// 					}
+		// 				}
+		// 				if (reachable) {
+		// 					break;
+		// 				}
+		// 			}
+		// 		}
+		// 		if (!reachable) {
+		// 			return false;
+		// 		}
+		// 	}
+		// 	return true;
+		// };
+
 		#if SYNTHESIS_PRUNE_GUARANTEES_BY_INCLUSION
 			// find guarantees to prune: those that are smaller than some valid guarantee
 			// std::cout << std::endl << "Pruning guarantees:" << std::endl;
@@ -784,7 +826,7 @@ struct Synthesizer {
 					for (const auto& pair : guarantee2states) {
 						const Guarantee* other = pair.first;
 						if (other->entails_validity) {
-							continue; // do not prune valid guarantees
+							continue; // do not prune valid guarantees // TODO: needed?
 						}
 						if (is_include(*guarantee2states.at(other), *guarantee2states.at(guarantee), true)) {
 							// std::cout << "   -> pruning: " << other->name << std::endl;
@@ -793,6 +835,12 @@ struct Synthesizer {
 					}
 				}
 			}
+			// for (const Guarantee* guarantee : keep) {
+			// 	if (is_unconnected(*guarantee)) {
+			// 		std::cout << "   -> removing: " << guarantee->name << std::endl;
+			// 		keep.erase(guarantee);
+			// 	}
+			// }
 
 			// make sure active/local are retained
 			keep.insert(&guarantee_table.active_guarantee());

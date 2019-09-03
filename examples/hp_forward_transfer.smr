@@ -10,10 +10,60 @@ observer HazardPointer_1 [negative] {
 		s3(HP1_protected);
 		s4(HP1_retired);
 		s5(HP1_fail)[final];
-		s6(HP1_protected_invoked);
-		s7(HP1_retired_invoked);
-		s8(HP1_protected_transfer);
-		s9(HP1_retired_transfer);
+
+	transitions:
+		s1 -- enter protect1(T, P) >> s2;
+		s2 -- exit protect1(T) >> s3;
+		s3 -- enter retire(*, P) >> s4;
+		s4 -- free(*, P) >> s5;
+
+		s2 -- enter protect1(T, !P) >> s1;
+		s3 -- enter protect1(T, !P) >> s1;
+		s4 -- enter protect1(T, !P) >> s1;
+
+}
+
+observer HazardPointer_2 [negative] {
+
+	variables:
+		thread T;
+		pointer P;	
+
+	states:
+		s1(HP2_init)[initial];
+		s2(HP2_invoked);
+		s3(HP2_protected);
+		s4(HP2_retired);
+		s5(HP2_fail)[final];
+
+	transitions:
+		s1 -- enter protect2(T, P) >> s2;
+		s2 -- exit protect2(T) >> s3;
+		s3 -- enter retire(*, P) >> s4;
+		s4 -- free(*, P) >> s5;
+
+		s2 -- enter protect2(T, !P) >> s1;
+		s3 -- enter protect2(T, !P) >> s1;
+		s4 -- enter protect2(T, !P) >> s1;
+
+}
+
+observer HazardPointer_Transfer [negative] {
+
+	variables:
+		thread T;
+		pointer P;	
+
+	states:
+		s1(HPt_init)[initial];
+		s2(HPt_invoked);
+		s3(HPt_protected);
+		s4(HPt_retired);
+		s5(HPt_fail)[final];
+		s6(HPt_protected_invoked);
+		s7(HPt_retired_invoked);
+		s8(HPt_protected_transfer);
+		s9(HPt_retired_transfer);
 
 	transitions:
 		s1 -- enter protect1(T, P) >> s2;
@@ -41,29 +91,4 @@ observer HazardPointer_1 [negative] {
 		s7 -- enter protect2(T, !P) >> s1;
 		s8 -- enter protect2(T, !P) >> s1;
 		s9 -- enter protect2(T, !P) >> s1;
-}
-
-observer HazardPointer_2 [negative] {
-
-	variables:
-		thread T;
-		pointer P;	
-
-	states:
-		s1(HP2_init)[initial];
-		s2(HP2_invoked);
-		s3(HP2_protected);
-		s4(HP2_retired);
-		s5(HP2_fail)[final];
-
-	transitions:
-		s1 -- enter protect2(T, P) >> s2;
-		s2 -- exit protect2(T) >> s3;
-		s3 -- enter retire(*, P) >> s4;
-		s4 -- free(*, P) >> s5;
-
-		s2 -- enter protect2(T, !P) >> s1;
-		s3 -- enter protect2(T, !P) >> s1;
-		s4 -- enter protect2(T, !P) >> s1;
-
 }

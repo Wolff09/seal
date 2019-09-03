@@ -25,7 +25,7 @@ std::unique_ptr<Observer> prtypes::make_active_local_guarantee_observer(const Fu
 	assert(takes_single_pointer(free_function));
 	assert(takes_single_pointer(retire_function));
 
-	auto result = std::make_unique<Observer>();
+	auto result = std::make_unique<Observer>("Guarantee-Active/Local");
 	result->negative_specification = false;
 	
 	// variables
@@ -51,7 +51,7 @@ std::unique_ptr<Observer> prtypes::make_base_smr_observer(const Function& retire
 	assert(takes_single_pointer(retire_function));
 	std::string name_prefix = "Base";
 
-	auto result = std::make_unique<Observer>();
+	auto result = std::make_unique<Observer>("BaseSMR");
 	result->negative_specification = true;
 	
 	// variables

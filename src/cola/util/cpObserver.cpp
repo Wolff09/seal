@@ -63,7 +63,7 @@ struct CopyObserverVisitor final : public ObserverVisitor {
 	}
 
 	void visit(const Observer& observer) {
-		result = std::make_unique<Observer>();
+		result = std::make_unique<Observer>(observer.name);
 		result->negative_specification = observer.negative_specification;
 		for (const auto& var : observer.variables) {
 			var->accept(*this);
@@ -85,7 +85,7 @@ std::unique_ptr<Observer> cola::copy(const Observer& observer) {
 
 std::unique_ptr<ObserverVariable> cola::copy(const ObserverVariable& variable) {
 	CopyObserverVisitor visitor;
-	visitor.result = std::make_unique<Observer>();
+	visitor.result = std::make_unique<Observer>("<dummy>");
 	variable.accept(visitor);
 	return std::move(visitor.result->variables.back());
 }

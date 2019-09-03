@@ -362,7 +362,7 @@ VataNfa translate_observer(const Observer& observer, const Alphabet& alphabet, c
 	VataNfa nfa;
 
 //	std::cout << "==================================================" << std::endl;
-//	std::cout << "#Translating observer" << std::endl;
+//	std::cout << "#Translating observer" << observer.name << std::endl;
 
 	// assign vata compatible ids to states of the observer
 	// vata nfa has no explicit notion of states (except initial/final), implicitly added by transitions

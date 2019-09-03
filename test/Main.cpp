@@ -229,11 +229,12 @@ static void read_input() {
 		add_custom_guarantees(program, retire);
 	}
 
-	if (config.verbose) {
+	// if (config.verbose) {
+	if (true) {
 		std::cout << std::endl << "List of guarantees "  << table.all_guarantees.size() <<  ":" << std::endl;
 		for (const auto& guarantee : table) {
 			std::cout << "  - " << "(transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")  for  " << guarantee.name << std::endl;
-			cola::print(*guarantee.observer, std::cout);
+			// cola::print(*guarantee.observer, std::cout);
 		}
 	} else if (!config.quiet) {
 		std::cout << "Using " << table.all_guarantees.size() << " guarantees in the type system." << std::endl;

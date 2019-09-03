@@ -537,7 +537,7 @@ std::string guard_to_dot_string(const Observer& observer, const Guard& guard) {
 
 void cola::print(const Observer& observer, std::ostream& stream) {
 	std::map<const State*, std::string> state2id;
-	stream << "digraph observer { " << std::endl;
+	stream << "digraph " << observer.name << " { " << std::endl;
 	for (std::size_t index = 0; index < observer.states.size(); ++index) {
 		const State* state = observer.states.at(index).get();
 		std::string id = "s" + std::to_string(index);

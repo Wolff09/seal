@@ -97,7 +97,7 @@ antlrcpp::Any ObserverBuilder::visitObserverDefinition(CoLaParser::ObserverDefin
 	_name2ptrvar.clear();
 
 	// parse observer
-	auto new_observer = std::make_unique<Observer>();
+	auto new_observer = std::make_unique<Observer>(context->name->getText());
 	_observer = new_observer.get();
 
 	if (context->positive && !context->negative) {

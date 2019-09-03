@@ -13,6 +13,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 # remain in testing mode for the moment
 # set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # configure compiler

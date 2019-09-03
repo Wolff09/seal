@@ -124,11 +124,13 @@ namespace cola {
 	};
 
 	struct Observer {
+		std::string name;
 		bool negative_specification = true; // negative specification accepts what is *not* in specification (classic notion)
 		std::vector<std::unique_ptr<ObserverVariable>> variables;
 		std::vector<std::unique_ptr<State>> states;
 		std::vector<std::unique_ptr<Transition>> transitions;
 		virtual ~Observer() = default;
+		Observer(std::string name) : name(name) {}
 		virtual void accept(ObserverVisitor& visitor) const { visitor.visit(*this); }
 		static const Function& free_function() {
 			static auto mkfreefun = [](const Type& ptrtype) -> std::unique_ptr<Function> {
