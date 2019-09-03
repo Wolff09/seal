@@ -229,8 +229,7 @@ static void read_input() {
 		add_custom_guarantees(program, retire);
 	}
 
-	// if (config.verbose) {
-	if (true) {
+	if (config.verbose) {
 		std::cout << std::endl << "List of guarantees "  << table.all_guarantees.size() <<  ":" << std::endl;
 		for (const auto& guarantee : table) {
 			std::cout << "  - " << "(transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")  for  " << guarantee.name << std::endl;
