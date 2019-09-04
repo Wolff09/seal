@@ -4,6 +4,7 @@
 ######## Needs to be run from /build/bin ########
 #################################################
 
+import sys
 from subprocess import STDOUT, check_output, TimeoutExpired
 
 TIMEOUT = 60*60*12 # in seconds
@@ -68,8 +69,8 @@ def run_with_timeout(name, smr, args):
 	return gist
 
 def run_test(name, smr):
-	gist_synth = run_with_timeout(name, smr, ['-gts'])
-	gist_hand = run_with_timeout(name, smr, ['-gts', '-c', EXAMPLES_DIR + TYPE_FILE[smr]])
+	gist_synth = run_with_timeout(name, smr, ['-gt'])
+	gist_hand = run_with_timeout(name, smr, ['-gt', '-c', EXAMPLES_DIR + TYPE_FILE[smr]])
 	gist_annotations = run_with_timeout(name, smr, ['-ga'])
 	gist_linear = run_with_timeout(name, smr, ['-gl'])
 	print("{:<48}   |   {}   |   {}   |   {}   |   {}   |    {}".format(
@@ -83,44 +84,52 @@ def run_test(name, smr):
 
 def print_head(smr):
 	print()
+	print()
 	print("{:<48}   |   {:>11}   |  {:>22}    |  {:>22}    |  {:>15}    |   {:>15} ".format(smr + " Program", "Synthesis", "synthesized Types", "hand-crafted Types", "Annotations", "Linearizability"))
 	print("---------------------------------------------------+-----------------+----------------------------+----------------------------+---------------------+----------------------")
 
 def main():
+	print("(Timeout per task is set to: " + str(TIMEOUT) + "s.)")
+
 	# HP
 	print_head("HP")
 	run_test("TreiberStack_transformed", HP)
-	# run_test("TreiberOptimizedStack_transformed", HP)
-	# run_test("MichaelScottQueue_transformed", HP)
-	# run_test("DGLM_transformed", HP)
-	# run_test("VechevDCasSet_transformed", HP)
-	# run_test("VechevCasSet_transformed", HP)
-	# run_test("OHearnSet_transformed", HP)
-	# run_test("MichaelSet_transformed", HP)
+	run_test("TreiberOptimizedStack_transformed", HP)
+	run_test("MichaelScottQueue_transformed", HP)
+	run_test("DGLM_transformed", HP)
+	run_test("VechevDCasSet_transformed", HP)
+	run_test("VechevCasSet_transformed", HP)
+	run_test("OHearnSet_transformed", HP)
+	run_test("MichaelSet_transformed", HP)
 
 	# EBR
 	print_head("EBR")
-	run_test("/TreiberStack", EBR)
-	# run_test("/TreiberOptimizedStack", EBR)
-	# run_test("/MichaelScottQueue", EBR)
-	# run_test("/DGLM", EBR)
-	# run_test("/VechevDCasSet", EBR)
-	# run_test("/VechevCasSet", EBR)
-	# run_test("/OHearnSet", EBR)
-	# run_test("/MichaelSet", EBR)
+	run_test("TreiberStack", EBR)
+	run_test("TreiberOptimizedStack", EBR)
+	run_test("MichaelScottQueue", EBR)
+	run_test("DGLM", EBR)
+	run_test("VechevDCasSet", EBR)
+	run_test("VechevCasSet", EBR)
+	run_test("OHearnSet", EBR)
+	run_test("MichaelSet", EBR)
 
-	# HP 
+	# HP (with different SMR automaton)
 	print_head("HP (monolith)")
 	SMR_FILE[HP] = SMR_FILE[HP_MONOLITH]
 	run_test("TreiberStack_transformed", HP)
-	# run_test("TreiberOptimizedStack_transformed", HP)
-	# run_test("MichaelScottQueue_transformed", HP)
-	# run_test("DGLM_transformed", HP)
-	# run_test("VechevDCasSet_transformed", HP)
-	# run_test("VechevCasSet_transformed", HP)
-	# run_test("OHearnSet_transformed", HP)
-	# run_test("MichaelSet_transformed", HP)
+	run_test("TreiberOptimizedStack_transformed", HP)
+	run_test("MichaelScottQueue_transformed", HP)
+	run_test("DGLM_transformed", HP)
+	run_test("VechevDCasSet_transformed", HP)
+	run_test("VechevCasSet_transformed", HP)
+	run_test("OHearnSet_transformed", HP)
+	run_test("MichaelSet_transformed", HP)
 
 
 if __name__ == '__main__':
+	if len(sys.argv) > 1:
+		if len(sys.argv) != 2:
+			raise Exception("Wrong number of arguments!")
+		TIMEOUT = int(sys.argv[1])
+
 	main()
