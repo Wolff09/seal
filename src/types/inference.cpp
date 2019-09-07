@@ -642,12 +642,18 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 	assert(!Vata2::Nfa::is_lang_empty(from_nfa));
 	assert(!Vata2::Nfa::is_lang_empty(behavior));
 
+	GuaranteeSet blacklist(baseline);
 	GuaranteeSet result = std::move(baseline);
+
 	for (const auto& guarantee : guarantee_table) {
-		// if already present (passed as baseline), no need to infer
-		if (result.count(guarantee) > 0) {
+		if (blacklist.count(guarantee) != 0) {
 			continue;
 		}
+		// // if already present (passed as baseline), no need to infer
+		// if (result.count(guarantee) > 0) {
+		// 	continue;
+		// }
+
 		#if INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID
 			if (!guarantee.entails_validity && prtypes::entails_valid(result)) {
 				continue;
@@ -665,6 +671,7 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 			if (search != guarantee_table.inclusion_map.end()) {
 				const GuaranteeSet& included_in = search->second;
 				result.insert(included_in.begin(), included_in.end());
+				blacklist.insert(included_in.begin(), included_in.end());
 			}
 		}
 	}
@@ -748,20 +755,116 @@ void preprocess_inference(const GuaranteeTable& table, const GuaranteeSet& guara
 	assert(prtypes::implies(inference.count(table.local_guarantee()), guarantees.count(table.local_guarantee())));
 }
 
-GuaranteeSet compute_inference_epsilon(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees) {
-	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
-	auto result = infer_guarantees(guarantee_table, translator, intersection, guarantees);
-	preprocess_inference(guarantee_table, guarantees, result);
-	return result;
-}
 
-GuaranteeSet compute_inference_command(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees, std::vector<Symbol> symbols) {
-	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
-	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
-	auto result = infer_guarantees(guarantee_table, translator, concatenation);
-	preprocess_inference(guarantee_table, guarantees, result);
-	return result;
-}
+// GuaranteeSet compute_inference_epsilon(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees) {
+// 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
+// 	auto result = infer_guarantees(guarantee_table, translator, intersection, guarantees);
+// 	preprocess_inference(guarantee_table, guarantees, result);
+// 	return result;
+// }
+
+// GuaranteeSet compute_inference_command(const GuaranteeTable& guarantee_table, Translator& translator, const GuaranteeSet& guarantees, std::vector<Symbol> symbols) {
+// 	auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
+// 	auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), std::move(symbols));
+// 	auto result = infer_guarantees(guarantee_table, translator, concatenation);
+// 	preprocess_inference(guarantee_table, guarantees, result);
+// 	return result;
+// }
+
+#if INFERENCE_FAST_PARTIAL
+	GuaranteeSet get_active_local(const GuaranteeTable& guarantee_table, const GuaranteeSet& guarantees) {
+		GuaranteeSet result;
+		if (guarantees.count(guarantee_table.local_guarantee()) == 0) {
+			result.insert(guarantee_table.local_guarantee());
+		}
+		if (guarantees.count(guarantee_table.active_guarantee()) == 0) {
+			result.insert(guarantee_table.active_guarantee());
+		}
+		return result;
+	}
+
+	GuaranteeSet InferenceEngine::compute_inference_epsilon(const GuaranteeSet& guarantees) {
+		const GuaranteeSet active_local = get_active_local(guarantee_table, guarantees);
+		GuaranteeSet result;
+		for (const auto& guarantee : guarantees) {
+			GuaranteeSet set(active_local);
+			set.insert(guarantee);
+
+			auto set_key = get_key(set);
+			auto search = inference_map_epsilon.find(set_key);
+
+			if (search == inference_map_epsilon.end()) {
+				// compute entry
+				auto intersection = nfa_intersection_for_guarantees(translator, set);
+				auto infer = infer_guarantees(guarantee_table, translator, intersection, set);
+				result.insert(infer.begin(), infer.end());
+				inference_map_epsilon[set_key] = std::move(infer);
+
+			} else {
+				// reuse entry
+				const GuaranteeSet& found = search->second;
+				result.insert(found.begin(), found.end());
+			}
+		}
+		preprocess_inference(guarantee_table, guarantees, result);
+		return result;
+	}
+
+	GuaranteeSet InferenceEngine::compute_inference_command(const GuaranteeSet& guarantees, Symbol symbol) {
+		std::vector<Symbol> symbol_vec = { symbol };
+		GuaranteeSet result;
+		if (guarantees.empty()) {
+			auto test_intersection = nfa_intersection_for_guarantees(translator, guarantees);
+			auto test_concatenation = nfa_concatenation_with_symbols(translator, std::move(test_intersection), symbol_vec);
+			result = infer_guarantees(guarantee_table, translator, test_concatenation);
+		} else {
+			const GuaranteeSet active_local = get_active_local(guarantee_table, guarantees);
+			for (const auto& guarantee : guarantees) {
+				GuaranteeSet set(active_local);
+				set.insert(guarantee);
+
+				auto set_key = get_key(set);
+				auto& set_map = inference_map_command[set_key];
+				auto sym_key = symbol.vata_symbol;
+
+				auto search = set_map.find(sym_key);
+				if (search == set_map.end()) {
+					// compute entry
+					auto intersection = nfa_intersection_for_guarantees(translator, set);
+					auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), symbol_vec);
+					auto infer = infer_guarantees(guarantee_table, translator, concatenation);
+					result.insert(infer.begin(), infer.end());
+					set_map[sym_key] = std::move(infer);
+
+				} else {
+					// use existing entry
+					const GuaranteeSet& found = search->second;
+					result.insert(found.begin(), found.end());
+				}
+			}
+		}
+		preprocess_inference(guarantee_table, guarantees, result);
+		return result;
+	}
+
+#else
+	GuaranteeSet InferenceEngine::compute_inference_epsilon(const GuaranteeSet& guarantees) {
+		auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
+		auto result = infer_guarantees(guarantee_table, translator, intersection, guarantees);
+		preprocess_inference(guarantee_table, guarantees, result);
+		return result;
+	}
+
+	GuaranteeSet InferenceEngine::compute_inference_command(const GuaranteeSet& guarantees, Symbol symbol) {
+		auto intersection = nfa_intersection_for_guarantees(translator, guarantees);
+		auto concatenation = nfa_concatenation_with_symbols(translator, std::move(intersection), { symbol });
+		auto result = infer_guarantees(guarantee_table, translator, concatenation);
+		preprocess_inference(guarantee_table, guarantees, result);
+		return result;
+	}
+
+#endif
+
 
 std::size_t InferenceEngine::get_index(const Guarantee& guarantee) {
 	return key_helper.at(&guarantee);
@@ -793,7 +896,7 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 	auto key = get_key(guarantees);
 
 	if (inference_map_epsilon.count(key) == 0) {
-		inference_map_epsilon[key] = compute_inference_epsilon(guarantee_table, translator, guarantees);
+		inference_map_epsilon[key] = compute_inference_epsilon(guarantees);
 	}
 
 	return inference_map_epsilon.at(key);
@@ -801,7 +904,7 @@ GuaranteeSet InferenceEngine::infer(const GuaranteeSet& guarantees) {
 
 GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, const Command& command, const VariableDeclaration* ptr) {
 	auto key = get_key(guarantees);
-	auto map = inference_map_command[key];
+	auto& map = inference_map_command[key];
 	auto symbols = compute_symbols_for_event(translator.get_alphabet(), command, ptr);
 	
 	std::vector<GuaranteeSet> sets;
@@ -809,7 +912,7 @@ GuaranteeSet InferenceEngine::infer_command(const GuaranteeSet& guarantees, cons
 		auto symkey = sym.vata_symbol;
 
 		if (map.count(symkey) == 0) {
-			map[symkey] = compute_inference_command(guarantee_table, translator, guarantees, { sym });
+			map[symkey] = compute_inference_command(guarantees, sym);
 		}
 
 		sets.push_back(map.at(symkey));

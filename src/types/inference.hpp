@@ -72,6 +72,8 @@ namespace prtypes {
 			std::size_t get_index(const Guarantee& guarantee);
 			key_type get_key(const GuaranteeSet& guarantees);
 			GuaranteeSet infer_command(const GuaranteeSet& guarantees, const cola::Command& command, const cola::VariableDeclaration* ptr);
+			GuaranteeSet compute_inference_epsilon(const GuaranteeSet& guarantees);
+			GuaranteeSet compute_inference_command(const GuaranteeSet& guarantees, Symbol symbols);
 
 		public:
 			InferenceEngine(const cola::Program& program, const GuaranteeTable& table);
