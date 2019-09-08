@@ -9,12 +9,32 @@ from subprocess import STDOUT, check_output, TimeoutExpired
 
 TIMEOUT = 60*60*12 # in seconds
 TIMEOUT_GIST = "#gist=?;to:t/o;to:t/o;to:t/o;to:t/o"
-HP = "HP"
-EBR = "EBR"
-HP_MONOLITH = "HP_MONOLITH"
-EXAMPLES_DIR = "../../examples/"
-SMR_FILE = { HP: "hp_forward_transfer.smr", EBR: "ebr.smr", HP_MONOLITH: "hp_forward_transfer_monolith.smr" }
-TYPE_FILE = { HP: "CustomTypes/hp_guarantees_forward_transfer.smr", EBR: "CustomTypes/ebr_guarantees.smr" }
+EXAMPLES_DIR = "examples/"
+
+HP = 1
+EBR = 2
+HP_MONOLITH = 3
+
+SMR_NAME = {
+	HP: "Hazard Pointers (HP)",
+	EBR: "Epoch-Based Reclamation (EBR)",
+	HP_MONOLITH: "Hazard Pointers (HP), monolith spec"
+}
+SMR_FILE = {
+	HP: "hp_forward_transfer.smr",
+	EBR: "ebr.smr",
+	HP_MONOLITH: "hp_forward_transfer_monolith.smr"
+}
+SMR_PROGRAM_FOLDER = {
+	HP: "HP",
+	EBR: "EBR",
+	HP_MONOLITH: "HP"
+}
+TYPE_FILE = {
+	HP: "CustomTypes/hp_guarantees_forward_transfer.smr",
+	EBR: "CustomTypes/ebr_guarantees.smr",
+	HP: "CustomTypes/hp_guarantees_forward_transfer.smr"
+}
 
 
 def get_cell(gist, i):
@@ -56,11 +76,10 @@ def get_linearizability_info(gist):
 	return get_info(gist, 4)
 
 def run_with_timeout(name, smr, args):
-	path_program = EXAMPLES_DIR + smr + "/" + name + ".cola"
+	path_program = EXAMPLES_DIR + SMR_PROGRAM_FOLDER[smr] + "/" + name + ".cola"
 	path_smr = EXAMPLES_DIR + SMR_FILE[smr]
 	all_args = ['./seal'] + args + [path_program, path_smr]
 
-	# TODO: handle timeout
 	try:
 		out  = check_output(all_args, stderr=STDOUT, timeout=TIMEOUT, text=True)
 		gist = out.splitlines()[-1]
@@ -92,7 +111,7 @@ def main():
 	print("(Timeout per task is set to: " + str(TIMEOUT) + "s.)")
 
 	# HP
-	print_head("HP")
+	print_head(SMR_NAME[HP])
 	run_test("TreiberStack_transformed", HP)
 	run_test("TreiberOptimizedStack_transformed", HP)
 	run_test("MichaelScottQueue_transformed", HP)
@@ -103,7 +122,7 @@ def main():
 	run_test("MichaelSet_transformed", HP)
 
 	# EBR
-	print_head("EBR")
+	print_head(SMR_NAME[EBR])
 	run_test("TreiberStack", EBR)
 	run_test("TreiberOptimizedStack", EBR)
 	run_test("MichaelScottQueue", EBR)
@@ -114,16 +133,15 @@ def main():
 	run_test("MichaelSet", EBR)
 
 	# HP (with different SMR automaton)
-	print_head("HP (monolith)")
-	SMR_FILE[HP] = SMR_FILE[HP_MONOLITH]
-	run_test("TreiberStack_transformed", HP)
-	run_test("TreiberOptimizedStack_transformed", HP)
-	run_test("MichaelScottQueue_transformed", HP)
-	run_test("DGLM_transformed", HP)
-	run_test("VechevDCasSet_transformed", HP)
-	run_test("VechevCasSet_transformed", HP)
-	run_test("OHearnSet_transformed", HP)
-	run_test("MichaelSet_transformed", HP)
+	print_head(SMR_NAME[HP_MONOLITH])
+	run_test("TreiberStack_transformed", HP_MONOLITH)
+	run_test("TreiberOptimizedStack_transformed", HP_MONOLITH)
+	run_test("MichaelScottQueue_transformed", HP_MONOLITH)
+	run_test("DGLM_transformed", HP_MONOLITH)
+	run_test("VechevDCasSet_transformed", HP_MONOLITH)
+	run_test("VechevCasSet_transformed", HP_MONOLITH)
+	run_test("OHearnSet_transformed", HP_MONOLITH)
+	run_test("MichaelSet_transformed", HP_MONOLITH)
 
 
 if __name__ == '__main__':

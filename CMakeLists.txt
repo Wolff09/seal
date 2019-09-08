@@ -1,5 +1,6 @@
 # project(seal CXX)
 set(TOOL_NAME seal)
+set(INSTALL_FOLDER seal)
 
 # built requirements
 cmake_minimum_required(VERSION 3.5)
@@ -33,3 +34,7 @@ include_directories(src)
 # sources/executables
 add_subdirectory(src)
 add_subdirectory(test)
+
+# installation
+install(FILES benchmark.py DESTINATION ${INSTALL_FOLDER})
+install(DIRECTORY examples DESTINATION ${INSTALL_FOLDER})

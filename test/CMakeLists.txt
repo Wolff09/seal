@@ -16,3 +16,10 @@ include_directories(${TCLAP_INCLUDE_DIRS})
 
 add_executable(${TOOL_NAME} main.cpp)
 target_link_libraries(${TOOL_NAME} CoLa PRTypes)
+
+
+################################
+######### installation #########
+################################
+
+install(TARGETS ${TOOL_NAME} DESTINATION ${INSTALL_FOLDER})
