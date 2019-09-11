@@ -418,7 +418,7 @@ int main(int argc, char** argv) {
 
 	// parse command line arguments
 	try {
-		CmdLine cmd("LEAP verification tool for lock-free data structures", ' ', "0.9");
+		CmdLine cmd("SEAL verification tool for lock-free data structures with safe memory reclamation", ' ', "0.9");
 		auto is_program_constraint = std::make_unique<IsRegularFileConstraint>("_to_program");
 		auto is_observer_constraint = std::make_unique<IsRegularFileConstraint>("_to_smr");
 
@@ -431,14 +431,14 @@ int main(int argc, char** argv) {
 		SwitchArg type_switch("t", "checktypes", "Perform type check", cmd, false);
 		SwitchArg annotation_switch("a", "checkannotations", "Perform annotation check", cmd, false);
 		SwitchArg linearizability_switch("l", "checklinearizability", "Perform linearizability check", cmd, false);
-		SwitchArg interactive_switch("i", "interactive", "Interactive mode to control type check", cmd, false);
+		// SwitchArg interactive_switch("i", "interactive", "Interactive mode to control type check", cmd, false);
 		SwitchArg eager_switch("e", "eager", "Eagerly checks annotations before adding them", cmd, false);
-		SwitchArg quiet_switch("q", "quiet", "Disables most output", cmd, false);
-		SwitchArg verbose_switch("v", "verbose", "Verbose output", cmd, false);
-		SwitchArg gist_switch("g", "gist", "Print machine readable gist at very end", cmd, false);
-		ValueArg<std::string> customtype_arg("c", "customtypes", "Do not synthesize typse, instead use custom types provided by file", false , "", "path", cmd);
-		ValueArg<std::string> output_arg("o", "output", "Output file for transformed program", false , "", "path", cmd);
-		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyse", true, "", is_program_constraint.get(), cmd);
+		// SwitchArg quiet_switch("q", "quiet", "Disables most output", cmd, false);
+		// SwitchArg verbose_switch("v", "verbose", "Verbose output", cmd, false);
+		SwitchArg gist_switch("g", "gist", "Print machine readable gist at the very end", cmd, false);
+		ValueArg<std::string> customtype_arg("c", "customtypes", "Do not synthesize types, instead use custom types provided by file", false , "", "path", cmd);
+		// ValueArg<std::string> output_arg("o", "output", "Output file for transformed program", false , "", "path", cmd);
+		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyze", true, "", is_program_constraint.get(), cmd);
 		UnlabeledValueArg<std::string> observer_arg("observer", "Input observer file for SMR specification", true, "", is_observer_constraint.get(), cmd);
 
 		cmd.parse( argc, argv );
@@ -448,15 +448,20 @@ int main(int argc, char** argv) {
 		config.rewrite_and_retry = !keep_switch.getValue();
 		config.check_annotations = annotation_switch.getValue();
 		config.check_linearizability = linearizability_switch.getValue();
-		config.interactive = interactive_switch.getValue();
 		config.eager = eager_switch.getValue();
-		config.quiet = quiet_switch.getValue();
-		config.verbose = verbose_switch.getValue();
 		config.print_gist = gist_switch.getValue();
-		config.output_path = output_arg.getValue();
-		config.output = output_arg.isSet();
 		config.synthesize_types = !customtype_arg.isSet();
 		config.customtypes_path = customtype_arg.getValue();
+		config.interactive = false;
+		config.quiet = false;
+		config.verbose = false;
+		config.output = false;
+		config.output_path = "";
+		// config.interactive = interactive_switch.getValue();
+		// config.quiet = quiet_switch.getValue();
+		// config.verbose = verbose_switch.getValue();
+		// config.output = output_arg.isSet();
+		// config.output_path = output_arg.getValue();
 
 		if (!config.check_types && !config.check_annotations && !config.check_linearizability) {
 			config.check_types = config.check_annotations = config.check_linearizability = true;
