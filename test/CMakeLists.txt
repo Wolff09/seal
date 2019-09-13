@@ -14,7 +14,7 @@ include_directories(${TCLAP_INCLUDE_DIRS})
 ####### setting up build #######
 ################################
 
-add_executable(${TOOL_NAME} main.cpp)
+add_executable(${TOOL_NAME} Main.cpp)
 target_link_libraries(${TOOL_NAME} CoLa PRTypes)
 
 
