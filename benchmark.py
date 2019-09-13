@@ -33,7 +33,7 @@ SMR_PROGRAM_FOLDER = {
 TYPE_FILE = {
 	HP: "CustomTypes/hp_guarantees_forward_transfer.smr",
 	EBR: "CustomTypes/ebr_guarantees.smr",
-	HP: "CustomTypes/hp_guarantees_forward_transfer.smr"
+	HP_MONOLITH: "CustomTypes/hp_guarantees_forward_transfer.smr"
 }
 
 
@@ -90,47 +90,47 @@ def run_with_timeout(name, smr, args):
 def run_test(name, smr):
 	gist_synth = run_with_timeout(name, smr, ['-gt'])
 	gist_hand = run_with_timeout(name, smr, ['-gt', '-c', EXAMPLES_DIR + TYPE_FILE[smr]])
-	gist_annotations = run_with_timeout(name, smr, ['-ga'])
-	gist_linear = run_with_timeout(name, smr, ['-gl'])
+	gist_annotations = TIMEOUT_GIST # run_with_timeout(name, smr, ['-ga'])
+	gist_linear = TIMEOUT_GIST # run_with_timeout(name, smr, ['-gl'])
 	print("{:<48}   |   {}   |   {}   |   {}   |   {}   |    {}".format(
-		smr + "/" + name,
+		SMR_PROGRAM_FOLDER[smr] + "/" + name,
 		get_synthesis_info(gist_synth),
 		get_type_info(gist_synth),
 		get_type_info(gist_hand),
 		get_annotation_info(gist_annotations),
 		get_linearizability_info(gist_linear)
-	))
+	), flush=True)
 
 def print_head(smr):
 	print()
 	print()
-	print("{:<48}   |   {:>11}   |  {:>22}    |  {:>22}    |  {:>15}    |   {:>15} ".format(smr + " Program", "Synthesis", "synthesized Types", "hand-crafted Types", "Annotations", "Linearizability"))
-	print("---------------------------------------------------+-----------------+----------------------------+----------------------------+---------------------+----------------------")
+	print("{:<48}   |   {:>11}   |  {:>22}    |  {:>22}    |  {:>15}    |   {:>15} ".format(smr, "Synthesis", "synthesized Types", "hand-crafted Types", "Annotations", "Linearizability"), flush=True)
+	print("---------------------------------------------------+-----------------+----------------------------+----------------------------+---------------------+----------------------", flush=True)
 
 def main():
-	print("(Timeout per task is set to: " + str(TIMEOUT) + "s.)")
+	print("(Timeout per task is set to: " + str(TIMEOUT) + "s.)", flush=True)
 
 	# HP
-	print_head(SMR_NAME[HP])
-	run_test("TreiberStack_transformed", HP)
-	run_test("TreiberOptimizedStack_transformed", HP)
-	run_test("MichaelScottQueue_transformed", HP)
-	run_test("DGLM_transformed", HP)
-	run_test("VechevDCasSet_transformed", HP)
-	run_test("VechevCasSet_transformed", HP)
-	run_test("OHearnSet_transformed", HP)
-	run_test("MichaelSet_transformed", HP)
+	# print_head(SMR_NAME[HP])
+	# run_test("TreiberStack_transformed", HP)
+	# run_test("TreiberOptimizedStack_transformed", HP)
+	# run_test("MichaelScottQueue_transformed", HP)
+	# run_test("DGLM_transformed", HP)
+	# run_test("VechevDCasSet_transformed", HP)
+	# run_test("VechevCasSet_transformed", HP)
+	# run_test("OHearnSet_transformed", HP)
+	# run_test("MichaelSet_transformed", HP)
 
 	# EBR
-	print_head(SMR_NAME[EBR])
-	run_test("TreiberStack", EBR)
-	run_test("TreiberOptimizedStack", EBR)
-	run_test("MichaelScottQueue", EBR)
-	run_test("DGLM", EBR)
-	run_test("VechevDCasSet", EBR)
-	run_test("VechevCasSet", EBR)
-	run_test("OHearnSet", EBR)
-	run_test("MichaelSet", EBR)
+	# print_head(SMR_NAME[EBR])
+	# run_test("TreiberStack", EBR)
+	# run_test("TreiberOptimizedStack", EBR)
+	# run_test("MichaelScottQueue", EBR)
+	# run_test("DGLM", EBR)
+	# run_test("VechevDCasSet", EBR)
+	# run_test("VechevCasSet", EBR)
+	# run_test("OHearnSet", EBR)
+	# run_test("MichaelSet", EBR)
 
 	# HP (with different SMR automaton)
 	print_head(SMR_NAME[HP_MONOLITH])
