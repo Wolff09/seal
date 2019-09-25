@@ -551,23 +551,25 @@ void cola::print(const Observer& observer, std::ostream& stream) {
 			stream << "    _ -> " << id << " ; " << std::endl;
 		}
 	}
-	for (const auto& transition : observer.transitions) {
-		std::string src_id = state2id.at(&transition->src);
-		std::string dst_id = state2id.at(&transition->dst);
-		stream << "    " << src_id << " -> " << dst_id << " [label=\"";
-		switch (transition->kind) {
-			case Transition::INVOCATION: stream << "enter "; break;
-			case Transition::RESPONSE: stream << "exit "; break;
-		}
-		stream << transition->label.name << "(_t";
-		if (transition->kind == Transition::INVOCATION) {
-			for (const auto& arg : transition->label.args) {
-				stream << ", ";
-				stream << arg->name;
+	for (const auto& state : observer.states) {
+		for (const auto& transition : state->transitions) {
+			std::string src_id = state2id.at(&transition->src);
+			std::string dst_id = state2id.at(&transition->dst);
+			stream << "    " << src_id << " -> " << dst_id << " [label=\"";
+			switch (transition->kind) {
+				case Transition::INVOCATION: stream << "enter "; break;
+				case Transition::RESPONSE: stream << "exit "; break;
 			}
+			stream << transition->label.name << "(_t";
+			if (transition->kind == Transition::INVOCATION) {
+				for (const auto& arg : transition->label.args) {
+					stream << ", ";
+					stream << arg->name;
+				}
+			}
+			stream << "),\\n" << guard_to_dot_string(observer, *transition->guard);
+			stream << "\"]; " << std::endl;
 		}
-		stream << "),\\n" << guard_to_dot_string(observer, *transition->guard);
-		stream << "\"]; " << std::endl;
 	}
 	stream << "} " << std::endl;
 }

@@ -1,6 +1,7 @@
 #include "types/types.hpp"
 
 #include <iostream>
+#include <list>
 
 using namespace prtypes;
 using cola::State;
@@ -54,36 +55,38 @@ inline StateVecSet combine_states(std::vector<T> list) {
 //
 // post for observed thread
 //
-// struct PostVisitor : public cola::ObserverVisitor {
-// 	void visit(const cola::ThreadObserverVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ThreadObserverVariable&)"); }
-// 	void visit(const cola::ProgramObserverVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ProgramObserverVariable&)"); }
-// 	void visit(const cola::SelfGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const SelfGuardVariable&)"); }
-// 	void visit(const cola::ArgumentGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ArgumentGuardVariable&)"); }
-// 	void visit(const cola::TrueGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const TrueGuard&)"); }
-// 	void visit(const cola::ConjunctionGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ConjunctionGuard&)"); }
-// 	void visit(const cola::EqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const EqGuard&)"); }
-// 	void visit(const cola::NeqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const NeqGuard&)"); }
-// 	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const Transition&)"); }
-// 	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const Observer&)"); }
+struct PostVisitor : public cola::ObserverVisitor {
+	void visit(const cola::ThreadObserverVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ThreadObserverVariable&)"); }
+	void visit(const cola::ProgramObserverVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ProgramObserverVariable&)"); }
+	void visit(const cola::SelfGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const SelfGuardVariable&)"); }
+	void visit(const cola::ArgumentGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ArgumentGuardVariable&)"); }
+	void visit(const cola::TrueGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const TrueGuard&)"); }
+	void visit(const cola::ConjunctionGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ConjunctionGuard&)"); }
+	void visit(const cola::EqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const EqGuard&)"); }
+	void visit(const cola::NeqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const NeqGuard&)"); }
+	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const Transition&)"); }
+	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const Observer&)"); }
 
 
-// 	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const State&)"); }
-// };
+	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const State&)"); }
+};
 
-// struct PostInfo {
-// 	enum Observation { OBSERVED, UNOBSERVED, ANY };
-// 	const Function& label;
-// 	Transition::Kind kind;
-// 	Observation thread_observation;
-// 	Observation address_observation;
-// 	PostInfo(const Function& label, Transition::Kind kind, Observation thread_observation, Observation address_observation)
-// 		: label(label), kind(kind), thread_observation(thread_observation), address_observation(address_observation) {}
-// 	PostInfo(const Function& label, Transition::Kind kind) : PostInfo(label, kind, ANY, ANY) {}
-// };
+struct PostInfo {
+	enum Observation { OBSERVED, UNOBSERVED, ANY };
+	const Function& label;
+	Transition::Kind kind;
+	Observation thread_observation;
+	PostInfo(const Function& label, Transition::Kind kind, Observation thread_observation)
+		: label(label), kind(kind), thread_observation(thread_observation) {}
+	PostInfo(const Function& label, Transition::Kind kind) : PostInfo(label, kind, ANY) {}
 
-// inline StateVecSet general_post(const StateVecSet& /*set*/, PostInfo /*info*/) {
-// 	throw std::logic_error("not yet implemented (general_post)");
-// }
+	PostInfo(const Transition& transition, Observation thread_observation) : PostInfo(transition.label, transition.kind, thread_observation) {}
+	PostInfo(const Transition& transition) : PostInfo(transition.label, transition.kind, ANY) {}
+};
+
+inline StateVecSet general_post(const StateVec& /*vec*/, PostInfo /*info*/) {
+	throw std::logic_error("not yet implemented (general_post)");
+}
 
 
 //
@@ -100,7 +103,7 @@ inline bool state_final(const StateVec& vec) {
 }
 
 inline std::set<const State*> state_post(const State* /*state*/, const cola::VariableDeclaration& /*variable*/, const cola::Command& /*command*/) {
-	// TODO [requires State to know outgoing transitions]
+	// TODO [requires State to know outgoing transitions] --> context.get_transitions
 	throw std::logic_error("not yet implemented (state_post)");
 }
 
@@ -123,9 +126,31 @@ inline StateVecSet state_post(const StateVecSet& set, const cola::VariableDeclar
 	return result;
 }
 
-inline StateVecSet state_closure(const StateVecSet& /*set*/) {
-	// TODO [requires State to know outgoing transitions]
-	throw std::logic_error("not yet implemented (state_closure)");
+inline StateVecSet state_closure(const StateVec& vec) {
+	// TODO [requires State to know outgoing transitions] --> context.get_transitions
+
+	std::list<PostInfo> infos;
+	for (const State* state : vec) {
+		for (const Transition& transition : state.transitions) {
+			infos.emplace_back(transition, PostInfo::UNOBSERVED);
+		}
+	}
+
+	StateVecSet result;
+	for (PostInfo& info : infos) {
+		auto post = general_post(vec, std::move(info));
+		result.insert(post.begin(), post.end());
+	}
+	return result;
+}
+
+inline StateVecSet state_closure(const StateVecSet& set) {
+	StateVecSet result;
+	for (const auto& vec : set) {
+		auto closure = state_closure(vec);
+		result.insert(closure.begin(), closure.end());
+	}
+	return result;
 }
 
 inline StateVecSet state_union(const StateVecSet& set, const StateVecSet& other) {
@@ -221,6 +246,32 @@ TypeContext::TypeContext(const SmrObserverStore& store)
 	empty_type(make_empty_type(*this, store))
 {}
 
+inline std::vector<std::reference_wrapper<const Transition>> find_transitions(const SmrObserverStore& store, const State& state) {
+	std::vector<std::reference_wrapper<const Transition>> result;
+	auto handle_observer = [&result, &state] (const Observer& observer) {
+		for (const auto& transition : observer.transitions) {
+			if (&transition->src == &state) {
+				result.push_back(*transition);
+			}
+		}
+	};
+
+	handle_observer(*store.base_observer);
+	for (const auto& observer : store.impl_observer) {
+		handle_observer(*observer);
+	}
+	return result;
+}
+
+const std::vector<std::reference_wrapper<const Transition>>& TypeContext::get_transitions(const State& state) const {
+	auto find = transition_lookup.find(&state);
+	if (find == transition_lookup.end()) {
+		auto insertion = transition_lookup.insert({ &state, find_transitions(observer_store, state) });
+		return insertion.first->second;
+	} else {
+		return find->second;
+	}
+}
 
 //
 // type operations

@@ -41,7 +41,7 @@ void ObserverBuilder::check_name_clash(std::string name) {
 }
 
 template<typename T>
-inline const T find(const std::unordered_map<std::string, T>& container, std::string name, std::string error) {
+inline T find(const std::unordered_map<std::string, T>& container, std::string name, std::string error) {
 	auto find = container.find(name);
 	if (find == container.end()) {
 		throw std::logic_error("Parsing error: " + error + " '" + name + "'.");
@@ -49,7 +49,7 @@ inline const T find(const std::unordered_map<std::string, T>& container, std::st
 	return find->second;
 }
 
-const State& ObserverBuilder::find_state(std::string name) {
+State& ObserverBuilder::find_state(std::string name) {
 	return find(_name2state, name, "undefined state");
 }
 
@@ -202,7 +202,7 @@ void add_raw_guard(C& container, T* ptr) {
 }
 
 antlrcpp::Any ObserverBuilder::visitObserverTransition(CoLaParser::ObserverTransitionContext* context) {
-	const auto& src = find_state(context->src->getText());
+	auto& src = find_state(context->src->getText());
 	const auto& dst = find_state(context->dst->getText());
 	const auto& label = find_function(context->name->getText());
 
@@ -243,7 +243,7 @@ antlrcpp::Any ObserverBuilder::visitObserverTransition(CoLaParser::ObserverTrans
 		conjuncts.push_back(std::make_unique<TrueGuard>());
 	}
 
-	_observer->transitions.push_back(std::make_unique<Transition>(src, dst, label, kind, std::make_unique<ConjunctionGuard>(std::move(conjuncts))));
+	src.transitions.push_back(std::make_unique<Transition>(src, dst, label, kind, std::make_unique<ConjunctionGuard>(std::move(conjuncts))));
 	return nullptr;
 }
 
