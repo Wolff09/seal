@@ -1,24 +1,24 @@
 #include "types/checker.hpp"
-#include "types/inference.hpp"
 #include "types/error.hpp"
 #include "types/util.hpp"
 #include "cola/util.hpp"
+#include <iostream>
 
 using namespace cola;
 using namespace prtypes;
 
 // TODO: remove if/while (for expressions containing pointers)
 
-void debug_type_env(const TypeEnv& env, std::string note="") {
-	std::cout << "Type Env " << note << std::endl;
-	for (const auto& [decl, guarantees] : env) {
-		std::cout << "   - " << decl.get().name << ": ";
-		for (const auto& g : guarantees) {
-			std::cout << g.get().name << ", ";
-		}
-		std::cout << std::endl;
-	}
-}
+// void debug_type_env(const TypeEnv& env, std::string note="") {
+// 	std::cout << "Type Env " << note << std::endl;
+// 	for (const auto& [decl, guarantees] : env) {
+// 		std::cout << "   - " << decl.get().name << ": ";
+// 		for (const auto& g : guarantees) {
+// 			std::cout << g.get().name << ", ";
+// 		}
+// 		std::cout << std::endl;
+// 	}
+// }
 
 
 std::unique_ptr<Assert> make_assert_from_invariant(const Invariant* inv) {
@@ -42,7 +42,7 @@ void TypeChecker::check_annotated_statement(const AnnotatedStatement& stmt) {
 bool TypeChecker::is_pointer_valid(const VariableDeclaration& variable) {
 	assert(variable.type.sort == Sort::PTR);
 	assert(prtypes::has_binding(current_type_environment, variable));
-	return entails_valid(current_type_environment.at(variable));
+	return current_type_environment.at(variable).is_valid;
 }
 
 
@@ -53,8 +53,7 @@ void TypeChecker::check_skip(const Skip& /*skip*/) {
 void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclaration& ptr) {
 	conditionally_raise_error<UnsupportedConstructError>(ptr.is_shared, "allocations must not target shared variables");
 	assert(prtypes::has_binding(current_type_environment, ptr));
-	current_type_environment.at(ptr).clear();
-	current_type_environment.at(ptr).insert(guarantee_table.local_guarantee());
+	current_type_environment.at(ptr) = type_context.local_type;
 }
 
 void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
@@ -68,27 +67,23 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 			invalid.insert(variable);
 		}
 	}
-	bool is_safe_call = guarantee_table.observer_store.simulation.is_safe(enter, params, invalid);
+	bool is_safe_call = type_context.observer_store.simulation.is_safe(enter, params, invalid);
 	conditionally_raise_error<UnsafeCallError>(!is_safe_call, enter);
 
-	if (&enter.decl == &guarantee_table.observer_store.retire_function) {
+	// check retire for active
+	if (&enter.decl == &type_context.observer_store.retire_function) {
 		assert(params.size() == 1);
 		assert(params.at(0).get().type.sort == Sort::PTR);
 		assert(prtypes::has_binding(current_type_environment, params.at(0)));
 		bool arg_is_valid = is_pointer_valid(params.at(0));
-		bool arg_is_active = this->current_type_environment.at(params.at(0)).count(guarantee_table.active_guarantee()) > 0;
-		arg_is_active |= this->current_type_environment.at(params.at(0)).count(guarantee_table.local_guarantee()) > 0;
+		bool arg_is_active = this->current_type_environment.at(params.at(0)).is_active;
+		arg_is_active |= this->current_type_environment.at(params.at(0)).is_local > 0;
 		conditionally_raise_error<UnsafeCallError>(!arg_is_valid, enter, "invalid argument");
 		conditionally_raise_error<UnsafeCallError>(!arg_is_active, enter, "argument not active");
 	}
 
 	// update types
-	TypeEnv result;
-	for (const auto& [decl, guarantees] : this->current_type_environment) {
-//		std::cout << "Infering types for: " << decl.get().name << std::endl;
-		result[decl] = inference.infer_enter(guarantees, enter, decl);
-	}
-	this->current_type_environment = std::move(result);
+	this->current_type_environment = type_post(this->current_type_environment, enter);
 
 	// std::cout << "done";
 	// debug_type_env(this->current_type_environment);
@@ -99,12 +94,7 @@ void TypeChecker::check_exit(const Exit& exit) {
 	// std::cout << std::endl << std::endl << ">>>>>> EXIT: "; cola::print(exit, std::cout);
 	// debug_type_env(this->current_type_environment);
 
-	TypeEnv result;
-	for (const auto& [decl, guarantees] : this->current_type_environment) {
-//		std::cout << "Infering types for: " << decl.get().name << std::endl;
-		result[decl] = inference.infer_exit(guarantees, exit);
-	}
-	this->current_type_environment = std::move(result);
+	this->current_type_environment = type_post(this->current_type_environment, exit);
 
 	// std::cout << "done";
 	// debug_type_env(this->current_type_environment);
@@ -113,20 +103,17 @@ void TypeChecker::check_exit(const Exit& exit) {
 
 void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& var) {
 	conditionally_raise_error<UnsupportedConstructError>(var.type.sort == Sort::PTR, "returning pointers is not supported");
-	for (auto& [decl, guarantees] : this->current_type_environment) {
-		guarantees.clear();
+	for (auto& [decl, type] : this->current_type_environment) {
+		type = type_context.default_type; // TODO: does this work?
 	}
-	// throw std::logic_error("not yet implemented: TypeChecker::check_return");
 }
 
 void TypeChecker::check_break(const Break& /*brk*/) {
 	this->break_envs.push_back(this->current_type_environment);
 	
 	// result is universal typeenv to avoid restricting types unnecessarily
-	for (auto& [decl, guarantees] : this->current_type_environment) {
-		for (const auto& g : this->guarantee_table.all_guarantees) {
-			guarantees.insert(*g);
-		}
+	for (auto& [decl, type] : this->current_type_environment) {
+		type = type_context.empty_type;
 	}
 }
 
@@ -144,9 +131,8 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 		conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs), assume, lhs);
 		conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(rhs), assume, rhs);
 		
-		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
-		sum.erase(guarantee_table.local_guarantee());
-		sum = inference.infer(sum);
+		Type sum = prtypes::type_union(current_type_environment.at(lhs), current_type_environment.at(rhs));
+		sum = prtypes::type_remove_local(sum);
 		current_type_environment.at(lhs) = sum;
 		current_type_environment.at(rhs) = sum;
 
@@ -161,23 +147,11 @@ void TypeChecker::check_assume_pointer(const cola::Assume& assume, const cola::V
 	}
 
 	conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(rhs_var), assume, rhs_var);
-
 	// rely on preprocessing to have inserted an assertion for rhs_deref result to be active and thus valid
 }
 
 void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableDeclaration& /*lhs*/, BinaryExpression::Operator /*op*/, const NullValue& /*rhs*/) {
 	// do nothing
-
-	// assert(assume.expr);
-	// if (lhs.type.sort == Sort::PTR && op == BinaryExpression::Operator::EQ) {
-	// 	// NULL is always valid
-	// 	assert(prtypes::has_binding(current_type_environment, lhs));
-	// 	conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs), assume, lhs);
-	// 	current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
-
-	// } else {
-	// 	// do nothing
-	// }
 }
 
 void TypeChecker::check_assume_pointer(const cola::Assume& assume, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, cola::BinaryExpression::Operator /*op*/, const cola::Expression& /*rhs*/) {
@@ -194,9 +168,8 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		assert(prtypes::has_binding(current_type_environment, rhs));
 		
-		GuaranteeSet sum = prtypes::merge(current_type_environment.at(lhs), current_type_environment.at(rhs));
-		sum.erase(guarantee_table.local_guarantee());
-		sum = inference.infer(sum);
+		Type sum = prtypes::type_union(current_type_environment.at(lhs), current_type_environment.at(rhs));
+		sum = prtypes::type_remove_active(sum);
 		current_type_environment.at(lhs) = sum;
 		current_type_environment.at(rhs) = sum;
 
@@ -208,7 +181,7 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
 	if (op == BinaryExpression::Operator::EQ) {
 		assert(prtypes::has_binding(current_type_environment, lhs));
-		current_type_environment.at(lhs).erase(guarantee_table.local_guarantee());
+		current_type_environment.at(lhs) = prtypes::type_remove_local(current_type_environment.at(lhs));
 
 	} else {
 		raise_error<UnsupportedConstructError>("unsupported comparison operator in assertions; must be '=='");
@@ -219,11 +192,7 @@ void TypeChecker::check_assert_active(const Assert& /*assertion*/, const Variabl
 	// std::cout << std::endl << std::endl << ">>>>>> ASSERT ACTIVE: "; cola::print(assertion, std::cout);
 	// debug_type_env(this->current_type_environment);
 
-	assert(prtypes::has_binding(current_type_environment, ptr));
-	GuaranteeSet guarantees = std::move(current_type_environment.at(ptr));
-	guarantees.insert(guarantee_table.active_guarantee());
-	guarantees = inference.infer(guarantees);
-	current_type_environment.at(ptr) = std::move(guarantees);
+	current_type_environment.at(ptr) = prtypes::type_add_active(current_type_environment.at(ptr));
 
 	// std::cout << "done";
 	// debug_type_env(this->current_type_environment);
@@ -242,8 +211,7 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Variabl
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs));
 
-	GuaranteeSet result(current_type_environment.at(rhs));
-	result.erase(guarantee_table.local_guarantee());
+	Type result = prtypes::type_remove_local(current_type_environment.at(rhs));
 
 	current_type_environment.at(lhs) = result;
 	current_type_environment.at(rhs) = result;
@@ -254,7 +222,7 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Variabl
 
 void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const NullValue& /*rhs*/) {
 	assert(prtypes::has_binding(current_type_environment, lhs));
-	current_type_environment.at(lhs).clear();
+	current_type_environment.at(lhs) = type_context.default_type;
 }
 
 void TypeChecker::check_assign_pointer(const Assignment& assignment, const Dereference& lhs_deref, const VariableDeclaration& lhs_var, const VariableDeclaration& rhs) {
@@ -262,7 +230,7 @@ void TypeChecker::check_assign_pointer(const Assignment& assignment, const Deref
 	assert(prtypes::has_binding(current_type_environment, rhs));
 
 	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(lhs_var), assignment, lhs_deref, lhs_var);
-	current_type_environment.at(rhs).erase(guarantee_table.local_guarantee());
+	current_type_environment.at(rhs) = prtypes::type_remove_local(current_type_environment.at(rhs));
 }
 
 void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Dereference& /*lhs_deref*/, const VariableDeclaration& /*lhs_var*/, const NullValue& /*rhs*/) {
@@ -274,7 +242,7 @@ void TypeChecker::check_assign_pointer(const Assignment& assignment, const Varia
 	assert(prtypes::has_binding(current_type_environment, rhs_var));
 
 	conditionally_raise_error<UnsafeDereferenceError>(!is_pointer_valid(rhs_var), assignment, rhs_deref, rhs_var);
-	current_type_environment.at(lhs).clear();
+	current_type_environment.at(lhs) = type_context.default_type;
 }
 
 void TypeChecker::check_assign_nonpointer(const Assignment& /*node*/, const Expression& /*lhs*/, const Expression& /*rhs*/) {
@@ -296,13 +264,9 @@ void TypeChecker::check_assign_nonpointer(const Assignment& assignment, const Va
 
 void TypeChecker::check_angel_choose(bool active) {
 	conditionally_raise_error<TypeCheckError>(!!current_angel, "Only one angel allocation per function execution supported (don't put it into loops).");
-	current_angel = std::make_unique<VariableDeclaration>("§A§", guarantee_table.observer_store.retire_function.args.at(0)->type, false);
+	current_angel = std::make_unique<VariableDeclaration>("§A§", type_context.observer_store.retire_function.args.at(0)->type, false);
 	assert(!prtypes::has_binding(current_type_environment, *current_angel));
-	current_type_environment[*current_angel].clear();
-
-	if (active) {
-		current_type_environment[*current_angel].insert(guarantee_table.active_guarantee());
-	}
+	current_type_environment.at(*current_angel) = active ? type_context.active_type : type_context.default_type;
 
 	// debug_type_env(current_type_environment, "@angle(choose) post");
 }
@@ -313,9 +277,8 @@ void TypeChecker::check_angel_active() {
 
 	// debug_type_env(current_type_environment, "@angle(active) pre");
 
-	GuaranteeSet type = current_type_environment.at(*current_angel);
-	type.insert(guarantee_table.active_guarantee());
-	type = inference.infer(type);
+	Type type = current_type_environment.at(*current_angel);
+	type = prtypes::type_add_active(type);
 	current_type_environment.at(*current_angel) = type;
 
 	// debug_type_env(current_type_environment, "@angle(active) post");
@@ -328,8 +291,7 @@ void TypeChecker::check_angel_contains(const VariableDeclaration& ptr) {
 
 	// debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) pre");
 
-	GuaranteeSet sum = prtypes::merge(current_type_environment.at(*current_angel), current_type_environment.at(ptr));
-	sum = inference.infer(sum);
+	Type sum = prtypes::type_union(current_type_environment.at(*current_angel), current_type_environment.at(ptr));
 	current_type_environment.at(ptr) = sum;
 
 	// debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) post");
@@ -337,10 +299,10 @@ void TypeChecker::check_angel_contains(const VariableDeclaration& ptr) {
 
 
 void TypeChecker::check_scope(const Scope& scope) {
-	// populate current_type_environment with empty guarantees for declared pointer variables
+	// populate current_type_environment with default type for declared pointer variables
 	for (const auto& decl : scope.variables) {
 		if (decl->type.sort == Sort::PTR) {
-			auto insertion = current_type_environment.insert({ *decl, GuaranteeSet() });
+			auto insertion = current_type_environment.insert({ *decl, type_context.default_type });
 			conditionally_raise_error<UnsupportedConstructError>(!insertion.second, "hiding variable declaration of outer scope not supported");
 		}
 	}
@@ -369,12 +331,12 @@ void TypeChecker::check_atomic_begin() {
 }
 
 void TypeChecker::check_atomic_end() {
-	// remove transient guarantees from local pointers, remove all guarantees from shared pointers
-	for (auto& [decl, guarantees] : current_type_environment) {
+	// handle transient types on local pointers, reset shared pointers to default type
+	for (auto& [decl, type] : current_type_environment) {
 		if (decl.get().is_shared) {
-			guarantees.clear();
+			type = type_context.default_type;
 		} else {
-			guarantees = prtypes::prune_transient_guarantees(std::move(guarantees));
+			type = prtypes::type_closure(type);
 		}
 	}
 }
@@ -396,7 +358,7 @@ void TypeChecker::check_choice(const Choice& choice) {
 	TypeEnv result = std::move(post_types.back());
 	post_types.pop_back();
 	while (!post_types.empty()) {
-		result = intersection(result, post_types.back());
+		result = prtypes::type_intersection(result, post_types.back());
 		post_types.pop_back();
 	}
 
@@ -435,29 +397,25 @@ void TypeChecker::check_ite(const IfThenElse& ite) {
 	ite.elseBranch->accept(*this);
 	TypeEnv post_false = std::move(this->current_type_environment);
 
-	this->current_type_environment = intersection(post_true, post_false);
+	this->current_type_environment = prtypes::type_intersection(post_true, post_false);
 }
 
-inline bool guaranteeset_equals(const GuaranteeSet& lhs, const GuaranteeSet& rhs) {
-	for (const auto& guarantee : lhs) {
-		if (rhs.count(guarantee) == 0) {
-			return false;
-		}
-	}
-	for (const auto& guarantee : rhs) {
-		if (lhs.count(guarantee) == 0) {
-			return false;
-		}
-	}
-	return true;
+inline bool type_equals(const prtypes::Type& lhs, const prtypes::Type& rhs) {
+	// TODO: move to types.hpp
+	return lhs.is_local == rhs.is_local
+	    && lhs.is_active == rhs.is_active
+	    && lhs.is_valid == rhs.is_valid
+	    && lhs.is_transient == rhs.is_transient
+	    && lhs.states == rhs.states
+	    && &lhs.context == &rhs.context;
 }
 
 inline bool typeenv_equals(const TypeEnv& lhs, const TypeEnv& rhs) {
 	// TODO: write better equals
 	assert(lhs.size() == rhs.size());
-	for (const auto& [decl, guarantees] : lhs) {
+	for (const auto& [decl, type] : lhs) {
 		assert(rhs.count(decl) > 0);
-		if (!guaranteeset_equals(guarantees, rhs.at(decl))) {
+		if (!type_equals(type, rhs.at(decl))) {
 			return false;
 		}
 	}
@@ -477,11 +435,11 @@ void TypeChecker::check_loop(const Loop& loop) {
 		assert(this->break_envs.empty());
 		pre_types = this->current_type_environment;
 		loop.body->accept(*this);
-		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
+		this->current_type_environment = prtypes::type_intersection(pre_types, this->current_type_environment);
 		
 		// conditionally_raise_error<TypeCheckError>(!this->break_envs.empty(), "'break' must not appear in (conditional) loops");
 		while (!this->break_envs.empty()) {
-			this->current_type_environment = prtypes::intersection(this->current_type_environment, std::move(this->break_envs.back()));
+			this->current_type_environment = prtypes::type_intersection(this->current_type_environment, std::move(this->break_envs.back()));
 			this->break_envs.pop_back();
 		}
 
@@ -509,7 +467,7 @@ void TypeChecker::check_while(const While& whl) {
 //		debug_type_env(this->current_type_environment);
 		pre_types = this->current_type_environment;
 		whl.body->accept(*this);
-		this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
+		this->current_type_environment = prtypes::type_intersection(pre_types, this->current_type_environment);
 
 		conditionally_raise_error<TypeCheckError>(this->break_envs.size() == 0, "'while (true)' does not 'break'");
 		if (!result) {
@@ -518,7 +476,7 @@ void TypeChecker::check_while(const While& whl) {
 			this->break_envs.pop_back();
 		}
 		while (!this->break_envs.empty()) {
-			*result = prtypes::intersection(*result, std::move(this->break_envs.back()));
+			*result = prtypes::type_intersection(*result, std::move(this->break_envs.back()));
 			this->break_envs.pop_back();
 		}
 
@@ -576,7 +534,7 @@ void TypeChecker::check_program(const Program& program) {
 	
 	// populate current_type_environment with empty guarantees for shared pointer variables
 	for (const auto& decl : program.variables) {
-		auto insertion = current_type_environment.insert({ *decl, GuaranteeSet() });
+		auto insertion = current_type_environment.insert({ *decl, type_context.default_type });
 		conditionally_raise_error<UnsupportedConstructError>(!insertion.second, "multiple occurence of the same shared variable declaration");
 	}
 

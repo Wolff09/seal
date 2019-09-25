@@ -1,5 +1,4 @@
 #include "types/cave.hpp"
-#include "types/guarantees.hpp"
 #include "cola/ast.hpp"
 #include "cola/util.hpp"
 #include "types/error.hpp"

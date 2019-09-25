@@ -5,7 +5,6 @@
 #include "tclap/CmdLine.h"
 
 #include "cola/parse.hpp"
-#include "types/guarantees.hpp"
 #include "cola/ast.hpp"
 #include "cola/observer.hpp"
 #include "cola/util.hpp"
@@ -14,7 +13,6 @@
 #include "types/rmraces.hpp"
 #include "types/check.hpp"
 #include "types/cave.hpp"
-#include "types/synthesis.hpp"
 
 using namespace TCLAP;
 using namespace cola;
@@ -78,7 +76,6 @@ struct LeapConfig {
 	bool quiet, verbose;
 	bool print_gist;
 	bool output;
-	bool synthesize_types;
 } config;
 
 enum SmrType { SMR_HP, SMR_EBR };
@@ -93,8 +90,6 @@ std::string smr_to_string(SmrType type) {
 struct ParseUnit {
 	std::shared_ptr<Program> program;
 	std::unique_ptr<SmrObserverStore> store;
-	std::unique_ptr<GuaranteeTable> table;
-	SmrType smrType;
 } input;
 
 enum AnalysisResult { SAFE, FAIL, UDEF };
@@ -103,7 +98,6 @@ struct AnalysisOutput {
 	AnalysisResult type_safe = UDEF;
 	AnalysisResult annotations_hold = UDEF;
 	AnalysisResult linearizable = UDEF;
-	duration_t time_synthesis = ZERO_DURATION;
 	duration_t time_types_last = ZERO_DURATION;
 	duration_t time_types_total = ZERO_DURATION;
 	duration_t time_rewrite = ZERO_DURATION;
@@ -135,34 +129,6 @@ inline std::pair<const Function&, const Function&> lookup_functions(const Progra
 	return { find_function_or_fail(program, name1), find_function_or_fail(program, name2) };
 }
 
-inline SmrType get_smr_type(const Program& program) {
-	SmrType result = SMR_HP;
-	bool found_smr_option = false;
-	for (const auto& kvpair : program.options) {
-		if (kvpair.first == "smr") {
-			if (found_smr_option) {
-				throw std::logic_error("Option 'smr' specified multiple times. Only allowed once.");
-			}
-			found_smr_option = true;
-			if (kvpair.second == "HP") {
-				result = SMR_HP;
-			} else if (kvpair.second == "EBR") {
-				result = SMR_EBR;
-			} else {
-				std::cout << "Unrecognized SMR option." << std::endl;
-				throw std::logic_error("Given SMR algorithm '" + kvpair.second + "' unknown; must be 'HP' or 'EBR'.");
-			}
-		}
-	}
-	if (found_smr_option) {
-		std::cout << "Specified SMR algorithm: " << smr_to_string(result) << std::endl;
-	} else {
-		std::cout << "No SMR algorithm specified! Use option 'smr' to provide on of: 'HP' or 'EBR'." << std::endl;
-		throw std::logic_error("No SMR algorithm specified in the input program.'");
-	}
-	return result;
-}
-
 static void create_smr_observer(const Program& program, const Function& retire) {
 	std::cout << std::endl << "Preparing SMR automaton..." << std::flush;
 	auto observers = cola::parse_observer(config.observer_path, program);
@@ -178,20 +144,10 @@ static void create_smr_observer(const Program& program, const Function& retire) 
 	}
 }
 
-static void add_custom_guarantees(const Program& program, const Function& /*retire*/) {
-	std::cout << std::endl << "Loading custom types... " << std::flush;
-	auto guarantees = cola::parse_observer(config.customtypes_path, program);
-	for (auto& guarantee : guarantees) {
-		input.table->add_guarantee(std::move(guarantee));
-	}
-	std::cout << "done" << std::endl;
-}
-
 static void read_input() {
 	// parse program
 	input.program = cola::parse_program(config.program_path);
 	Program& program = *input.program;
-	input.smrType = get_smr_type(program);
 
 	// query retire
 	auto search_retire = find_function(program, "retire");
@@ -208,36 +164,6 @@ static void read_input() {
 
 	// init SMR
 	create_smr_observer(program, retire);
-
-	// create guarantee table
-	input.table = std::make_unique<GuaranteeTable>(*input.store);
-	GuaranteeTable& table = *input.table;
-
-	if (!config.check_types) {
-		return;
-	}
-
-	// add types
-	if (config.synthesize_types) {
-		std::cout << std::endl << "Synthesizing types... " << std::flush;
-		timepoint_t begin = get_time();
-		prtypes::populate_guarantee_table_with_synthesized_guarantees(table);
-		output.time_synthesis = get_elapsed(begin);
-		std::cout << "done" << std::endl;
-
-	} else {
-		add_custom_guarantees(program, retire);
-	}
-
-	if (config.verbose) {
-		std::cout << std::endl << "List of guarantees "  << table.all_guarantees.size() <<  ":" << std::endl;
-		for (const auto& guarantee : table) {
-			std::cout << "  - " << "(transient, valid) = (" << guarantee.is_transient << ", " << guarantee.entails_validity << ")  for  " << guarantee.name << std::endl;
-			// cola::print(*guarantee.observer, std::cout);
-		}
-	} else if (!config.quiet) {
-		std::cout << "Using " << table.all_guarantees.size() << " guarantees in the type system." << std::endl;
-	}
 }
 
 template<typename ErrorClass, typename... Targs>
@@ -251,7 +177,7 @@ void try_fix(ErrorClass& err, Targs... args) {
 	} else {
 		output.number_rewrites++;
 		auto begin = get_time();
-		prtypes::try_fix_pointer_race(*input.program, *input.table, err, args...);
+		prtypes::try_fix_pointer_race(*input.program, *input.store, err, args...);
 		output.time_rewrite += get_elapsed(begin);
 	}
 }
@@ -272,7 +198,7 @@ static void do_type_check() {
 		std::cout << std::endl << "Checking typing..." << std::endl;
 		auto begin = get_time();
 		try {
-			type_safe = prtypes::type_check(*input.program, *input.table);
+			type_safe = prtypes::type_check(*input.program, *input.store);
 			output.time_types_total += get_elapsed(begin);
 			output.time_types_last = get_elapsed(begin);
 
@@ -311,7 +237,7 @@ static void do_annotation_check() {
 	std::cout << std::endl << "Checking assertions... " << std::flush;
 	bool assertions_safe = false;
 	auto begin = get_time();
-	assertions_safe = discharge_assertions(*input.program, *input.table);
+	assertions_safe = discharge_assertions(*input.program, *input.store);
 	output.time_annotations = get_elapsed(begin);
 	std::cout << "done" << std::endl;
 	std::cout << "** Assertion check: " << (assertions_safe ? "succeeded" : "failed") << " **" << std::endl << std::endl;
@@ -335,13 +261,6 @@ static void print_summary() {
 		return;
 	}
 
-	auto summary_synthesis = [&]() -> std::string {
-		if (config.synthesize_types) {
-			return std::to_string(input.table->all_guarantees.size()) + " types in " + to_s(output.time_synthesis);
-		} else {
-			return "--skipped--";
-		}
-	};
 	auto summary_rewrite = [&]() -> std::string {
 		if (config.rewrite_and_retry) {
 			if (output.number_rewrites == 0) {
@@ -382,7 +301,6 @@ static void print_summary() {
 	std::cout << std::endl << std::endl;
 	std::cout << "# Summary:" << std::endl;
 	std::cout << "# ========" << std::endl;
-	std::cout << "# Type Synthesis:         " << summary_synthesis() << std::endl;
 	std::cout << "# Type Check:             " << summary_types() << std::endl;
 	std::cout << "# Rewrites:               " << summary_rewrite() << std::endl;
 	std::cout << "# Annotation Check:       " << summary_annotations() << std::endl;
@@ -407,8 +325,6 @@ void print_gist() {
 	};
 	std::cout << std::endl << std::endl;
 	std::cout << "#gist=";
-	std::cout << input.table->all_guarantees.size() << ";";
-	std::cout << mk_status(config.synthesize_types, SAFE, output.time_synthesis) << ";";
 	std::cout << mk_status(config.check_types, output.type_safe, output.time_types_last) << ";";
 	std::cout << mk_status(config.check_annotations, output.annotations_hold, output.time_annotations) << ";";
 	std::cout << mk_status(config.check_linearizability, output.linearizable, output.time_linearizability) << std::endl;
@@ -436,7 +352,6 @@ int main(int argc, char** argv) {
 		// SwitchArg quiet_switch("q", "quiet", "Disables most output", cmd, false);
 		// SwitchArg verbose_switch("v", "verbose", "Verbose output", cmd, false);
 		SwitchArg gist_switch("g", "gist", "Print machine readable gist at the very end", cmd, false);
-		ValueArg<std::string> customtype_arg("c", "customtypes", "Do not synthesize types, instead use custom types provided by file", false , "", "path", cmd);
 		// ValueArg<std::string> output_arg("o", "output", "Output file for transformed program", false , "", "path", cmd);
 		UnlabeledValueArg<std::string> program_arg("program", "Input program file to analyze", true, "", is_program_constraint.get(), cmd);
 		UnlabeledValueArg<std::string> observer_arg("observer", "Input observer file for SMR specification", true, "", is_observer_constraint.get(), cmd);
@@ -450,8 +365,6 @@ int main(int argc, char** argv) {
 		config.check_linearizability = linearizability_switch.getValue();
 		config.eager = eager_switch.getValue();
 		config.print_gist = gist_switch.getValue();
-		config.synthesize_types = !customtype_arg.isSet();
-		config.customtypes_path = customtype_arg.getValue();
 		config.interactive = false;
 		config.quiet = false;
 		config.verbose = false;

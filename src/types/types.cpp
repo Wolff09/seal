@@ -122,6 +122,12 @@ inline StateVecSet state_closure(const StateVecSet& /*set*/) {
 	throw std::logic_error("not yet implemented (state_closure)");
 }
 
+inline StateVecSet state_union(const StateVecSet& set, const StateVecSet& other) {
+	StateVecSet result(set);
+	result.insert(other.begin(), other.end());
+	return result;
+}
+
 inline StateVecSet state_intersection(const StateVecSet& set, const StateVecSet& other) {
 	StateVecSet result;
 	std::set_intersection(set.begin(), set.end(), other.begin(), other.end(), std::inserter(result, result.begin()));
@@ -197,8 +203,17 @@ inline Type make_active_local_type(const TypeContext& context, const SmrObserver
 	return make_type(context, store, [](const State& state, std::size_t index) { return index != 0 || state.initial; });
 }
 
-TypeContext::TypeContext(const SmrObserverStore& store) : observer_store(store), default_type(make_default_type(*this, store)), active_type(make_active_local_type(*this, store)), local_type(make_active_local_type(*this, store)) {
+inline Type make_empty_type(const TypeContext& context, const SmrObserverStore& /*store*/) {
+	return Type(context, {}, false, false, false, false);
 }
+
+TypeContext::TypeContext(const SmrObserverStore& store)
+	: observer_store(store),
+	default_type(make_default_type(*this, store)),
+	active_type(make_active_local_type(*this, store)),
+	local_type(make_active_local_type(*this, store)),
+	empty_type(make_empty_type(*this, store))
+{}
 
 
 //
@@ -214,6 +229,11 @@ Type prtypes::type_union(const Type& type, const Type& other) {
 		type.is_valid || other.is_valid,
 		type.is_transient || other.is_transient
 	);
+}
+
+Type prtypes::type_intersection(const Type& /*type*/, const Type& /*other*/) {
+	// TODO: implement (union of states)
+	throw std::logic_error("not yet implement (type_intersection");
 }
 
 Type prtypes::type_closure(const Type& type) {
@@ -233,11 +253,11 @@ Type prtypes::type_post(const Type& type, const cola::VariableDeclaration& varia
 	// add active/local if allowed by the original post
 	bool is_active = false;
 	bool is_local = false;
-	if (state_inclusion(post, type.context.active_type.states)) {
+	if (state_inclusion(post, type.context.get().active_type.states)) {
 		is_active |= type.is_active;
 		is_local |= type.is_local;
 		if (is_active || is_local) {
-			types_states = state_intersection(types_states, type.context.active_type.states);
+			types_states = state_intersection(types_states, type.context.get().active_type.states);
 		}
 	}
 
@@ -250,3 +270,24 @@ Type prtypes::type_post(const Type& type, const cola::VariableDeclaration& varia
 		return Type(type.context, std::move(types_states), is_active, is_local, false);
 	}
 }
+
+inline void fix_type(Type& /*type*/) {
+	// TODO: add closure if needed?
+	throw std::logic_error("not yet implement (type_fix");
+}
+
+Type prtypes::type_remove_local(const Type& type) {
+	Type result(type);
+	result.is_local = false;
+	fix_type(result);
+	return result;
+}
+
+Type prtypes::type_remove_active(const Type& type) {
+	Type result(type);
+	result.is_active = false;
+	fix_type(result);
+	return result;
+}
+
+
