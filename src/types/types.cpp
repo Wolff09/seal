@@ -1,5 +1,6 @@
 #include "types/types.hpp"
 
+#include <iostream>
 
 using namespace prtypes;
 using cola::State;
@@ -14,14 +15,17 @@ using cola::Observer;
 template<typename T> // T = container<const State*>
 inline StateVecSet combine_states(std::vector<T> list) {
 	std::vector<typename T::const_iterator> begin, cur, end;
+	bool available = true;
 	for (std::size_t index = 0; index < list.size(); ++index) {
-		begin.push_back(list.at(index).begin());
-		cur.push_back(list.at(index).begin());
-		end.push_back(list.at(index).end());
+		const auto& elem = list.at(index);
+		begin.push_back(elem.begin());
+		cur.push_back(elem.begin());
+		end.push_back(elem.end());
+		available &= elem.begin() != elem.end();
 	}
 
 	StateVecSet result;
-	while (cur != end) {
+	while (available) {
 		// get current vector
 		StateVec element;
 		for (const auto& it : cur) {
@@ -30,12 +34,14 @@ inline StateVecSet combine_states(std::vector<T> list) {
 		result.insert(element);
 
 		// progress cur
+		available = false;
 		for (std::size_t index = 0; index < cur.size(); ++index) {
 			cur.at(index)++;
 
 			if (cur.at(index) == end.at(index)) {
 				cur.at(index) = begin.at(index);
 			} else {
+				available = true;
 				break;
 			}
 		}
