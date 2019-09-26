@@ -2,11 +2,12 @@
 #ifndef PRTYPES_OBSERVER
 #define PRTYPES_OBSERVER
 
+#include <memory>
+#include <vector>
+#include "cola/ast.hpp"
 #include "cola/observer.hpp"
-#include "types/factory.hpp"
-#include "types/error.hpp"
-#include "types/assumption.hpp"
 #include "types/simulation.hpp"
+#include "z3++.h"
 
 
 namespace prtypes {
@@ -27,7 +28,6 @@ namespace prtypes {
 
 
 
-
 	struct SymbolicState;
 	struct SymbolicObserver;
 	using SymbolicStateSet = std::set<const SymbolicState*>;
@@ -38,7 +38,8 @@ namespace prtypes {
 		cola::Transition::Kind kind;
 		z3::expr guard;
 
-		SymbolicTransition(const SymbolicState& dst, const cola::Transition& transition);
+		// SymbolicTransition(SymbolicObserver& observer, const SymbolicState& dst, const cola::Transition& transition);
+		SymbolicTransition(const SymbolicState& dst, const cola::Function& label, cola::Transition::Kind kind, z3::expr guard);
 	};
 
 	struct SymbolicState {
@@ -46,29 +47,29 @@ namespace prtypes {
 		std::vector<std::unique_ptr<SymbolicTransition>> transitions;
 		bool is_final, is_active;
 		SymbolicStateSet closure;
-		std::vector<const cola::State*> origin;
+		std::vector<const cola::State*> origin; // TODO: use sets?
 
 		SymbolicState(const SymbolicObserver& observer, bool is_final, bool is_active);
 	};
 
 	struct SymbolicObserver {
-		std::vector<std::unique_ptr<SymbolicState>> states;
-		z3::context context;
-		z3::solver solver;
-		z3::expr threadvar, adrvar, selfparam;
-		std::vector<z3::expr> paramvars;
+		private:
+			mutable z3::context context;
+			mutable z3::solver solver;
+			friend SymbolicStateSet symbolic_post(const SymbolicState& state, const cola::Command& command, const cola::VariableDeclaration& variable);
 
-		SymbolicObserver(const SmrObserverStore& store);
+		public:
+			std::vector<std::unique_ptr<SymbolicState>> states;
+			z3::expr threadvar, adrvar, selfparam;
+			std::vector<z3::expr> paramvars;
+
+			SymbolicObserver(const SmrObserverStore& store);
 	};
 
 
+	SymbolicStateSet symbolic_post(const SymbolicState& state, const cola::Command& command, const cola::VariableDeclaration& variable); // TODO: observer should be const? => make solver a mutable private member and post a friend?
 
-	// TODO: constructors: transitionen vervollständigen, guards übersetzen
-
-
-	SymbolicStateSet symbolic_post(const SymbolicState& state, const cola::Command& command, const cola::VariableDeclaration& variable);
-
-	SymbolicStateSet symbolic_post(const SymbolicStateSet& set, const cola::Command& command, const cola::VariableDeclaration& variable);
+	SymbolicStateSet symbolic_post(const SymbolicStateSet& set, const cola::Command& command, const cola::VariableDeclaration& variable); // TODO: observer should be const? => make solver a mutable private member and post a friend?
 
 	SymbolicStateSet symbolic_closure(const SymbolicStateSet& set);
 

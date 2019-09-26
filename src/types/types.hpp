@@ -12,26 +12,24 @@
 
 namespace prtypes {
 
-	using StateVec = std::vector<const cola::State*>;
-	using StateVecSet = std::set<StateVec>;
-
 	struct TypeContext;
 
 	struct Type {
 		std::reference_wrapper<const TypeContext> context;
-		StateVecSet states;
+		SymbolicStateSet states;
 		bool is_active;
 		bool is_local;
 		bool is_valid;
 		bool is_transient;
 
-		Type(const TypeContext& context, StateVecSet states, bool is_active, bool is_local, bool is_valid, bool is_transient);
-		Type(const TypeContext& context, StateVecSet states, bool is_active, bool is_local, bool is_valid);
-		Type(const TypeContext& context, StateVecSet states, bool is_active, bool is_local);
+		Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local, bool is_valid, bool is_transient);
+		Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local, bool is_valid);
+		Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local);
 	};
 
 	struct TypeContext {
 		const SmrObserverStore& observer_store;
+		std::unique_ptr<SymbolicObserver> cross_product;
 		const Type default_type, active_type, local_type, empty_type;
 
 		TypeContext(const SmrObserverStore& store);

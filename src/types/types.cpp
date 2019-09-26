@@ -10,163 +10,40 @@ using cola::Transition;
 using cola::Observer;
 
 
-//
-// combining states
-//
-template<typename T> // T = container<const State*>
-inline StateVecSet combine_states(std::vector<T> list) {
-	std::vector<typename T::const_iterator> begin, cur, end;
-	bool available = true;
-	for (std::size_t index = 0; index < list.size(); ++index) {
-		const auto& elem = list.at(index);
-		begin.push_back(elem.begin());
-		cur.push_back(elem.begin());
-		end.push_back(elem.end());
-		available &= elem.begin() != elem.end();
-	}
-
-	StateVecSet result;
-	while (available) {
-		// get current vector
-		StateVec element;
-		for (const auto& it : cur) {
-			element.push_back(*it);
-		}
-		result.insert(element);
-
-		// progress cur
-		available = false;
-		for (std::size_t index = 0; index < cur.size(); ++index) {
-			cur.at(index)++;
-
-			if (cur.at(index) == end.at(index)) {
-				cur.at(index) = begin.at(index);
-			} else {
-				available = true;
-				break;
-			}
-		}
-	}
-
-	return result;
-}
-
-
-//
-// post for observed thread
-//
-struct PostVisitor : public cola::ObserverVisitor {
-	void visit(const cola::ThreadObserverVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ThreadObserverVariable&)"); }
-	void visit(const cola::ProgramObserverVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ProgramObserverVariable&)"); }
-	void visit(const cola::SelfGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const SelfGuardVariable&)"); }
-	void visit(const cola::ArgumentGuardVariable& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ArgumentGuardVariable&)"); }
-	void visit(const cola::TrueGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const TrueGuard&)"); }
-	void visit(const cola::ConjunctionGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const ConjunctionGuard&)"); }
-	void visit(const cola::EqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const EqGuard&)"); }
-	void visit(const cola::NeqGuard& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const NeqGuard&)"); }
-	void visit(const Transition& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const Transition&)"); }
-	void visit(const Observer& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const Observer&)"); }
-
-
-	void visit(const State& /*obj*/) override { throw std::logic_error("Unexpected invocation (PostVisitor::visit(const State&)"); }
-};
-
-struct PostInfo {
-	enum Observation { OBSERVED, UNOBSERVED, ANY };
-	const Function& label;
-	Transition::Kind kind;
-	Observation thread_observation;
-
-	PostInfo(const Function& label, Transition::Kind kind, Observation thread_observation)
-		: label(label), kind(kind), thread_observation(thread_observation) {}
-	PostInfo(const Function& label, Transition::Kind kind) : PostInfo(label, kind, ANY) {}
-
-	PostInfo(const Transition& transition, Observation thread_observation) : PostInfo(transition.label, transition.kind, thread_observation) {}
-	PostInfo(const Transition& transition) : PostInfo(transition.label, transition.kind, ANY) {}
-};
-
-inline StateVecSet general_post(const StateVec& /*vec*/, PostInfo /*info*/) {
-	throw std::logic_error("not yet implemented (general_post)");
-}
-
 
 //
 // operations on observer states
 //
 
-inline bool state_final(const StateVec& vec) {
-	for (const auto& state : vec) {
-		if (state->final) {
-			return true;
-		}
-	}
-	return false;
+inline SymbolicStateSet state_post(const SymbolicState& state, const cola::VariableDeclaration& variable, const cola::Command& command) {
+	return prtypes::symbolic_post(state, command, variable);
 }
 
-inline std::set<const State*> state_post(const State* /*state*/, const cola::VariableDeclaration& /*variable*/, const cola::Command& /*command*/) {
-	// TODO [requires State to know outgoing transitions] --> context.get_transitions
-	throw std::logic_error("not yet implemented (state_post)");
+inline SymbolicStateSet state_post(const SymbolicStateSet& set, const cola::Command& command, const cola::VariableDeclaration& variable) {
+	return prtypes::symbolic_post(set, command, variable);
 }
 
-inline StateVecSet state_post(const StateVec& vec, const cola::VariableDeclaration& variable, const cola::Command& command) {
-	// compute per state post
-	std::vector<std::set<const State*>> post(vec.size());
-	for (std::size_t index = 0; index < vec.size(); ++index) {
-		post.at(index) = state_post(vec.at(index), variable, command);
-	}
-
-	return combine_states(post);
+inline SymbolicStateSet state_closure(const SymbolicState& state) {
+	return prtypes::symbolic_closure(state);
 }
 
-inline StateVecSet state_post(const StateVecSet& set, const cola::VariableDeclaration& variable, const cola::Command& command) {
-	StateVecSet result;
-	for (const auto& vec : set) {
-		StateVecSet post = state_post(vec, variable, command);
-		result.insert(post.begin(), post.end());
-	}
-	return result;
+inline SymbolicStateSet state_closure(const SymbolicStateSet& set) {
+	return prtypes::symbolic_closure(set);
 }
 
-inline StateVecSet state_closure(const StateVec& vec) {
-	// TODO [requires State to know outgoing transitions] --> context.get_transitions
-
-	std::list<PostInfo> infos;
-	for (const State* state : vec) {
-		for (const auto& transition : state->transitions) {
-			infos.emplace_back(*transition, PostInfo::UNOBSERVED);
-		}
-	}
-
-	StateVecSet result;
-	for (PostInfo& info : infos) {
-		auto post = general_post(vec, std::move(info));
-		result.insert(post.begin(), post.end());
-	}
-	return result;
-}
-
-inline StateVecSet state_closure(const StateVecSet& set) {
-	StateVecSet result;
-	for (const auto& vec : set) {
-		auto closure = state_closure(vec);
-		result.insert(closure.begin(), closure.end());
-	}
-	return result;
-}
-
-inline StateVecSet state_union(const StateVecSet& set, const StateVecSet& other) {
-	StateVecSet result(set);
+inline SymbolicStateSet state_union(const SymbolicStateSet& set, const SymbolicStateSet& other) {
+	SymbolicStateSet result(set);
 	result.insert(other.begin(), other.end());
 	return result;
 }
 
-inline StateVecSet state_intersection(const StateVecSet& set, const StateVecSet& other) {
-	StateVecSet result;
+inline SymbolicStateSet state_intersection(const SymbolicStateSet& set, const SymbolicStateSet& other) {
+	SymbolicStateSet result;
 	std::set_intersection(set.begin(), set.end(), other.begin(), other.end(), std::inserter(result, result.begin()));
 	return result;
 }
 
-inline bool state_inclusion(const StateVecSet& smaller, const StateVecSet& bigger) {
+inline bool state_inclusion(const SymbolicStateSet& smaller, const SymbolicStateSet& bigger) {
 	return std::includes(bigger.begin(), bigger.end(), smaller.begin(), smaller.end());
 }
 
@@ -175,76 +52,69 @@ inline bool state_inclusion(const StateVecSet& smaller, const StateVecSet& bigge
 // types
 //
 
-inline bool compute_valid(const StateVecSet& set) {
+inline bool compute_valid(const SymbolicStateSet& set) {
 	// create a dummy "enter free(ptr)" to use state_post
 	auto dummy_decl = std::make_unique<cola::VariableDeclaration>("dummy", Observer::free_function().args.at(0)->type, false);
 	auto dummy_enter = std::make_unique<cola::Enter>(Observer::free_function());
 	dummy_enter->args.push_back(std::make_unique<cola::VariableExpression>(*dummy_decl));
 
 	// compute post and check if all post states are final
-	auto free_post = state_post(set, *dummy_decl, *dummy_enter);
-	for (const auto& vec : free_post) {
-		if (!state_final(vec)) {
+	auto free_post = state_post(set, *dummy_enter, *dummy_decl);
+	for (const auto& state : free_post) {
+		if (!state->is_final) {
 			return false;
 		}
 	}
 	return true;
 }
 
-inline bool compute_transient(const StateVecSet& set) {
+inline bool compute_transient(const SymbolicStateSet& set) {
 	return !state_inclusion(state_closure(set), set);
 }
 
-Type::Type(const TypeContext& context, StateVecSet states, bool is_active, bool is_local, bool is_valid, bool is_transient)
+Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local, bool is_valid, bool is_transient)
 	: context(context), states(states), is_active(is_active), is_local(is_local), is_valid(is_valid), is_transient(is_transient) {
 }
 
-Type::Type(const TypeContext& context, StateVecSet states, bool is_active, bool is_local, bool is_valid) : Type(context, std::move(states), is_active, is_local, is_valid, compute_transient(states)) {
+Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local, bool is_valid) : Type(context, std::move(states), is_active, is_local, is_valid, compute_transient(states)) {
 }
 
-Type::Type(const TypeContext& context, StateVecSet states, bool is_active, bool is_local) : Type(context, std::move(states), is_active, is_local, compute_valid(states), compute_transient(states)) {
+Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local) : Type(context, std::move(states), is_active, is_local, compute_valid(states), compute_transient(states)) {
 }
 
 
 template<typename F>
-inline Type make_type(const TypeContext& context, const SmrObserverStore& store, F filter) {
-	std::vector<std::vector<const State*>> list(store.impl_observer.size() + 1);
-	auto add_states = [&list, &filter] (const Observer& observer, std::size_t index) {
-		auto& vector = list.at(index);
-		vector.reserve(observer.states.size());
-		for (const auto& state : observer.states) {
-			if (filter(*state, index)) {
-				vector.push_back(state.get());
-			}
+inline Type make_type(const TypeContext& context, F filter) {
+	SymbolicStateSet state_set;
+	for (const auto& state : context.cross_product->states) {
+		if (filter(*state)) {
+			state_set.insert(state.get());
 		}
-	};
-
-	add_states(*store.base_observer, 0);
-	for (std::size_t index = 0; index < store.impl_observer.size(); ++index) {
-		add_states(*store.impl_observer.at(index), index + 1);
 	}
-
-	return Type(context, combine_states(list), false, false);
+	return Type(context, state_set, false, false);
 }
 
-inline Type make_default_type(const TypeContext& context, const SmrObserverStore& store) {
-	return make_type(context, store, [](const State& /*state*/, std::size_t /*index*/) { return true; });
+inline Type make_default_type(const TypeContext& context) {
+	return make_type(context, [](const SymbolicState& /*state*/) { return true; });
 }
 
-inline Type make_active_local_type(const TypeContext& context, const SmrObserverStore& store) {
-	return make_type(context, store, [](const State& state, std::size_t index) { return index != 0 || state.initial; });
+inline Type make_active_local_type(const TypeContext& context, bool active) { // active = false ==> local
+	Type result = make_type(context, [](const SymbolicState& state) { return state.is_active; });
+	result.is_active = active;
+	result.is_local = !active;
+	return result;
 }
 
-inline Type make_empty_type(const TypeContext& context, const SmrObserverStore& /*store*/) {
+inline Type make_empty_type(const TypeContext& context) {
 	return Type(context, {}, false, false, false, false);
 }
 
 TypeContext::TypeContext(const SmrObserverStore& store)
 	: observer_store(store),
-	default_type(make_default_type(*this, store)),
-	active_type(make_active_local_type(*this, store)),
-	local_type(make_active_local_type(*this, store)),
-	empty_type(make_empty_type(*this, store))
+	default_type(make_default_type(*this)),
+	active_type(make_active_local_type(*this, true)),
+	local_type(make_active_local_type(*this, false)),
+	empty_type(make_empty_type(*this))
 {}
 
 //
@@ -276,7 +146,7 @@ Type prtypes::type_closure(const Type& type) {
 Type prtypes::type_post(const Type& type, const cola::VariableDeclaration& variable, const cola::Command& command) {
 	// note: just doing post on states might give a set of locations that cannot be represented in the type system
 	// compute post for states
-	auto post = state_post(type.states, variable, command);
+	auto post = state_post(type.states, command, variable);
 
 	// closure of post gives a valid type
 	auto types_states = state_closure(post);
