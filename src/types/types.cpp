@@ -76,6 +76,7 @@ struct PostInfo {
 	const Function& label;
 	Transition::Kind kind;
 	Observation thread_observation;
+
 	PostInfo(const Function& label, Transition::Kind kind, Observation thread_observation)
 		: label(label), kind(kind), thread_observation(thread_observation) {}
 	PostInfo(const Function& label, Transition::Kind kind) : PostInfo(label, kind, ANY) {}
@@ -131,8 +132,8 @@ inline StateVecSet state_closure(const StateVec& vec) {
 
 	std::list<PostInfo> infos;
 	for (const State* state : vec) {
-		for (const Transition& transition : state.transitions) {
-			infos.emplace_back(transition, PostInfo::UNOBSERVED);
+		for (const auto& transition : state->transitions) {
+			infos.emplace_back(*transition, PostInfo::UNOBSERVED);
 		}
 	}
 
@@ -245,33 +246,6 @@ TypeContext::TypeContext(const SmrObserverStore& store)
 	local_type(make_active_local_type(*this, store)),
 	empty_type(make_empty_type(*this, store))
 {}
-
-inline std::vector<std::reference_wrapper<const Transition>> find_transitions(const SmrObserverStore& store, const State& state) {
-	std::vector<std::reference_wrapper<const Transition>> result;
-	auto handle_observer = [&result, &state] (const Observer& observer) {
-		for (const auto& transition : observer.transitions) {
-			if (&transition->src == &state) {
-				result.push_back(*transition);
-			}
-		}
-	};
-
-	handle_observer(*store.base_observer);
-	for (const auto& observer : store.impl_observer) {
-		handle_observer(*observer);
-	}
-	return result;
-}
-
-const std::vector<std::reference_wrapper<const Transition>>& TypeContext::get_transitions(const State& state) const {
-	auto find = transition_lookup.find(&state);
-	if (find == transition_lookup.end()) {
-		auto insertion = transition_lookup.insert({ &state, find_transitions(observer_store, state) });
-		return insertion.first->second;
-	} else {
-		return find->second;
-	}
-}
 
 //
 // type operations

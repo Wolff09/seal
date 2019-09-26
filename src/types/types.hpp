@@ -36,11 +36,6 @@ namespace prtypes {
 
 		TypeContext(const SmrObserverStore& store);
 		TypeContext(const TypeContext&) = delete;
-
-		const std::vector<std::reference_wrapper<const cola::Transition>>& get_transitions(const cola::State& state) const;
-
-		private:
-			mutable std::map<const cola::State*, std::vector<std::reference_wrapper<const cola::Transition>>> transition_lookup;
 	};
 
 
