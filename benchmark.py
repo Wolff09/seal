@@ -1,8 +1,8 @@
 # -*- coding: utf8 -*-
 
-#################################################
-######## Needs to be run from /build/bin ########
-#################################################
+####################################################
+######## Needs to be run from /path/to/seal ########
+####################################################
 
 import sys
 from subprocess import STDOUT, check_output, TimeoutExpired
