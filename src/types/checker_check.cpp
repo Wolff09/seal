@@ -289,7 +289,8 @@ void TypeChecker::check_angel_choose(bool active) {
 	conditionally_raise_error<TypeCheckError>(!!current_angel, "Only one angel allocation per function execution supported (don't put it into loops).");
 	current_angel = std::make_unique<VariableDeclaration>("§A§", type_context.observer_store.retire_function.args.at(0)->type, false);
 	assert(!prtypes::has_binding(current_type_environment, *current_angel));
-	current_type_environment.at(*current_angel) = active ? type_context.active_type : type_context.default_type;
+	Type type = active ? type_context.active_type : type_context.default_type;
+	current_type_environment.insert({ *current_angel, type });
 
 	// debug_type_env(current_type_environment, "@angle(choose) post");
 }
