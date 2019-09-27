@@ -28,7 +28,6 @@ set(SOURCES
 	checker_check.cpp
 	check.cpp
 	simulation.cpp
-	factory.cpp
 	cave.cpp
 	rmraces.cpp
 	preprocess.cpp
