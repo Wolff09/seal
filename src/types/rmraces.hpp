@@ -4,7 +4,7 @@
 
 #include "cola/ast.hpp"
 #include "types/error.hpp"
-#include "types/observer.hpp"
+#include "types/check.hpp"
 
 
 namespace prtypes {

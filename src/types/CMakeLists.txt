@@ -28,11 +28,11 @@ set(SOURCES
 	checker_check.cpp
 	check.cpp
 	simulation.cpp
-	observer.cpp
 	factory.cpp
 	cave.cpp
 	rmraces.cpp
 	preprocess.cpp
+	sobserver.cpp
 	types.cpp
 )
 

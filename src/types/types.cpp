@@ -15,10 +15,6 @@ using cola::Observer;
 // operations on observer states
 //
 
-inline SymbolicStateSet state_post(const SymbolicState& state, const cola::VariableDeclaration& variable, const cola::Command& command) {
-	return prtypes::symbolic_post(state, command, variable);
-}
-
 inline SymbolicStateSet state_post(const SymbolicStateSet& set, const cola::Command& command, const cola::VariableDeclaration& variable) {
 	return prtypes::symbolic_post(set, command, variable);
 }
@@ -76,10 +72,13 @@ Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, 
 	: context(context), states(states), is_active(is_active), is_local(is_local), is_valid(is_valid), is_transient(is_transient) {
 }
 
-Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local, bool is_valid) : Type(context, std::move(states), is_active, is_local, is_valid, compute_transient(states)) {
+Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local, bool is_valid) : Type(context, std::move(states), is_active, is_local, is_valid, false) {
+	this->is_transient = compute_transient(this->states);
 }
 
-Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local) : Type(context, std::move(states), is_active, is_local, compute_valid(states), compute_transient(states)) {
+Type::Type(const TypeContext& context, SymbolicStateSet states, bool is_active, bool is_local) : Type(context, std::move(states), is_active, is_local, false, false) {
+	this->is_valid = compute_valid(this->states);
+	this->is_transient = compute_transient(this->states);
 }
 
 
@@ -91,50 +90,81 @@ inline Type make_type(const TypeContext& context, F filter) {
 			state_set.insert(state.get());
 		}
 	}
-	return Type(context, state_set, false, false);
+	return Type(context, std::move(state_set), false, false);
 }
 
 inline Type make_default_type(const TypeContext& context) {
-	return make_type(context, [](const SymbolicState& /*state*/) { return true; });
+	Type result = make_type(context, [](const SymbolicState& /*state*/) { return true; });
+	return result;
 }
 
 inline Type make_active_local_type(const TypeContext& context, bool active) { // active = false ==> local
 	Type result = make_type(context, [](const SymbolicState& state) { return state.is_active; });
 	result.is_active = active;
 	result.is_local = !active;
+	if (!active) {
+		result.is_transient = false;
+	}
 	return result;
 }
 
 inline Type make_empty_type(const TypeContext& context) {
-	return Type(context, {}, false, false, false, false);
+	return Type(context, {}, false, false, true, false);
 }
 
 TypeContext::TypeContext(const SmrObserverStore& store)
 	: observer_store(store),
-	default_type(make_default_type(*this)),
-	active_type(make_active_local_type(*this, true)),
-	local_type(make_active_local_type(*this, false)),
-	empty_type(make_empty_type(*this))
+	  cross_product(std::make_unique<SymbolicObserver>(store)),
+	  default_type(make_default_type(*this)),
+	  active_type(make_active_local_type(*this, true)),
+	  local_type(make_active_local_type(*this, false)),
+	  empty_type(make_empty_type(*this))
 {}
 
 //
 // type operations
 //
 
+inline Type fix_type(const Type& type) {
+	Type result(type);
+	result.states = state_closure(type.states);
+	result.is_transient = false;
+
+	if (type.is_active) {
+		result.states = state_intersection(result.states, type.context.get().active_type.states);
+		result.is_transient |= type.context.get().active_type.is_transient;
+	}
+	if (type.is_local) {
+		result.states = state_intersection(result.states, type.context.get().local_type.states);
+		result.is_transient |= type.context.get().local_type.is_transient;
+	}
+
+	return result;
+}
+
 Type prtypes::type_union(const Type& type, const Type& other) {
-	return Type(
+	return fix_type(Type(
 		type.context,
 		state_intersection(type.states, other.states),
 		type.is_active || other.is_active,
 		type.is_local || other.is_local,
 		type.is_valid || other.is_valid,
 		type.is_transient || other.is_transient
-	);
+	));
 }
 
-Type prtypes::type_intersection(const Type& /*type*/, const Type& /*other*/) {
+Type prtypes::type_intersection(const Type& type, const Type& other) {
 	// TODO: implement (union of states)
-	throw std::logic_error("not yet implement (type_intersection");
+	// throw std::logic_error("not yet implement (type_intersection)");
+
+	return fix_type(Type(
+		type.context,
+		state_union(type.states, other.states),
+		type.is_active && other.is_active,
+		type.is_local && other.is_local,
+		type.is_valid && other.is_valid,
+		type.is_transient || other.is_transient
+	));
 }
 
 Type prtypes::type_closure(const Type& type) {
@@ -172,23 +202,66 @@ Type prtypes::type_post(const Type& type, const cola::VariableDeclaration& varia
 	}
 }
 
-inline void fix_type(Type& /*type*/) {
-	// TODO: add closure if needed?
-	throw std::logic_error("not yet implement (type_fix");
-}
-
 Type prtypes::type_remove_local(const Type& type) {
 	Type result(type);
 	result.is_local = false;
-	fix_type(result);
-	return result;
+	return fix_type(result);
 }
 
 Type prtypes::type_remove_active(const Type& type) {
 	Type result(type);
 	result.is_active = false;
-	fix_type(result);
+	return fix_type(result);
+}
+
+Type prtypes::type_add_active(const Type& type) {
+	return type_union(type, type.context.get().active_type);
+}
+
+TypeEnv prtypes::type_intersection(const TypeEnv& env, const TypeEnv& other) {
+	TypeEnv result;
+	for (const auto& [decl, type] : env) {
+		auto find = other.find(decl);
+		if (find != other.end()) {
+			result.insert({ decl, type_intersection(type, find->second) });
+		}
+	}
+	return result;
+}
+
+TypeEnv prtypes::type_post(const TypeEnv& env, const cola::Command& command) {
+	TypeEnv result(env);
+	for (auto& [decl, type] : result) {
+		type = type_post(type, decl, command);
+	}
 	return result;
 }
 
 
+bool prtypes::equals(const Type& type, const Type& other) {
+	return type.is_local == other.is_local
+	    && type.is_active == other.is_active
+	    && type.is_valid == other.is_valid
+	    && type.is_transient == other.is_transient
+	    && type.states == other.states
+	    && &type.context.get() == &other.context.get()
+	    ;
+}
+
+bool prtypes::equals(const TypeEnv& env, const TypeEnv& other) {
+	if (env.size() != other.size()) {
+		return false;
+	} else {
+		auto env_it = env.begin();
+		auto other_it = other.begin();
+		while (env_it != env.end()) {
+			assert(other_it != other.end());
+			if (!prtypes::equals(env_it->second, other_it->second)) {
+				return false;
+			}
+			++env_it;
+			++other_it;
+		}
+		return true;
+	}
+}

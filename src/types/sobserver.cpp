@@ -1,11 +1,10 @@
-#include "types/observer.hpp"
-#include "types/assumption.hpp"
+#include "types/sobserver.hpp"
 
 #include <iostream>
 #include <deque>
 #include <list>
-#include "types/factory.hpp"
 #include "types/error.hpp"
+#include "types/factory.hpp"
 #include "types/assumption.hpp"
 
 using namespace cola;
@@ -204,7 +203,10 @@ struct GuardTranslator final : public ObserverVisitor {
 	void visit(const ThreadObserverVariable& /*var*/) override { result = context.observer.threadvar; }
 	void visit(const ProgramObserverVariable& /*var*/) override { result = context.observer.adrvar; }
 	void visit(const SelfGuardVariable& /*var*/) override { result = context.observer.selfparam; }
-	void visit(const ArgumentGuardVariable& var) override { result = context.observer.paramvars.at(param2index.at(&var.decl)); }
+	void visit(const ArgumentGuardVariable& var) override {
+		auto index = param2index.at(&var.decl);
+		result = context.observer.params.at(index);
+	}
 	void visit(const TrueGuard& /*obj*/) override { result = context.context.bool_val(true); }
 	void mk_equality(const ComparisonGuard& guard) {
 		guard.lhs.accept(*this);
@@ -240,7 +242,7 @@ inline z3::expr translate_guard(Context context, const Transition& transition) {
 // SymbolicTransition::SymbolicTransition(SymbolicObserver& observer, const SymbolicState& dst, const Transition& transition) : dst(dst), label(transition.label), kind(transition.kind), guard(translate_guard(observer, transition)) {
 // }
 
-SymbolicTransition::SymbolicTransition(const SymbolicState& dst, const Function& label, Transition::Kind kind, z3::expr guard) : dst(dst), label(label), kind(kind), guard(guard) {
+SymbolicTransition::SymbolicTransition(const SymbolicState& dst, const Function& label, Transition::Kind kind, z3::expr guard) : dst(dst), label(label), kind(kind), guard(guard.simplify()) {
 }
 
 SymbolicState::SymbolicState(const SymbolicObserver& observer, bool is_final, bool is_active) : observer(observer), is_final(is_final), is_active(is_active) {
@@ -294,8 +296,11 @@ struct HalfWaySymbolicTransition {
 
 inline std::map<const State*, std::list<HalfWaySymbolicTransition>> make_complete_transition_map(Context context, const SmrObserverStore& store, const std::set<std::pair<const Function*, Transition::Kind>>& all_symbols) {
 	std::map<const State*, std::list<HalfWaySymbolicTransition>> result;
-	apply_to_transitions(store, [&result,&context](const Transition& transition) {
-		result[&transition.src].emplace_back(context, transition);
+	apply_to_states(store, [&result,&context](const State& state){
+		std::list<HalfWaySymbolicTransition>& list = result[&state];
+		for (const auto& transition : state.transitions) {
+			list.emplace_back(context, *transition);
+		}
 	});
 
 	for (auto& [state, transitions] : result) {
@@ -428,6 +433,50 @@ struct CrossProductMaker {
 		}
 	}
 
+	void post_process() {
+		// ensure that final states cannot reach non-final states
+		bool has_final_state = false;
+		for (const auto& state : states) {
+			if (state->is_final) {
+				has_final_state = true;
+				for (const auto& transition : state->transitions) {
+					conditionally_raise_error<UnsupportedObserverError>(!transition->dst.is_final, "final states must not reach non-final states");
+				}
+			}
+		}
+		if (!has_final_state) {
+			return;
+		}
+
+		// create unique final state, add self-loops
+		auto final_state = std::make_unique<SymbolicState>(context.observer, true, false); // TODO: is the final state active?
+		for (const auto& [label, kind] : all_symbols) {
+			final_state->transitions.push_back(std::make_unique<SymbolicTransition>(*final_state, *label, kind, context.context.bool_val(true)));
+		}
+
+		// replace final states with unique one in transitions
+		auto make_replacement = [&final_state](const SymbolicTransition& transition) -> std::unique_ptr<SymbolicTransition> {
+			return std::make_unique<SymbolicTransition>(*final_state, transition.label, transition.kind, transition.guard);
+		};
+		for (auto& state : states) {
+			for (auto& transition : state->transitions) {
+				if (transition->dst.is_final) {
+					transition = make_replacement(*transition);
+				}
+			}
+		}
+
+		// remove final states
+		std::vector<std::unique_ptr<SymbolicState>> all_states = std::move(states);
+		states.clear();
+		for (auto& state : all_states) {
+			if (!state->is_final) {
+				states.push_back(std::move(state));
+			}
+		}
+		states.push_back(std::move(final_state));
+	}
+
 	void compute_cross_product() {
 		prepare_initial_states();
 
@@ -437,6 +486,34 @@ struct CrossProductMaker {
 
 			handle_symbolicstate(*current);
 		}
+
+		post_process();
+
+		// // debug output
+		// std::cout << "#states = " << states.size() << std::endl;
+		// auto print_sstate = [](const SymbolicState& symbolic_state) {
+		// 	std::cout << "{ ";
+		// 	bool first = true;
+		// 	for (const auto& state : symbolic_state.origin) {
+		// 		if (!first) std::cout << ", ";
+		// 		first = false;
+		// 		std::cout << state->name;
+		// 	}
+		// 	std::cout << " }";
+		// };
+		// for (const auto& state : states) {
+		// 	std::cout << "++ ";
+		// 	if (state->is_final) std::cout << "final ";
+		// 	if (state->is_active) std::cout << "active ";
+		// 	std::cout << "state: ";
+		// 	print_sstate(*state);
+		// 	std::cout << std::endl;
+		// 	for (const auto& transition : state->transitions) {
+		// 		std::cout << "    --[ " << (transition->kind == Transition::INVOCATION ? "enter " : "exit ") << transition->label.name << " ]--> ";
+		// 		print_sstate(transition->dst);
+		// 		std::cout << "    // " << transition->guard << std::endl;
+		// 	}
+		// }
 	}
 };
 
@@ -455,9 +532,10 @@ inline std::vector<std::unique_ptr<SymbolicState>> make_states(const SmrObserver
 
 SymbolicObserver::SymbolicObserver(const SmrObserverStore& store) : solver(context), threadvar(context.int_const("__THREAD")), adrvar(context.int_const("__ADR")), selfparam(context.int_const("self")) {
 	// add param variables to context
-	for (std::size_t index = 0; index < find_max_params(store); ++index) {
+	std::size_t max_params = find_max_params(store);
+	for (std::size_t index = 0; index < max_params; ++index) {
 		std::string name = "param_" + std::to_string(index);
-		this->selfparam = context.int_const(name.c_str());
+		this->params.push_back(context.int_const(name.c_str()));
 	}
 
 	// prepare passing stuff around
@@ -495,7 +573,7 @@ inline std::tuple<const Function*, Transition::Kind, z3::expr> prepare(const Sym
 	for (std::size_t index = 0; index < command.args.size(); ++index) {
 		for (std::size_t other = index + 1; other < command.args.size(); ++other) {
 			if (is_equal(*command.args.at(index), *command.args.at(other))) {
-				constraints.push_back(observer.paramvars.at(index) == observer.paramvars.at(other));
+				constraints.push_back(observer.params.at(index) == observer.params.at(other));
 			}
 		}
 	}
@@ -504,7 +582,7 @@ inline std::tuple<const Function*, Transition::Kind, z3::expr> prepare(const Sym
 	auto dummy_var_expression = std::make_unique<VariableExpression>(variable);
 	for (std::size_t index = 0; index < command.args.size(); ++index) {
 		if (is_equal(*command.args.at(index), *dummy_var_expression)) {
-			constraints.push_back(observer.paramvars.at(index) == observer.adrvar);
+			constraints.push_back(observer.params.at(index) == observer.adrvar);
 		}
 	}
 

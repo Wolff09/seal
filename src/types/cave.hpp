@@ -3,7 +3,7 @@
 #define PRTYPES_CAVE
 
 #include "cola/ast.hpp"
-#include "types/observer.hpp"
+#include "types/check.hpp"
 #include <ostream>
 #include <string>
 #include <vector>

@@ -9,16 +9,39 @@ using namespace prtypes;
 
 // TODO: remove if/while (for expressions containing pointers)
 
-// void debug_type_env(const TypeEnv& env, std::string note="") {
-// 	std::cout << "Type Env " << note << std::endl;
-// 	for (const auto& [decl, guarantees] : env) {
-// 		std::cout << "   - " << decl.get().name << ": ";
-// 		for (const auto& g : guarantees) {
-// 			std::cout << g.get().name << ", ";
-// 		}
-// 		std::cout << std::endl;
-// 	}
-// }
+void debug_type_env(const TypeEnv& env, std::string note="") {
+	auto print_sstate = [](const SymbolicState& symbolic_state) {
+		std::cout << "{ ";
+		bool first = true;
+		for (const auto& state : symbolic_state.origin) {
+			if (!first) std::cout << ", ";
+			first = false;
+			std::cout << state->name;
+		}
+		std::cout << " }";
+	};
+	std::cout << "Type Env " << note << std::endl;
+	for (const auto& [decl, type] : env) {
+		std::cout << "   - " << decl.get().name << ": ";
+		bool first = true;
+		for (const auto& state : type.states) {
+			if (first) {
+				first = false;
+			} else {
+				std::cout << "++";
+			}
+			print_sstate(*state);
+		}
+		std::cout << "   ";
+		if (type.is_valid) {
+			std::cout << " (valid)";
+		}
+		if (type.is_transient) {
+			std::cout << " (transient)";
+		}
+		std::cout << std::endl;
+	}
+}
 
 
 std::unique_ptr<Assert> make_assert_from_invariant(const Invariant* inv) {
@@ -335,7 +358,7 @@ void TypeChecker::check_atomic_end() {
 	for (auto& [decl, type] : current_type_environment) {
 		if (decl.get().is_shared) {
 			type = type_context.default_type;
-		} else {
+		} else if (type.is_transient) {
 			type = prtypes::type_closure(type);
 		}
 	}
@@ -400,30 +423,8 @@ void TypeChecker::check_ite(const IfThenElse& ite) {
 	this->current_type_environment = prtypes::type_intersection(post_true, post_false);
 }
 
-inline bool type_equals(const prtypes::Type& lhs, const prtypes::Type& rhs) {
-	// TODO: move to types.hpp
-	return lhs.is_local == rhs.is_local
-	    && lhs.is_active == rhs.is_active
-	    && lhs.is_valid == rhs.is_valid
-	    && lhs.is_transient == rhs.is_transient
-	    && lhs.states == rhs.states
-	    && &lhs.context == &rhs.context;
-}
-
-inline bool typeenv_equals(const TypeEnv& lhs, const TypeEnv& rhs) {
-	// TODO: write better equals
-	assert(lhs.size() == rhs.size());
-	for (const auto& [decl, type] : lhs) {
-		assert(rhs.count(decl) > 0);
-		if (!type_equals(type, rhs.at(decl))) {
-			return false;
-		}
-	}
-	return true;
-}
-
 void TypeChecker::check_loop(const Loop& loop) {
-//	std::cout << "ENTERING WHILE" << std::endl;
+	// std::cout << "ENTERING WHILE" << std::endl;
 //	debug_type_env(this->current_type_environment);
 	assert(loop.body);
 	TypeEnv pre_types;
@@ -443,14 +444,14 @@ void TypeChecker::check_loop(const Loop& loop) {
 			this->break_envs.pop_back();
 		}
 
-	} while (!typeenv_equals(pre_types, this->current_type_environment));
+	} while (!prtypes::equals(pre_types, this->current_type_environment));
 //	std::cout << "EXITING WHILE" << std::endl;
 //	debug_type_env(this->current_type_environment);
 }
 
 void TypeChecker::check_while(const While& whl) {
-//	std::cout << "ENTERING WHILE " << whl.id << std::endl;
-//	debug_type_env(this->current_type_environment);
+	// std::cout << "ENTERING WHILE " << whl.id << std::endl;
+	// debug_type_env(this->current_type_environment);
 	assert(whl.expr);
 	assert(whl.body);
 
@@ -463,8 +464,8 @@ void TypeChecker::check_while(const While& whl) {
 	// apply loop rule, but peel breaking iterations
 	TypeEnv pre_types;
 	do {
-//		std::cout << "========DOING WHILE " << whl.id << std::endl;
-//		debug_type_env(this->current_type_environment);
+		// std::cout << "========DOING WHILE " << whl.id << std::endl;
+		// debug_type_env(this->current_type_environment);
 		pre_types = this->current_type_environment;
 		whl.body->accept(*this);
 		this->current_type_environment = prtypes::type_intersection(pre_types, this->current_type_environment);
@@ -480,12 +481,12 @@ void TypeChecker::check_while(const While& whl) {
 			this->break_envs.pop_back();
 		}
 
-	} while (!typeenv_equals(pre_types, this->current_type_environment));
+	} while (!prtypes::equals(pre_types, this->current_type_environment));
 
 	assert(this->break_envs.empty());
 	this->current_type_environment = std::move(*result);
-//	std::cout << "EXITING WHILE" << std::endl;
-//	debug_type_env(this->current_type_environment);
+	// std::cout << "EXITING WHILE" << std::endl;
+	// debug_type_env(this->current_type_environment);
 
 	// // on-the-fly handle 'while (<cond>) { <body> }' as 'loop { assume(<cond>); <body> }; assume(!<cond>);'
 	// auto assume_positive = std::make_unique<Assume>(cola::copy(*whl.expr));
@@ -507,7 +508,7 @@ void TypeChecker::check_while(const While& whl) {
 	// 	whl.body->accept(*this);
 	// 	this->current_type_environment = prtypes::intersection(pre_types, this->current_type_environment);
 
-	// } while (!typeenv_equals(pre_types, this->current_type_environment));
+	// } while (!prtypes::equals(pre_types, this->current_type_environment));
 
 	// try {
 	// 	assume_negative->accept(*this);

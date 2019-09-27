@@ -19,10 +19,12 @@ observer HazardPointer [negative] {
 		s11(HP2_retired);
 		s12(HP2_protected_HP1_invoked);
 		s13(HP2_retired_HP1_invoked);
-		s14(HP2_protected_HP1_protected);
 		s15(HP2_retired_HP1_protected);
 
 		sF(fail)[final];
+
+		s16(HP1_interim);
+		s17(HP2_interim);
 
 	transitions:
 		s1 -- enter protect1(T, P) >> s2;
@@ -51,22 +53,19 @@ observer HazardPointer [negative] {
 		s9 -- exit protect2(T) >> s10;
 		s10 -- enter protect1(T, P) >> s12;
 		s11 -- enter protect1(T, P) >> s13;
-		s12 -- exit protect1(T) >> s14;
+		s12 -- exit protect1(T) >> s7;
 		s13 -- exit protect1(T) >> s15;
 		s10 -- enter retire(*, P) >> s11;
 		s12 -- enter retire(*, P) >> s13;
-		s14 -- enter retire(*, P) >> s15;
 		
 		s9 -- enter protect2(T, !P) >> s1;
 		s10 -- enter protect2(T, !P) >> s1;
 		s11 -- enter protect2(T, !P) >> s1;
 		s12 -- enter protect2(T, !P) >> s1;
 		s13 -- enter protect2(T, !P) >> s1;
-		s14 -- enter protect2(T, !P) >> s3;
 		s15 -- enter protect2(T, !P) >> s3;
 		s12 -- enter protect1(T, !P) >> s10;
 		s13 -- enter protect1(T, !P) >> s11;
-		s14 -- enter protect1(T, !P) >> s10;
 		s15 -- enter protect1(T, !P) >> s11;
 
 		s4 -- free(*, P) >> sF;
@@ -76,4 +75,10 @@ observer HazardPointer [negative] {
 		s13 -- free(*, P) >> sF;
 		s15 -- free(*, P) >> sF;
 
+		s2 -- enter protect2(T, P) >> s16;
+		s16 -- exit protect1(T) >> s5;
+		s16 -- exit protect2(T) >> s12;
+		s9 -- enter protect1(T, P) >> s17;
+		s17 -- exit protect2(T) >> s12;
+		s17 -- exit protect1(T) >> s5;
 }
