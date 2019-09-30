@@ -36,6 +36,12 @@ void debug_type_env(const TypeEnv& env, std::string note="") {
 		if (type.is_valid) {
 			std::cout << " (valid)";
 		}
+		if (type.is_active) {
+			std::cout << " (active)";
+		}
+		if (type.is_local) {
+			std::cout << " (local)";
+		}
 		if (type.is_transient) {
 			std::cout << " (transient)";
 		}
@@ -77,6 +83,7 @@ void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclarati
 	conditionally_raise_error<UnsupportedConstructError>(ptr.is_shared, "allocations must not target shared variables");
 	assert(prtypes::has_binding(current_type_environment, ptr));
 	current_type_environment.at(ptr) = type_context.local_type;
+	// debug_type_env(this->current_type_environment, "post malloc");
 }
 
 void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
@@ -138,6 +145,8 @@ void TypeChecker::check_break(const Break& /*brk*/) {
 	for (auto& [decl, type] : this->current_type_environment) {
 		type = type_context.empty_type;
 	}
+
+	// debug_type_env(this->current_type_environment, "post break");
 }
 
 
