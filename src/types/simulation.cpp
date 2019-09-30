@@ -295,7 +295,6 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 	}
 
 	// remove non-simulation pairs until fixed point
-	std::cout << "Computing simulation for " << observer.name << std::endl;
 	bool removed;
 	do {
 		removed = false;
@@ -309,7 +308,6 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 			}
 		}
 	} while (removed);
-	std::cout << "  => size: " << result.size() << std::endl;
 
 	// store information
 	this->observers.insert(&observer);
