@@ -73,12 +73,14 @@ def run_with_timeout(name, smr, args):
 	return gist
 
 def run_test(name, smr):
-	gist = run_with_timeout(name, smr, ['-gtal'])
+	gist_types = run_with_timeout(name, smr, ['-gts'])
+	gist_annot = run_with_timeout(name, smr, ['-ga'])
+	gist_linea = run_with_timeout(name, smr, ['-gl'])
 	print("{:<48}   |   {:>15}   |   {:>15}   |   {:>15} ".format(
 		SMR_PROGRAM_FOLDER[smr] + "/" + name,
-		get_type_info(gist),
-		get_annotation_info(gist),
-		get_linearizability_info(gist)
+		get_type_info(gist_types),
+		get_annotation_info(gist_annot),
+		get_linearizability_info(gist_linea)
 	), flush=True)
 
 def print_head(smr):
@@ -88,7 +90,7 @@ def print_head(smr):
 	print("---------------------------------------------------+---------------------+---------------------+----------------------", flush=True)
 
 def main():
-	print("(Timeout per task is set to: " + str(TIMEOUT) + "s.)", flush=True)
+	print("(Timeout per task/cell is set to: " + str(TIMEOUT) + "s.)", flush=True)
 
 	HP
 	print_head(SMR_NAME[HP])
@@ -119,4 +121,9 @@ if __name__ == '__main__':
 			raise Exception("Wrong number of arguments!")
 		TIMEOUT = int(sys.argv[1])
 
-	main()
+	try:
+		main()
+	except KeyboardInterrupt:
+		print("", flush=True)
+		print("", flush=True)
+		print("[interrupted]", flush=True)
