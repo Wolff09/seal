@@ -41,24 +41,24 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 	atomic {
 		// protection needed for type check to go through
 		// alternatively one could peel the first loop iteration
-		protect2(curr);
+		protect1(curr);
 		assert(active(curr));
 	}
 
 	while (true) { // do while (k < key)
 		pred = curr;
 		k3 = k;
-		protect1(pred);
+		protect2(pred);
 
 		curr = pred->next;
-		protect2(curr);
+		protect1(curr);
 
 		choose {
 			atomic {
 				assume(pred->marked == false);
 				// assume(curr == pred->next);
 				curr = pred->next; // atomicity abstraction
-				protect2(curr); // atomicity abstraction
+				protect1(curr); // atomicity abstraction
 				assert(active(pred->next)); // preprocessing
 				assert(active(curr)); // inferred
 				k3 = k3;
@@ -71,7 +71,7 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 			k3 = MIN_VAL;
 			atomic {
 				// protection for type check (as before)
-				protect2(curr);
+				protect1(curr);
 				assert(active(curr));
 			}
 		}

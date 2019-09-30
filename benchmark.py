@@ -5,7 +5,12 @@
 ####################################################
 
 import sys
-from subprocess import STDOUT, check_output, TimeoutExpired
+
+# from subprocess import STDOUT, check_output, TimeoutExpired
+import os
+import signal
+from subprocess import Popen, PIPE, TimeoutExpired
+from time import monotonic as timer
 
 TIMEOUT = 60*60*12 # in seconds
 TIMEOUT_GIST = "#gist=to:t/o;to:t/o;to:t/o"
@@ -65,17 +70,28 @@ def run_with_timeout(name, smr, args):
 	path_smr = EXAMPLES_DIR + SMR_FILE[smr]
 	all_args = ['./seal'] + args + [path_program, path_smr]
 
-	try:
-		out  = check_output(all_args, stderr=STDOUT, timeout=TIMEOUT, text=True)
-		gist = out.splitlines()[-1]
-	except TimeoutExpired:
-		gist = TIMEOUT_GIST
+	# the following may not properly kill subprocesses after the specified timeout
+	# try:
+	# 	out  = check_output(all_args, stderr=STDOUT, timeout=TIMEOUT, text=True)
+	# 	gist = out.splitlines()[-1]
+	# except TimeoutExpired:
+	# 	gist = TIMEOUT_GIST
+	# return gist
+
+	# see: https://stackoverflow.com/questions/36952245/subprocess-timeout-failure
+	start = timer()
+	with Popen(all_args, stderr=PIPE, stdout=PIPE, preexec_fn=os.setsid, text=True) as process:
+		try:
+			gist = process.communicate(timeout=TIMEOUT)[0]
+		except TimeoutExpired:
+			os.killpg(process.pid, signal.SIGINT) # send signal to the process group
+			gist = TIMEOUT_GIST
 	return gist
 
 def run_test(name, smr):
-	gist_types = run_with_timeout(name, smr, ['-gts'])
-	gist_annot = run_with_timeout(name, smr, ['-ga'])
-	gist_linea = run_with_timeout(name, smr, ['-gl'])
+	gist_types = run_with_timeout(name, smr, ['-gt'])
+	gist_annot = TIMEOUT_GIST # run_with_timeout(name, smr, ['-ga'])
+	gist_linea = TIMEOUT_GIST # run_with_timeout(name, smr, ['-gl'])
 	print("{:<48}   |   {:>15}   |   {:>15}   |   {:>15} ".format(
 		SMR_PROGRAM_FOLDER[smr] + "/" + name,
 		get_type_info(gist_types),
