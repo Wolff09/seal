@@ -69,7 +69,7 @@ static void fail_if(bool condition, CmdLine& cmd, std::string description="undef
 
 
 struct LeapConfig {
-	std::string program_path, observer_path, output_path, customtypes_path;
+	std::string program_path, observer_path, output_path;
 	bool check_types, check_annotations, check_linearizability;
 	bool rewrite_and_retry;
 	bool interactive, eager;
