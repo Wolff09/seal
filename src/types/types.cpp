@@ -109,7 +109,7 @@ inline Type make_active_local_type(const TypeContext& context, bool active) { //
 }
 
 inline Type make_empty_type(const TypeContext& context) {
-	return Type(context, {}, false, false, false, false); // TODO: correct?
+	return Type(context, {}, false, false, true, false); // TODO: correct?
 }
 
 TypeContext::TypeContext(const SmrObserverStore& store)

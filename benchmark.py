@@ -31,6 +31,10 @@ SMR_PROGRAM_FOLDER = {
 	HP: "HP",
 	EBR: "EBR",
 }
+ADDITIONAL_ARGS = {
+	HP: ["-s"],
+	EBR: []
+}
 
 
 def get_cell(gist, i):
@@ -68,7 +72,7 @@ def get_linearizability_info(gist):
 def run_with_timeout(name, smr, args):
 	path_program = EXAMPLES_DIR + SMR_PROGRAM_FOLDER[smr] + "/" + name + ".cola"
 	path_smr = EXAMPLES_DIR + SMR_FILE[smr]
-	all_args = ['./seal'] + args + [path_program, path_smr]
+	all_args = ['./seal'] + args + ADDITIONAL_ARGS[smr] + [path_program, path_smr]
 
 	# the following may not properly kill subprocesses after the specified timeout
 	# try:
@@ -90,8 +94,8 @@ def run_with_timeout(name, smr, args):
 
 def run_test(name, smr):
 	gist_types = run_with_timeout(name, smr, ['-gt'])
-	gist_annot = TIMEOUT_GIST # run_with_timeout(name, smr, ['-ga'])
-	gist_linea = TIMEOUT_GIST # run_with_timeout(name, smr, ['-gl'])
+	gist_annot = run_with_timeout(name, smr, ['-ga'])
+	gist_linea = run_with_timeout(name, smr, ['-gl'])
 	print("{:<48}   |   {:>15}   |   {:>15}   |   {:>15} ".format(
 		SMR_PROGRAM_FOLDER[smr] + "/" + name,
 		get_type_info(gist_types),
@@ -108,7 +112,7 @@ def print_head(smr):
 def main():
 	print("(Timeout per task/cell is set to: " + str(TIMEOUT) + "s.)", flush=True)
 
-	HP
+	# HP
 	print_head(SMR_NAME[HP])
 	run_test("TreiberStack_transformed", HP)
 	run_test("TreiberOptimizedStack_transformed", HP)
@@ -119,7 +123,7 @@ def main():
 	run_test("OHearnSet_transformed", HP)
 	run_test("MichaelSet_transformed", HP)
 
-	EBR
+	# EBR
 	print_head(SMR_NAME[EBR])
 	run_test("TreiberStack", EBR)
 	run_test("TreiberOptimizedStack", EBR)
