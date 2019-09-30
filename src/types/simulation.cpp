@@ -260,17 +260,17 @@ bool simulation_holds(const Observer& observer, const SimulationEngine::Simulati
 			}
 		}
 	}
-	// handle outgoing transitions of simulator
-	for (const auto& transition : simulator.transitions) {
-		auto next_simulator = &transition->dst;
-		auto to_simulate_post = abstract_post(observer, to_simulate, *transition);
-		for (const auto& next_to_simulate : to_simulate_post) {
-			auto required = std::make_pair(next_to_simulate, next_simulator);
-			if (!current.count(required)) {
-				return false;
-			}
-		}
-	}
+	// // handle outgoing transitions of simulator (this makes it a bisimulation!)
+	// for (const auto& transition : simulator.transitions) {
+	// 	auto next_simulator = &transition->dst;
+	// 	auto to_simulate_post = abstract_post(observer, to_simulate, *transition);
+	// 	for (const auto& next_to_simulate : to_simulate_post) {
+	// 		auto required = std::make_pair(next_to_simulate, next_simulator);
+	// 		if (!current.count(required)) {
+	// 			return false;
+	// 		}
+	// 	}
+	// }
 	return true;
 }
 
@@ -294,20 +294,22 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 		}
 	}
 
-	// // remove non-simulation pairs until fixed point
-	// bool removed;
-	// do {
-	// 	removed = false;
-	// 	auto it = result.begin();
-	// 	while (it != result.end()) {
-	// 		if (!simulation_holds(observer, result, *it->first, *it->second)) {
-	// 			removed = true;
-	// 			it = result.erase(it); // progresses it
-	// 		} else {
-	// 			it++;
-	// 		}
-	// 	}
-	// } while (removed);
+	// remove non-simulation pairs until fixed point
+	std::cout << "Computing simulation for " << observer.name << std::endl;
+	bool removed;
+	do {
+		removed = false;
+		auto it = result.begin();
+		while (it != result.end()) {
+			if (!simulation_holds(observer, result, *it->first, *it->second)) {
+				removed = true;
+				it = result.erase(it); // progresses it
+			} else {
+				it++;
+			}
+		}
+	} while (removed);
+	std::cout << "  => size: " << result.size() << std::endl;
 
 	// store information
 	this->observers.insert(&observer);
