@@ -56,7 +56,7 @@ def get_info(gist, i):
 	cells = get_cell(gist, i)
 	cells = cells.split(':')
 	cell_result = get_verdict(cells[0])
-	cell_time = cells[1]
+	cell_time = cells[1].strip()
 	return str(cell_time) + "  " + cell_result
 
 
