@@ -300,25 +300,6 @@
 					To solve this (tested with Ubuntu 18.04), install <code>libc++-dev</code> and <code>libc++abi-dev</code>.
 					Then, use the <code>clang++-libc++</code> compiler wrapper, i.e., pass <code>-DCMAKE_INSTALLATION_PREFIX=clang++-libc++</code> to <code>cmake</code>; it properly sets up <code>clang++</code> to use <code>libc++</code>.
 				</dd>
-
-<!-- 				<dt>Issue: missing internal dependencies</dt>
-				<dd>
-					On some systems, CMake fails to detect the projects internal dependencies properly.
-					You can solve this by manually forcing the dependencies to compile first:
-			<pre class="bg-light"><code class="bash">
-      cd path/to/Seal-POPL20/build
-      make tclap
-      make antlr4cpp
-      make cave
-      make vata2
-			</code></pre>
-			After that, retry to build and install:
-			<pre class="bg-light"><code class="bash">
-      cd path/to/Seal-POPL20/build
-      make
-      make install
-			</code></pre>
-				</dd> -->
 			</dl>
 		</div>
 		<br>
