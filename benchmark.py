@@ -84,7 +84,7 @@ def run_with_timeout(name, smr, args):
 
 	# see: https://stackoverflow.com/questions/36952245/subprocess-timeout-failure
 	start = timer()
-	with Popen(all_args, stderr=PIPE, stdout=PIPE, preexec_fn=os.setsid, text=True) as process:
+	with Popen(all_args, stderr=PIPE, stdout=PIPE, preexec_fn=os.setsid, universal_newlines=True) as process:
 		try:
 			gist = process.communicate(timeout=TIMEOUT)[0]
 		except TimeoutExpired:
