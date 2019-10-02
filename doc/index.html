@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<!-- Required meta tags -->
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+	<!-- Bootstrap CSS -->
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+	
+	<!-- Font Awesome CSS -->
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
+	
+	<!-- highlight.js -->
+	<link rel="stylesheet" href="highlight.default.css">
+	<script src="highlight.pack.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
+	
+	<title>POPL'20 Project Page</title>
+
+	<style type="text/css">
+		header {
+			padding: .75rem;
+		}
+		header .logos a {
+			display: inline-block;
+		}
+		header .logos a:hover {
+			opacity: .7;
+			transform: scale(1.05, 1.05);
+		}
+
+		table.experiments .fas, table.experiments .far {
+			width: 1.25em;
+		}
+		table.experiments .fa-check, .experiments.fa-check {
+			color: #33DD33;
+		}
+		table.experiments .fa-times, .experiments.fa-times {
+			color: #DD3333;
+		}
+		table.experiments .fa-clock, .experiments.fa-clock {
+			color: #EACF33;
+		}
+
+		kbd {
+			text-transform: uppercase;
+			/*background-color: #820954;*/
+			background-color: #e83e8c;
+		}
+
+		.tooltip-inner {
+			/*max-width: 400px;*/
+			max-width: 25rem;
+		}
+		/*.tooltip-inner i {
+			font-weight: 600;
+		}*/
+		span.ref-full::before, span.ref-year::before, .ref-item-id::before {
+			content: "[";
+		}
+		span.ref-full::after, span.ref-year::after, .ref-item-id::after {
+			content: "]";
+		}
+		.ref-item {
+			margin-top: .35rem;
+		}
+		.ref-item-id, .ref-item-id::before, .ref-item-id::after {
+			font-weight: bold;
+		}
+		.ref-item-paper {
+			font-style: italic;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<div class="container clearfix">
+			<h1 class="display-4 text-muted text-left mt-3 float-left">
+				POPL'20 Project Page
+			</h1>
+			<h1 class="display-4 text-muted text-right mt-3 float-right logos">
+				<a target="new" href="https://www.tcs.cs.tu-bs.de/index.html">
+					<img src="https://www.tcs.cs.tu-bs.de/images/logo_tcs.png" alt="Institute of Theoretical Computer Science" style="height: .85em; margin-top: -.15em;">
+				</a>
+			</h1>
+		</div>
+	</header>
+
+	<div class="container clearfix">
+		<!-- ********************************************************************************** -->
+		<!-- ************************************** PAPER ************************************* -->
+		<!-- ********************************************************************************** -->
+		<div class="jumbotron">
+			<!-- <img src="artifacts_evaluated_reusable.png" class="ml-4 mr-3" style="max-height: 9rem; float: right;"> -->
+			<h1 style="font-size: 2.75rem;">
+				Pointer Life Cycle Types for Lock-Free Data Structures with Memory Reclamation
+			</h1>
+			<h2>
+				<small>
+					<a target="new" href="https://www.tcs.cs.tu-bs.de/group/meyer/home.html">Roland Meyer</a>
+					and
+					<a target="new" href="https://www.tcs.cs.tu-bs.de/group/wolff/home.html">Sebastian Wolff</a>,
+					TU Braunschweig, Germany
+				</small>
+			</h2>
+			<h3>
+				<small>
+					Submitted to <a target="new" href="https://popl20.sigplan.org">POPL'20</a>.
+				</small>
+			</h3>
+			<!-- <p class="lead">Accepted for <a href="https://popl19.sigplan.org/home">POPL'19</a>.</p> -->
+			<p class="lead text-justify mb-2">
+				<strong>Abstract.</strong>
+				We consider the verification of lock-free data structures that manually manage their memory with the help of a safe memory reclamation (SMR) algorithm. Our first contribution is a type system that checks whether a program properly manages its memory. If the type check succeeds, and additionally the program's invariant annotations hold, it is safe to ignore the SMR algorithm and consider the program under garbage collection. Intuitively, our types track the protection of pointers as guaranteed by the SMR algorithm. There are two design decisions. The type system does not track any shape information, which makes it extremely lightweight. Instead, we rely on invariant annotations that postulate a protection by the SMR. To this end, we introduce angels, ghost variables with an angelic semantics. Moreover, the SMR algorithm is not hardcoded but a parameter of the type system definition. We rely on a recent specification language for SMR algorithms. Our second contribution is to automate the type and the invariant check. For the type check, we show a quadratic-time algorithm. For the invariant check, we give a source-to-source translation that links our programs to off-the-shelf verification tools. It compiles away the angelic semantics and allows us to infer appropriate annotations automatically in a guess&check manner. To demonstrate the effectiveness of our type-based verification approach, we check linearizability for various list and set implementations from the literature with both hazard pointers and epoch-based memory reclamation. For many of the examples, this is the first time they are verified automatically. For the ones where there is a competitor, we obtain a speed-up of an order of magnitude.
+			</p>
+			
+			<div class="text-right mt-3">
+				<!-- <a target="new" href="http://www.tcs.cs.tu-bs.de/group/wolff/doc/???.pdf" class="btn btn-primary text-right">
+					<i class="far fa-file-pdf"></i> 
+					Paper
+				</a>
+				<a target="new" href="http://www.tcs.cs.tu-bs.de/group/wolff/doc/???.pdf" class="btn btn-primary text-right">
+					<i class="far fa-file-pdf"></i> 
+					Slides
+				</a>
+				<a target="new" href="https://arxiv.org/abs/???" class="btn btn-primary text-right">
+					<i class="far fa-file-pdf"></i> 
+					Technical Report
+				</a>
+				<a target="new" href="https://doi.org/???" class="btn btn-primary text-right">
+					<i class="far fa-file-pdf"></i> 
+					DOI
+				</a> -->
+				<a target="new" href="https://github.com/Wolff09/seal/releases/tag/POPL20" class="btn btn-primary text-right">
+					<i class="fas fa-code"></i>
+					Source Code
+				</a>
+				<!-- <a href="https://www.tcs.cs.tu-bs.de/documents/???.ova" class="btn btn-primary text-right">
+					<i class="fas fa-hdd"></i>
+					Virtual Machine
+				</a> -->
+			</div>
+
+			<!-- <hr class="my-4">
+			<p>
+				CCS Concepts:
+				<strong>• Theory of computation → Data structures design and analysis; Program verification;</strong> Shared memory algorithms; Program specifications; Program analysis;
+			</p>
+			<p class="mb-4">
+				Additional Key Words and Phrases:
+				static analysis, lock-free data structures, verification, linearizability, safe memory reclamation, memory management
+			</p>
+			<p class="mb-0">
+				<b>ACM Reference Format:</b><br>
+				Roland Meyer and Sebastian Wolff. 2019. Decoupling Lock-Free Data Structures from Memory Reclamation for Static Analysis. <i>Proc. ACM Program. Lang.</i> 3, POPL, Article 58 (January 2019), 31 pages. <a href="https://doi.org/10. 1145/3290371">https://doi.org/10.1145/3290371</a>
+			</p> -->
+		</div>
+
+
+
+		<!-- ********************************************************************************** -->
+		<!-- *********************************** QUICKSTART *********************************** -->
+		<!-- ********************************************************************************** -->
+
+		<!-- Quick Start -->
+		<div class="alert alert-info container">
+				<strong><i class="fas fa-shipping-fast"></i> Quick Start <i class="fas fa-shipping-fast"></i></strong>
+				<ol class="mt-2 mb-2">
+					<li class="mt-1">
+						Download the Virtual Machine Snapshot (created with <a target="new" href="https://www.virtualbox.org">Virtual Box</a>, credentials in <code>~/Desktop/pw.txt</code>).
+						The artifact is located at <code>~/popl20artifact/</code>.
+						The folder <code>~/popl20artifact/seal/</code> contains an installation of our tool <kbd>seal</kbd>, the back-end verifier, and all examples.
+						<br>
+						<i class="fas fa-link text-secondary"></i> <a href="#installation" class="text-secondary">See Compilation and Installation</a>
+					</li>
+					<li class="mt-1">
+						Fire up the Virtual Machine.
+					</li>
+					<li class="mt-1">
+						Open a Shell and simply execute <code>cd ~/popl20artifact/seal/ && python3 benchmark.py</code> to run all benchmarks.
+						<br>
+						<i class="fas fa-link text-secondary"></i> <a href="#benchmarks" class="text-secondary">See Benchmarking</a>
+					</li>
+					<li class="mt-1">
+						Presto!
+					</li>
+				</ol>
+		</div>
+		<br>
+
+
+
+		<!-- ********************************************************************************** -->
+		<!-- ************************************* TOOLS ************************************** -->
+		<!-- ********************************************************************************** -->
+
+		<div class="mt-4">
+			<h1>Tool Overview</h1>
+			<p>
+				Our paper presents an analysis for verifying lock-free data structures that use safe memory reclamation (SMR) algorithms.
+				We follow a compositional approach which factors out the verification of the SMR implementation <span class="ref-full">MeyerW19</span>.
+				That is, we work with a specification of the SMR algorithm rather than its implementation.
+				The SMR specification is given in form of an SMR automaton (also called <i>observer</i>).
+				This automaton is a parameter in our theory/tool (not hard-coded).
+				To verify the data structure wrt. the SMR specification, we perform a type check.
+				A successful typing implies that the data structure is memory safe.
+				As a consequence, our theory allows to perform the actual verification task under garbage collection (GC) semantics&mdash;that is, we can ignore the memory management for the verification task.
+				A major design decision in our type system is the fact that we do not track shape information.
+				Instead, we rely on simple, light-weight annotations in the program.
+				As we show, these annotations can be discharged under GC as well.
+				Altogether, this means that the entire verification can soundly be conducted with an off-the-shelf GC verifier.
+			</p>
+			<p>
+				We implemented the proposed analysis in our tool <kbd>seal</kbd>.
+				As such, it performs the following tasks:
+			</p>
+			<ul>
+				<li>a type check to decide whether or not the data structure properly manages its memory (a successful type check implies memory safety),</li>
+				<li>a check to prove the invariant annotations in the input program (which may be needed for a successful type check) correct, and</li>
+				<li>a linearizability check of the data structure.</li>
+			</ul>
+			<p>
+				The novelty of our approach lies in the ability to perform the last two tasks under garbage collection, using an off-the-shelf verifier.
+				For our tool we use Vafeiadis' <a target="new" href="https://people.mpi-sws.org/~viktor/cave/">CAVE</a> <span class="ref-year">Vafeiadis09, Vafeiadis10a, Vafeiadis10b</span> as a back-end.
+				To help the type check go through, our tool comes with an experimental rewrite engine to automatically add invariant annotations and apply Lipton's <span class="ref-year">Lipton75</span> mover types.
+			</p>
+			<p>
+				We submitted our tool to the <a target="new" href="https://popl20.sigplan.org/track/POPL-2020-Artifact-Evaluation">POPL'20 artifact evaluation</a> where it received the <i>Artifact Evaluated &mdash; Reusable</i> badge.
+			</p>
+			<p>
+				In the this page we discuss how to reproduce our experiments.
+				Therefore, we walk through the installation, compilation, and benchmarking.
+				In the end, we briefly link the concepts and techniques from the paper to our implementation.
+			</p>
+		</div>
+		<br>
+
+
+		<!-- ********************************************************************************** -->
+		<!-- ************************************* INSTALL ************************************ -->
+		<!-- ********************************************************************************** -->
+
+		<div class="mt-4">
+			<h1 id="installation">Compilation and Installation</h1>
+			<p>This section describes how to setup your system to repeat the benchmarks from the paper.</p>
+
+			<h4>Download</h4>
+			<p>
+				The source code can be downloaded from GitHub here:
+				&nbsp;&nbsp;<i class="fas fa-link"></i> <a target="new" href="https://github.com/Wolff09/seal/releases/tag/POPL20">
+					GitHub release with tag <code>POPL20</code>
+				</a>
+			</p>
+
+			<h4>System Requirements</h4>
+			<p>
+				To compile this project you need <strong>CMake</strong> (>3.5), a <strong>C++17</strong> compatible compiler, <strong>Java JRE</strong> (>1.6), <strong>OCaml</strong>, and <strong>Z3</strong> (<a target="new" href="https://github.com/Z3Prover/z3/releases/tag/Z3-4.8.5">v4.8.5</a>).
+				Compilation was tested with Apple LLVM v.9.1.0, Apple LLVM v.10.0.1, and Clang v.8.0.
+				To run the benchmarking script, you need <strong>Pyton 3</strong> (>3.5).
+			</p>
+
+			<h4>Compilation</h4>
+			<p>
+				To build the project, do the following:</p>
+			<pre class="bg-light"><code class="bash">
+      cd path/to/Seal-POPL20
+      mkdir build
+      cd build
+      cmake .. -DCMAKE_INSTALLATION_PREFIX=/path/to/installation -DCMAKE_CXX_COMPILER=/path/to/CXX-compiler
+      make
+      make install
+			</code></pre>
+			<p>
+				This creates a folder <code>/path/to/installation/seal</code> at the specified location.
+				This folder contains all binaries, scripts, and examples needed to reproduce the evaluation from the paper.
+			</p>
+			<p>
+				We recommend to use the <code>-DCMAKE_INSTALLATION_PREFIX</code> to specify a location where to install the tool.
+				Omitting this flag will install the tool somewhere like <code>/usr/local/</code>.
+				You can omit the <code>-DCMAKE_CXX_COMPILER</code> option to use your system's default compiler.
+			</p>
+
+			<h4>Troubleshooting</h4>
+			There are some known issues you might run into.
+			<dl>
+				<dt>Issue: missing external dependencies</dt>
+				<dd>
+					The project includes the code for <code>AntLR</code>, however, your system might miss some dependencies for it to build successfully.
+					On Linux (tested with Ubuntu 18.04), make sure you have <code>uuid</code>, <code>uuid-dev</code>, and <code>pkg-config</code> installed.
+				</dd>
+
+				<dt>Issue: <code>clang</code> and <code>libc++</code> on Linux</dt>
+				<dd>
+					When using <code>clang</code> to build <kbd>seal</kbd>, you might run into problems compiling and linking <code>AntLR</code>.
+					To solve this (tested with Ubuntu 18.04), install <code>libc++-dev</code> and <code>libc++abi-dev</code>.
+					Then, use the <code>clang++-libc++</code> compiler wrapper, i.e., pass <code>-DCMAKE_INSTALLATION_PREFIX=clang++-libc++</code> to <code>cmake</code>; it properly sets up <code>clang++</code> to use <code>libc++</code>.
+				</dd>
+
+<!-- 				<dt>Issue: missing internal dependencies</dt>
+				<dd>
+					On some systems, CMake fails to detect the projects internal dependencies properly.
+					You can solve this by manually forcing the dependencies to compile first:
+			<pre class="bg-light"><code class="bash">
+      cd path/to/Seal-POPL20/build
+      make tclap
+      make antlr4cpp
+      make cave
+      make vata2
+			</code></pre>
+			After that, retry to build and install:
+			<pre class="bg-light"><code class="bash">
+      cd path/to/Seal-POPL20/build
+      make
+      make install
+			</code></pre>
+				</dd> -->
+			</dl>
+		</div>
+		<br>
+		
+
+		<!-- ********************************************************************************** -->
+		<!-- ********************************** BENCHMARKING ********************************** -->
+		<!-- ********************************************************************************** -->
+		<div class="mt-4">
+			<h1 id="benchmarks">Benchmarking</h1>
+			<p>
+				We describe how to repeat the benchmarks from the paper for verifying lock-free data structures relative to an SMR specification.
+			</p>
+
+			<h4 id="benchmarks-observers">SMR Specifications</h4>
+			<p>
+				<kbd>seal</kbd> comes packaged with an SMR automata for <i>Epoch-Based Reclamation&nbsp;(EBR)</i> <span class="ref-full">Fraser04, McKenneyS98</span> and <i>Hazard&nbsp;Pointers&nbsp;(HP)</i> <span class="ref-full">Michael02b</span>
+				The HP specification assumes two hazard pointers per thread.
+				The SMR automata can be found here:
+			</p>
+			<ul>
+				<li>EBR: <a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/ebr.smr">examples/ebr.smr</a> (<a target="new" href="#??????"><code>.png</code></a>)</li>
+				<li>HP: <a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/hp.smr">examples/hp_no_transfer.smr</a> (<a target="new" href="#??????"><code>.png</code></a>)</li>
+			</ul>
+
+			<h4 id="benchmarks-programs">Benchmark Programs</h4>
+			<p>
+				We evaluated our tool on <i>Treiber's Stack</i> <span class="ref-full">Treiber86, Michael02b</span>, <i>Michael&amp;Scott's Queue</i> <span class="ref-full">MichaelS96, Michael02b</span>, the <i>DGLM queue</i> <span class="ref-full">DohertyGLM04</span>, <i>Vechev&Yahav's DCAS Set</i> <span class="ref-full">VechevY08</span>, <i>Vechev&Yahav's CAS Set</i> <span class="ref-full">VechevY08</span>, the <i>ORVYY Set</i> <span class="ref-full">OHearnRVYY10</span>, and <i>Michael's Set</i> <span class="ref-full">Michael02a</span> using Hazard Pointers and Epoch-Based Reclamation.
+			</p>
+			<p>
+				For our experiments, we transformed the programs in order for the type check to go through.
+				To that end, we added annotations and applied Lipton's mover types.
+				For the code consider the following list.
+			</p>
+			<p>
+				<div class="container">
+					<div class="row">
+						<div class="col-12 col-md-6">
+							<strong>Data Structures with Hazard Pointers:</strong>
+							<ul>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/TreiberStack_transformed.cola">Treiber's Stack</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/TreiberOptimizedStack_transformed.cola">Optimized Treiber's Stack</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/MichaelScottQueue_transformed.cola">Michael&amp;Scott's Queue</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/DGLM_transformed.cola">DGLM queue</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/VechevDCasSet_transformed.cola">Vechev&Yahav's DCAS Set</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/VechevCasSet_transformed.cola">Vechev&Yahav's CAS Set</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/OHearnSet_transformed.cola">ORVYY Set</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/MichaelSet_transformed.cola">Michael's Set</a></li>
+							</ul>
+						</div>
+						<div class="col-12 col-md-6">
+							<strong>Data Structures with Epoch-Based Reclamation</strong>
+							<ul>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/TreiberStack.cola">Treiber's Stack</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/MichaelScottQueue.cola">Michael&amp;Scott's Queue</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/DGLM.cola">DGLM queue</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/VechevDCasSet.cola">Vechev&Yahav's DCAS Set</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/VechevCasSet.cola">Vechev&Yahav's CAS Set</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/OHearnSet.cola">ORVYY Set</a></li>
+								<li><a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/EBR/MichaelSet.cola">Michael's Set</a></li>
+							</ul>
+						</div>
+						<div class="w-100"></div>
+					</div>
+				</div>
+			</p>
+			
+			<h4>Running Benchmarks</h4>
+			<p>
+				To run the benchmarks got to the installation folder and execute the benchmark script like so:
+			</p>
+			<pre class="bg-light"><code class="bash">
+      cd path/to/installation
+      python3 benchmark.py
+			</code></pre>
+			<p>
+				Make sure to use <code>python3</code>.
+				Our test script uses the timeout feature of the <code>subprocess</code> library which is available only in version 3.5 and newer.
+			</p>
+			<p>
+				The <code>benchmark.py</code> script runs every task (type check, annotation check, linearizability check) for every example program with a default timeout of 12 hours.
+				You can modify the timeout in seconds by passing an optional argument to <code>benchmark.py</code>:
+			</p>
+			<pre class="bg-light"><code class="bash">
+      python3 benchmark.py &lt;timeout_in_seconds&gt;
+			</code></pre>
+			<p>
+				The benchmark script will output a table with the following columns:
+				<ol>
+					<li><i>Program: </i>the name of the example program,</li>
+					<li><i>Types:</i> time in seconds to perform a type check (with automatically generated types),</li>
+					<li><i>Annotations:</i> time in seconds to perform an annotation check with our back-end solver CAVE, and</li>
+					<li><i>Linearizability:</i> time in seconds to perform a linearizability check with our back-end solver CAVE.</li>
+				</ol> 
+			</p>
+
+			<div class="alert alert-warning container">
+				<strong><i class="fas fa-exclamation-circle"></i> Discrepancy <i class="fas fa-exclamation-circle"></i></strong>
+				<p class="mt-3">
+					Note that the evaluation of the type check differs from the one presented in the paper.
+					Since submitting the paper, we rewrote the type implementation of the tool.
+					Our new implementation now computes the most precise type on-the-fly, rather computing (or asking for) types upfront.
+					This gives some runtime penalty for the EBR benchmarks, however, vastly improves the performance across the HP benchmarks.
+				</p>
+				<p>
+					The annotation and linearizability checks are not affected by our changes.
+					Their runtimes are as reported in the paper.
+				</p>
+			</div>
+			
+			<h4>Expected Benchmarks Results</h4>
+			<p>
+				We repeat our evaluation.
+				We used an Intel i5-8600K@3.6GHz machine with 16GB of RAM running MAC OS 10.12.
+				The timeout was set to 12h.
+				We mark successful tasks with <i class="experiments fas fa-check"></i>, failed tasks with <i class="experiments fas fa-times"></i>, and timed out tasks with <i class="experiments far fa-clock"></i>.
+			</p>
+			<table class="table experiments">
+				<thead>
+					<tr>
+						<th scope="col">Program</th>
+						<th scope="col">SMR</th>
+						<th class="text-right" scope="col">Types</th>
+						<th class="text-right" scope="col">Annotations</th>
+						<th class="text-right" scope="col">Linearizability</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="row" rowspan="2">Treiber's Stack</th>
+						<td>EBR</td>
+						<td class="text-right">0.8s<i class="fas fa-check"></i></td>
+						<td class="text-right">10s <i class="fas fa-check"></i></td>
+						<td class="text-right">1s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">0.9s<i class="fas fa-check"></i></td>
+						<td class="text-right">12s <i class="fas fa-check"></i></td>
+						<td class="text-right">1s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row">Opt. Treiber's Stack</th>
+						<td>HP</td>
+						<td class="text-right">1.0s<i class="fas fa-check"></i></td>
+						<td class="text-right">11s <i class="fas fa-check"></i></td>
+						<td class="text-right">1s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row" rowspan="2">Michael&amp;Scott's Queue</th>
+						<td>EBR</td>
+						<td class="text-right">1.0s<i class="fas fa-check"></i></td>
+						<td class="text-right">16s <i class="fas fa-check"></i></td>
+						<td class="text-right">5s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">0.9s<i class="fas fa-check"></i></td>
+						<td class="text-right">12s <i class="fas fa-check"></i></td>
+						<td class="text-right">4s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row" rowspan="2">DGLM Queue</th>
+						<td>EBR</td>
+						<td class="text-right">0.9s<i class="fas fa-check"></i></td>
+						<td class="text-right">1s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right">6s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">0.9s<i class="fas fa-check"></i></td>
+						<td class="text-right">1s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right">5s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row" rowspan="2">Vechev&Yahav's DCAS Set</th>
+						<td>EBR</td>
+						<td class="text-right">0.1s<i class="fas fa-check"></i></td>
+						<td class="text-right">38s <i class="fas fa-check"></i></td>
+						<td class="text-right">200s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">2.3s<i class="fas fa-check"></i></td>
+						<td class="text-right">13s <i class="fas fa-check"></i></td>
+						<td class="text-right">98s <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row" rowspan="2">Vechev&Yahav's CAS Set</th>
+						<td>EBR</td>
+						<td class="text-right">0.2s<i class="fas fa-check"></i></td>
+						<td class="text-right">7h <i class="fas fa-check"></i></td>
+						<td class="text-right">42m <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">2.3s<i class="fas fa-check"></i></td>
+						<td class="text-right">3.5h <i class="fas fa-check"></i></td>
+						<td class="text-right">42m <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row" rowspan="2">ORVYY Set</th>
+						<td>EBR</td>
+						<td class="text-right">1.0s<i class="fas fa-check"></i></td>
+						<td class="text-right">7h <i class="fas fa-check"></i></td>
+						<td class="text-right">47m <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">2.3s <i class="fas fa-check"></i></td>
+						<td class="text-right">3.2h <i class="fas fa-check"></i></td>
+						<td class="text-right">47m <i class="fas fa-check"></i></td>
+					</tr>
+					<tr>
+						<th scope="row" rowspan="2">Michael's Set</th>
+						<td>EBR</td>
+						<td class="text-right">0.3s<i class="fas fa-check"></i></td>
+						<td class="text-right">22s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right">t/o <i class="far fa-clock"></i></td>
+					</tr>
+					<tr>
+						<td>HP</td>
+						<td class="text-right">2.3s<i class="fas fa-check"></i></td>
+						<td class="text-right">90s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right">t/o <i class="far fa-clock"></i></td>
+					</tr>
+				</tbody>
+			</table>
+			<p>
+				<sup>*</sup> False-positive due to imprecision in the back-end verifier.
+			</p>
+			<br>
+		</div>
+		<br>
+
+
+
+		<!-- ********************************************************************************** -->
+		<!-- ************************************** SEAL ************************************** -->
+		<!-- ********************************************************************************** -->
+
+		<div class="mt-4">
+			<h1>The <kbd>seal</kbd> Tool</h1>
+			<p>
+				Instead of using the benchmark script, you can directly interact with our tool <kbd>seal</kbd>.
+			</p>
+
+			<h4>Basic Usage</h4>
+			<p>
+				You invoke <kbd>seal</kbd> like so:
+			</p>
+			<pre class="bg-light"><code class="">
+         ./seal  [-t] [-l] [-a] [-s] [-e]  &lt;path_to_program&gt; &lt;path_to_smr&gt;
+			</code></pre>
+			<p>
+				The flags and their arguments are listed in the following table (excerpt).
+			</p>
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Flag / Argument</th>
+						<th class="text-center" scope="col">Optional</th>
+						<th class="text-center" scope="col">Default</th>
+						<th scope="col">Description</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td class="text-nowrap"><code> &lt;path_to_program&gt; </code></td>
+						<td class="text-center">no</td>
+						<td class="text-center">&mdash;</td>
+						<td>
+							Input program file to analyze.
+							For examples, <i class="fas fa-link text-secondary"></i> <a class="text-secondary" href="#benchmarks-programs" class="">See Benchmark Programs</a>
+						</td>
+					</tr>
+					<tr>
+						<td class="text-nowrap"><code> &lt;path_to_smr&gt; </code></td>
+						<td class="text-center">no</td>
+						<td class="text-center">&mdash;</td>
+						<td>
+							Input SMR automaton file for SMR specification.
+							For examples, <i class="fas fa-link text-secondary"></i> <a class="text-secondary" href="#benchmarks-observers" class="">See SMR Specification</a>
+						</td>
+					</tr>
+					<tr>
+						<td class="text-nowrap"><code> --checktypes <br> -t </code></td>
+						<td class="text-center">yes</td>
+						<td class="text-center"><code>true</code></td>
+						<td>Performs type check.</td>
+					</tr>
+					<tr>
+						<td class="text-nowrap"><code> --checkannotations <br> -a </code></td>
+						<td class="text-center">yes</td>
+						<td class="text-center"><code>true</code></td>
+						<td>Perform annotation check.</td>
+					</tr>
+					<tr>
+						<td class="text-nowrap"><code> --checklinearizability <br> -l </code></td>
+						<td class="text-center">yes</td>
+						<td class="text-center"><code>true</code></td>
+						<td>Perform linearizability check.</td>
+					</tr>
+					<tr>
+						<td class="text-nowrap"><code> --simple <br> -s </code></td>
+						<td class="text-center">yes</td>
+						<td class="text-center"><code>false</code></td>
+						<td>Simple type check. Turns of experimental rewriting&retrying (atomicity abstraction) upon type errors.</td>
+					</tr>
+					<tr>
+						<td class="text-nowrap"><code> --eager <br> -e </code></td>
+						<td class="text-center">yes</td>
+						<td class="text-center"><code>false</code></td>
+						<td>Lets the experimental rewriting&retrying check every annotation for validity before adding (deactivates heuristics).</td>
+					</tr>
+				</tbody>
+			</table>
+			<p>
+				Besides the above, <code>--version</code> prints the tool's version, <code>-h</code> and <code>--help</code> print the full usage description.
+			</p>
+		</div>
+		<br>
+
+
+
+		<!-- ********************************************************************************** -->
+		<!-- ********************************* IMPLEMENTATION ********************************* -->
+		<!-- ********************************************************************************** -->
+		<div class="mt-4">
+			<h1>Notes on the Implementation</h1>
+			<p>
+				The following table links the techniques presented in the paper to the implementation.
+			</p>
+
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Paper</th>
+						<th scope="col">Implementation</th>
+						<th scope="col">Description</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td scope="row">Programs</td>
+						<td><code class="text-nowrap">src/cola/ast.hpp</code></td>
+						<td class="text-justify">
+							Abstract syntax tree for programs.
+							Supports a more powerful language than the one used in the paper.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Program Simplification</td>
+						<td><code class="text-nowrap">src/types/preprocess.hpp <br> src/types/preprocess.cpp</code></td>
+						<td class="text-justify">
+							Translates a given program into a simpler one following the command language given in the paper.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">SMR automata (aka&nbsp;observers)</td>
+						<td><code class="text-nowrap">src/cola/observer.hpp</code></td>
+						<td class="text-justify">
+							SMR automata/observer implementation.
+							Like in the paper, the implementation assumes that <i>non-specified</i> transitions are intended to be self-loops.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Types</td>
+						<td><code class="text-nowrap">src/types/types.hpp <br> src/types/types.cpp</code></td>
+						<td class="text-justify">
+							Type implementation, storing the SMR automata locations that it represents as well as flags whether the type contains &#120120;, &#120131;, or &#120138;.
+							The &#120124; guarantees are implicit.
+							Intuitively, our implementation computes the most precise &#120124; on-the-fly.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Post Image on Observers</td>
+						<td><code class="text-nowrap">src/types/sobserver.hpp <br> src/types/sobserver.cpp</code></td>
+						<td class="text-justify">
+							Our implementation uses a <i>symbolic observer</i>.
+							It implements the cross-product on SMR automata, their completion wrt. to non-specified/implicit transitions, and uses more powerful formulas as transition guards that ordinary SMR automata from <code class="text-nowrap">src/cola/observer.hpp</code>.
+							For computing the post image, we use <code>Z3</code> to check the satisfiability of guards.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Type Transformer Relation</td>
+						<td><code class="text-nowrap">src/types/types.hpp <br> src/types/types.cpp</code></td>
+						<td class="text-justify">
+							As described in the paper, relies on the post image for observers.
+							Additionally, properly computes how &#120120;, &#120131;, and &#120138; are maintained/lost/added.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Type Check</td>
+						<td><code class="text-nowrap">src/types/checker.hpp <br> src/types/checker_check.cpp</code></td>
+						<td class="text-justify">
+							Implements the type rules from the paper.
+							In addition, performs on-the-fly loop-peeling for better convergence.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Invariant Check</td>
+						<td><code class="text-nowrap">src/types/cave.hpp <br> src/types/cave.cpp</code></td>
+						<td class="text-justify">
+							Implements the source-to-source translation from the paper.
+							Here, however, we the destination program is one that can be fed to the <code>CAVE</code> tool (differs slightly from <code class="text-nowrap">src/cola/ast.hpp</code>).
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Linearizability Check</td>
+						<td><code class="text-nowrap">src/types/cave.hpp <br> src/types/cave.cpp</code></td>
+						<td class="text-justify">
+							Uses <code>CAVE</code> to check for linearizability.
+							This step requires to translate a program into one that can be fed to <code>CAVE</code>.
+						</td>
+					</tr>
+					<tr>
+						<td scope="row">Program Transformation (Annotations, Mover&nbsp;Types)</td>
+						<td><code class="text-nowrap">src/types/rmraces.hpp <br> src/types/rmraces.cpp</code></td>
+						<td class="text-justify">
+							Based on failed type checks, uses heuristics to add annotations or apply mover types.
+							If necessary, annotations are checked for correctness before being added.
+							(For example, active annotations on shared variables are typically not checked.)
+							Mover types are applied if no helpful annotation can be found.
+							Then, a sequence is checked for right-moverness and if applicable moved into an atomic block.
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+
+
+
+
+		<!-- ********************************************************************************** -->
+		<!-- *********************************** REFERENCES *********************************** -->
+		<!-- ********************************************************************************** -->
+		<div id="references" class="mt-4">
+			<br>
+			<h1>References</h1>
+			<div class="ref-item" data-ref-full="Doherty et al. 2004", data-ref-year="2004">
+				<span class="ref-item-id">DohertyGLM04</span>
+				<span class="ref-item-author">Simon Doherty, Lindsay Groves, Victor Luchangco, and Mark Moir. 2004.</span>
+				<span class="ref-item-paper">Formal Verification of a Practical Lock-Free Queue Algorithm.</span>
+				<span class="ref-item-where">In FORTE (LNCS), Vol. 3235. Springer, 97–114.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1007/978-3-540-30232-2_7">https://doi.org/10.1007/978-3-540-30232-2_7</a>
+			</div>
+			<div class="ref-item" data-ref-full="Fraser 2004", data-ref-year="2004">
+				<span class="ref-item-id">Fraser04</span>
+				<span class="ref-item-author">Keir Fraser. 2004.</span>
+				<span class="ref-item-paper">Practical Lock-Freedom.</span>
+				<span class="ref-item-where">Ph.D. Dissertation. University of Cambridge, UK.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="http://ethos.bl.uk/OrderDetails.do?uin=uk.bl.ethos.599193">http://ethos.bl.uk/OrderDetails.do?uin=uk.bl.ethos.599193</a>
+			</div>
+			<div class="ref-item" data-ref-full="Lipton 1975", data-ref-year="1975">
+				<span class="ref-item-id">Lipton75</span>
+				<span class="ref-item-author">Richard J. Lipton. 1975.</span>
+				<span class="ref-item-paper">Reduction: A Method of Proving Properties of Parallel Programs.</span>
+				<span class="ref-item-where">CACM 18, 12 (1975), 717–721.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/361227.361234">https://doi.org/10.1145/361227.361234</a>
+			</div>
+			<div class="ref-item" data-ref-full="McKenney and Slingwine 1998", data-ref-year="1998">
+				<span class="ref-item-id">McKenneyS98</span>
+				<span class="ref-item-author">Paul E. McKenney and John D. Slingwine. 1998.</span>
+				<span class="ref-item-paper">Read-copy Update: Using Execution History to Solve Concurrency Problems.</span>
+				<span class="ref-item-where">In Parallel and Distributed Computing and Systems.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="http://www.rdrop.com/users/paulmck/RCU/rclockjrnl_tpds_mathtype.pdf">http://www.rdrop.com/users/paulmck/RCU/rclockjrnl_tpds_mathtype.pdf</a>
+			</div>
+			<div class="ref-item" data-ref-full="Meyer and Wolff 2019", data-ref-year="2019">
+				<span class="ref-item-id">MeyerW19</span>
+				<span class="ref-item-author">Roland Meyer and Sebastian Wolff. 2019.</span>
+				<span class="ref-item-paper">Decoupling lock-free data structures from memory reclamation for static analysis.</span>
+				<span class="ref-item-where">PACMPL 3, POPL (2019), 58:1–58:31.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/3290371">https://doi.org/10.1145/3290371</a>
+			</div>
+			<div class="ref-item" data-ref-full="Michael 2002a", data-ref-year="2002a">
+				<span class="ref-item-id">Michael02a</span>
+				<span class="ref-item-author">Maged M. Michael. 2002.</span>
+				<span class="ref-item-paper">High performance dynamic lock-free hash tables and list-based sets.</span>
+				<span class="ref-item-where">In SPAA. 73–82.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/564870.564881">https://doi.org/10.1145/564870.564881</a>
+			</div>
+			<div class="ref-item" data-ref-full="Michael 2002b", data-ref-year="2002b">
+				<span class="ref-item-id">Michael02b</span>
+				<span class="ref-item-author">Maged M. Michael. 2002.</span>
+				<span class="ref-item-paper">Safe memory reclamation for dynamic lock-free objects using atomic reads and writes.</span>
+				<span class="ref-item-where">In PODC. ACM, 21–30.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/571825.571829">https://doi.org/10.1145/571825.571829</a>
+			</div>
+			<div class="ref-item" data-ref-full="Michael and Scott 1996", data-ref-year="1996">
+				<span class="ref-item-id">MichaelS96</span>
+				<span class="ref-item-author">Maged M. Michael and Michael L. Scott. 1996.</span>
+				<span class="ref-item-paper">Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms.</span>
+				<span class="ref-item-where">In PODC. ACM, 267–275.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/248052.248106">https://doi.org/10.1145/248052.248106</a>
+			</div>
+			<div class="ref-item" data-ref-full="O'Hearn et al. 2010", data-ref-year="2010">
+				<span class="ref-item-id">OHearnRVYY10</span>
+				<span class="ref-item-author">Peter W. O’Hearn, Noam Rinetzky, Martin T. Vechev, Eran Yahav, and Greta Yorsh. 2010.</span>
+				<span class="ref-item-paper">Verifying linearizability with hindsight.</span>
+				<span class="ref-item-where">In PODC. ACM, 85–94.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/1835698.1835722">https://doi.org/10.1145/1835698.1835722</a>
+			</div>
+			<div class="ref-item" data-ref-full="Treiber 1986", data-ref-year="1986">
+				<span class="ref-item-id">Treiber86</span>
+				<span class="ref-item-author">R. Kent Treiber. 1986.</span>
+				<span class="ref-item-paper">Systems programming: coping with parallelism.</span>
+				<span class="ref-item-where">Technical Report RJ 5118. IBM.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://domino.research.ibm.com/library/cyberdig.nsf/0/58319a2ed2b1078985257003004617ef?OpenDocument">https://domino.research.ibm.com/library/cyberdig.nsf/0/58319a2ed2b1078985257003004617ef?OpenDocument</a>
+			</div>
+			<div class="ref-item" data-ref-full="Vafeiadis 2009", data-ref-year="2009">
+				<span class="ref-item-id">Vafeiadis09</span>
+				<span class="ref-item-author">Viktor Vafeiadis. 2009.</span>
+				<span class="ref-item-paper">Shape-Value Abstraction for Verifying Linearizability.</span>
+				<span class="ref-item-where">In VMCAI (LNCS), Vol. 5403. Springer, 335–348.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1007/978- 3- 540- 93900- 9_27">https://doi.org/10.1007/978- 3- 540- 93900- 9_27</a>
+			</div>
+			<div class="ref-item" data-ref-full="Vafeiadis 2010a", data-ref-year="2010a">
+				<span class="ref-item-id">Vafeiadis10a</span>
+				<span class="ref-item-author">Viktor Vafeiadis. 2010.</span>
+				<span class="ref-item-paper">Automatically Proving Linearizability.</span>
+				<span class="ref-item-where">In CAV (LNCS), Vol. 6174. Springer, 450–464.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1007/978-3-642-14295-6_40">https://doi.org/10.1007/978-3-642-14295-6_40</a>
+			</div>
+			<div class="ref-item" data-ref-full="Vafeiadis 2010b", data-ref-year="2010b">
+				<span class="ref-item-id">Vafeiadis10b</span>
+				<span class="ref-item-author">Viktor Vafeiadis. 2010.</span>
+				<span class="ref-item-paper">RGSep Action Inference.</span>
+				<span class="ref-item-where">In VMCAI (LNCS), Vol. 5944. Springer, 345–361.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1007/978-3-642-11319-2_25">https://doi.org/10.1007/978-3-642-11319-2_25</a>
+			</div>
+			<div class="ref-item" data-ref-full="Vechev and Yahav 2008", data-ref-year="2008">
+				<span class="ref-item-id">VechevY08</span>
+				<span class="ref-item-author">Martin T. Vechev and Eran Yahav. 2008.</span>
+				<span class="ref-item-paper">Deriving linearizable fine-grained concurrent objects.</span>
+				<span class="ref-item-where">In PLDI. ACM, 125–135.</span>
+				<a target="new" class="ref-item-url text-nowrap" href="https://doi.org/10.1145/1375581.1375598">https://doi.org/10.1145/1375581.1375598</a>
+			</div>
+		</div>
+
+		<br><br><br>
+	</div>
+
+	<footer class="footer bg-light p-3">
+		<div class="container text-right">
+			<small class="text-muted">Made with <a target="new" href="https://getbootstrap.com" class="text-dark">Bootstrap</a> and <a target="new" href="https://html9responsiveboilerstrapjs.com" class="text-dark">H9RBS.js</a>. Hosted by <a target="new" href="https://pages.github.com" class="text-dark">GitHub Pages</a>.</small>
+		</div>
+	</footer>
+
+
+
+	<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+	<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+
+	<script type="text/javascript">
+		var CITATION_MAP = { };
+		function mk_link(authors, paper, where, url, linktext) {
+			return '<a class="citation" target="new" data-toggle="tooltip" ' + 'title="' + authors + ' <i>' + paper + '</i> ' + where + '" href="' + url + '">' + linktext + '</a>';
+		}
+		$(".ref-item").each(function(){
+			const ref_id = $(this).find(".ref-item-id").text();
+			const ref_names = $(this).attr("data-ref-full");
+			const ref_year = $(this).attr("data-ref-year");
+			const ref_author = $(this).find(".ref-item-author").text();
+			const ref_paper = $(this).find(".ref-item-paper").text();
+			const ref_where = $(this).find(".ref-item-where").text();
+			const ref_url = $(this).find(".ref-item-url").text();
+			CITATION_MAP[ref_id] = [
+				mk_link(ref_author, ref_paper, ref_where, ref_url, ref_names),
+				mk_link(ref_author, ref_paper, ref_where, ref_url, ref_year),
+			];
+		});
+
+		var all_found = true;
+		$("span.ref-full, span.ref-year").each(function(){
+			const ref_keys = $(this).text().split(",");
+			const full = $(this).hasClass("ref-full") ? true : false;
+			var citation = "";
+			var first = true;
+			for (index = 0, len = ref_keys.length; index < len; ++index) {
+				const key = ref_keys[index].trim();
+				var link;
+				if (key in CITATION_MAP) {
+					link = CITATION_MAP[key][full ? 0 : 1];
+				} else {
+					link = key;
+					all_found = false;
+				}
+				if (!first) {
+					citation += ", ";
+				}
+				first = false;
+				citation += link;
+			}
+			$(this).html(citation);
+		});
+		if (all_found) {
+			$("#references").addClass("d-none");
+		}
+	</script>
+	<script type="text/javascript">
+		$('[data-toggle="tooltip"]').tooltip({ 'html': true });
+	</script>
+</body>
+</html>
