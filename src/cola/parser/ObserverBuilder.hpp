@@ -23,7 +23,7 @@ namespace cola {
 			const VariableDeclaration* _current_arg = nullptr;
 
 			void check_name_clash(std::string name);
-			const State& find_state(std::string name);
+			State& find_state(std::string name);
 			const Function& find_function(std::string name);
 			const ThreadObserverVariable& find_threadvar(std::string name);
 			const ProgramObserverVariable& find_ptrvar(std::string name);

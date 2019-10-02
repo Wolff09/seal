@@ -1,6 +1,7 @@
 #include "types/checker.hpp"
 #include "types/error.hpp"
 #include "cola/util.hpp"
+#include <iostream>
 
 using namespace cola;
 using namespace prtypes;

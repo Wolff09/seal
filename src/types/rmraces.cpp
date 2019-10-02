@@ -1,8 +1,9 @@
 #include "types/rmraces.hpp"
 #include "types/cave.hpp"
 #include "cola/util.hpp"
-#include "types/inference.hpp"
 #include <iostream>
+#include <deque>
+#include <sstream>
 
 using namespace cola;
 using namespace prtypes;
@@ -295,7 +296,7 @@ struct AssertionInsertionVisitor : public NonConstVisitor {
 	}
 };
 
-AssertionInsertionVisitor insert_active_assertion(Program& program, const GuaranteeTable& guarantee_table, const Command& cmd, const VariableDeclaration& var, bool insert_after_cmd=false, bool no_check=false) {
+AssertionInsertionVisitor insert_active_assertion(Program& program, const SmrObserverStore& observer_store, const Command& cmd, const VariableDeclaration& var, bool insert_after_cmd=false, bool no_check=false) {
 	// make insertion to insert
 	auto assertion = std::make_unique<Assert>(std::make_unique<InvariantActive>(std::make_unique<VariableExpression>(var)));
 	Assert& inserted_assertion = *assertion.get();
@@ -310,7 +311,7 @@ AssertionInsertionVisitor insert_active_assertion(Program& program, const Guaran
 	}
 
 	// check added assertion for validity
-	bool is_inserted_assertion_valid = prtypes::discharge_assertions(program, guarantee_table, { inserted_assertion });
+	bool is_inserted_assertion_valid = prtypes::discharge_assertions(program, observer_store, { inserted_assertion });
 	if (!is_inserted_assertion_valid) {
 		// roll back insertion, then fail
 		*visitor.owner_inserted = std::make_unique<Skip>();
@@ -693,7 +694,7 @@ std::unique_ptr<Statement> make_sequence_from_path(std::vector<const Statement*>
 }
 
 
-void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
+void try_fix_local_unsafe_assume(Program& program, const SmrObserverStore& observer_store, const UnsafeAssumeError& error) {
 	std::cout << "Trying to remove local unsafe assume by moving it to an earlier program location." << std::endl;
 
 	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
@@ -719,7 +720,7 @@ void try_fix_local_unsafe_assume(Program& program, const GuaranteeTable& guarant
 
 		// try to insert assertion in path; move assume if possible
 		try {
-			auto visitor = insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
+			auto visitor = insert_active_assertion(program, observer_store, **it, error.var, true /* insert after */, no_check);
 			if (!no_check) {
 				std::cout << " ==> inserting assertion here" << std::endl;
 			}
@@ -770,7 +771,7 @@ std::string expr_to_string(const Expression& expr) {
 	return result.str();
 }
 
-void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
+void try_remove_unsafe_assume(Program& program, const SmrObserverStore& observer_store, const UnsafeAssumeError& error) {
 	std::cout << "Trying to remove unsafe assume statement by repeating commands." << std::endl;
 
 	InsertionLocationFinderVisitor visitor(collect_variables(*error.pc.expr), error.pc);
@@ -813,11 +814,11 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 
 	// check remaining path elements to be heap-local or right movers
 	std::set<const Statement*> ignore_non_movers;
-	RightMovernessVisitor move_checker(guarantee_table.observer_store.retire_function);
+	RightMovernessVisitor move_checker(observer_store.retire_function);
 	for (; it != full_path.end(); ++it) {
-		assert(move_checker.right_moves(guarantee_table.observer_store.simulation));
+		assert(move_checker.right_moves(observer_store.simulation));
 		(*it)->accept(move_checker);
-		if (!move_checker.right_moves(guarantee_table.observer_store.simulation)) {
+		if (!move_checker.right_moves(observer_store.simulation)) {
 			const Statement& stmt = **it;
 			if (typeid(stmt) == typeid(Assume)) {
 				std::cout << "WARNING: ignoring (not repeating) non-moving assume statement: ";
@@ -836,8 +837,8 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 			}
 		}
 	}
-	assert(move_checker.right_moves(guarantee_table.observer_store.simulation));
-	// conditionally_raise_error<RefinementError>(!move_checker.right_moves(guarantee_table.observer_store.simulation), "repeating commands failed (some statements in 'full_path' do not move)");
+	assert(move_checker.right_moves(observer_store.simulation));
+	// conditionally_raise_error<RefinementError>(!move_checker.right_moves(observer_store.simulation), "repeating commands failed (some statements in 'full_path' do not move)");
 
 	// filter full path
 	auto tmp = std::move(full_path);
@@ -858,7 +859,7 @@ void try_remove_unsafe_assume(Program& program, const GuaranteeTable& guarantee_
 	std::cout << " ==> replaced unsafe assume with a repetition of the commands" << std::endl;
 }
 
-void try_fix_nonlocal_unsafe_assume(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error) {
+void try_fix_nonlocal_unsafe_assume(Program& program, const SmrObserverStore& observer_store, const UnsafeAssumeError& error) {
 	std::cout << "Trying to fix unsafe assume statement by inserting an appropriate assertion earlier in the program." << std::endl;
 	std::cout << "(Beware, this might not fix the problem but I cannot check this)" << std::endl;
 
@@ -885,7 +886,7 @@ void try_fix_nonlocal_unsafe_assume(Program& program, const GuaranteeTable& guar
 
 		// try to insert assertion in path; move assume if possible
 		try {
-			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
+			insert_active_assertion(program, observer_store, **it, error.var, true /* insert after */, no_check);
 			if (!no_check) {
 				std::cout << " ==> inserting assertion here" << std::endl;
 			}
@@ -901,7 +902,7 @@ void try_fix_nonlocal_unsafe_assume(Program& program, const GuaranteeTable& guar
 	raise_error<RefinementError>("could not infer valid move to try fix pointer race");
 }
 
-void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
+void try_fix_local_unsafe_dereference(Program& program, const SmrObserverStore& observer_store, const UnsafeDereferenceError& error) {
 	std::cout << "Trying to fix unsafe dereference of local pointer by inserting an appropriate assertion earlier in the program." << std::endl;
 
 	InsertionLocationFinderVisitor visitor({ &error.var }, error.pc);
@@ -927,7 +928,7 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 
 		// try to insert assertion in path; move assume if possible
 		try {
-			insert_active_assertion(program, guarantee_table, **it, error.var, true /* insert after */, no_check);
+			insert_active_assertion(program, observer_store, **it, error.var, true /* insert after */, no_check);
 			if (!no_check) {
 				std::cout << " ==> inserting assertion here" << std::endl;
 			}
@@ -944,10 +945,10 @@ void try_fix_local_unsafe_dereference(Program& program, const GuaranteeTable& gu
 }
 
 
-void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guarantee_table, const UnsafeAssumeError& error, bool avoid_reoffending) {
+void prtypes::try_fix_pointer_race(Program& program, const SmrObserverStore& observer_store, const UnsafeAssumeError& error, bool avoid_reoffending) {
 	try {
 		// insert assertion for offending command
-		insert_active_assertion(program, guarantee_table, error.pc, error.var);
+		insert_active_assertion(program, observer_store, error.pc, error.var);
 		std::cout << " ==> inserted active assertion for variable '" << error.var.name << "'" << std::endl;
 
 	} catch (RefinementError err) {
@@ -958,16 +959,16 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 		// try to move the offending assertion
 		assert(error.pc.expr);
 		if (is_expression_local(*error.pc.expr)) {
-			try_fix_local_unsafe_assume(program, guarantee_table, error);
+			try_fix_local_unsafe_assume(program, observer_store, error);
 		} else {
 			try {
-				try_remove_unsafe_assume(program, guarantee_table, error);
+				try_remove_unsafe_assume(program, observer_store, error);
 			} catch (RefinementError suberr) {
 				if (avoid_reoffending) {
 					throw std::move(suberr);
 				} else {
 					std::cout << suberr.what() << std::endl;
-					try_fix_nonlocal_unsafe_assume(program, guarantee_table, error);
+					try_fix_nonlocal_unsafe_assume(program, observer_store, error);
 				}
 			}
 		}
@@ -975,12 +976,12 @@ void prtypes::try_fix_pointer_race(Program& program, const GuaranteeTable& guara
 	}
 }
 
-void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeCallError& error) {
-	if (&error.pc.decl == &guarantee_table.observer_store.retire_function) {
+void prtypes::try_fix_pointer_race(cola::Program& program, const SmrObserverStore& observer_store, const UnsafeCallError& error) {
+	if (&error.pc.decl == &observer_store.retire_function) {
 		assert(error.pc.args.size() == 1);
 		assert(error.pc.args.at(0));
 		const VariableExpression& expr = *static_cast<const VariableExpression*>(error.pc.args.at(0).get()); // TODO: unhack this
-		insert_active_assertion(program, guarantee_table, error.pc, expr.decl);
+		insert_active_assertion(program, observer_store, error.pc, expr.decl);
 		std::cout << " ==> inserted active assertion for variable '" << expr.decl.name << "'" << std::endl;
 
 	} else {
@@ -988,10 +989,10 @@ void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable&
 	}
 }
 
-void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable& guarantee_table, const UnsafeDereferenceError& error) {
+void prtypes::try_fix_pointer_race(cola::Program& program, const SmrObserverStore& observer_store, const UnsafeDereferenceError& error) {
 	try {
 		// insert assertion for offending command
-		insert_active_assertion(program, guarantee_table, error.pc, error.var);
+		insert_active_assertion(program, observer_store, error.pc, error.var);
 		std::cout << " ==> inserted active assertion for variable '" << error.var.name << "'" << std::endl;
 
 	} catch (RefinementError err) {
@@ -1001,7 +1002,7 @@ void prtypes::try_fix_pointer_race(cola::Program& program, const GuaranteeTable&
 
 		if (!error.var.is_shared) {
 			// dereferences of local pointers should be guarded by SMR; try find earlier point where it is safe
-			try_fix_local_unsafe_dereference(program, guarantee_table, error);
+			try_fix_local_unsafe_dereference(program, observer_store, error);
 		} else {
 			throw std::move(err);
 		}

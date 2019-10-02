@@ -1,230 +1,100 @@
 #include "types/check.hpp"
 #include "types/checker.hpp"
-#include "types/inference.hpp"
-#include "types/observer.hpp"
-#include "types/factory.hpp"
-#include "types/guarantees.hpp"
-#include "types/cave.hpp"
-#include "cola/ast.hpp"
-#include "cola/observer.hpp"
-#include "cola/parse.hpp"
-#include "cola/util.hpp"
-#include "types/rmraces.hpp"
-#include "types/preprocess.hpp"
+#include "types/assumption.hpp"
 
 using namespace cola;
-using namespace prtypes;
 
+//
+// base observer
+//
 
-bool prtypes::type_check(const Program& program, const GuaranteeTable& guarantee_table) {
-	TypeChecker checker(program, guarantee_table);
-	return checker.is_well_typed();
+inline std::pair<const Function&, const Type&> get_basics() {
+	static const Function& free_function = Observer::free_function();
+	static const Type& ptrtype = free_function.args.at(0)->type;
+	return { free_function, ptrtype };
+}
+
+inline bool takes_single_pointer(const Function& function) {
+	return function.args.size() == 1 && function.args.at(0)->type.sort == Sort::PTR;
+}
+
+inline std::unique_ptr<Transition> mk_transition_invocation_any_thread(const State& src, const State& dst, const Function& function, const ObserverVariable& obsvar) {
+	auto guard = std::make_unique<EqGuard>(obsvar, std::make_unique<ArgumentGuardVariable>(*function.args.at(0)));
+	return std::make_unique<Transition>(src, dst, function, Transition::INVOCATION, std::move(guard));
+}
+
+std::unique_ptr<Observer> make_base_smr_observer(const Function& retire_function) {
+	auto [free_function, ptrtype] = get_basics();
+	assert(takes_single_pointer(free_function));
+	assert(takes_single_pointer(retire_function));
+	std::string name_prefix = "Base";
+
+	auto result = std::make_unique<Observer>("BaseSMR");
+	result->negative_specification = true;
+	
+	// variables
+	result->variables.push_back(std::make_unique<ThreadObserverVariable>(name_prefix + ":thread"));
+	result->variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>(name_prefix + ":address", ptrtype, false)));
+
+	// states
+	result->states.push_back(std::make_unique<State>(name_prefix + ".0", true, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".1", false, false));
+	result->states.push_back(std::make_unique<State>(name_prefix + ".2", false, true));
+
+	// transitions
+	result->states.at(0)->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(0), *result->states.at(1), retire_function, *result->variables.at(1)));
+	result->states.at(0)->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(0), *result->states.at(2), free_function, *result->variables.at(1)));
+	result->states.at(1)->transitions.push_back(mk_transition_invocation_any_thread(*result->states.at(1), *result->states.at(0), free_function, *result->variables.at(1)));
+
+	return result;
 }
 
 
+//
+// SMR store
+//
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+prtypes::SmrObserverStore::SmrObserverStore(const Program& program, const Function& retire_function) : program(program), retire_function(retire_function), base_observer(make_base_smr_observer(retire_function)) {
+	this->simulation.compute_simulation(*this->base_observer);
+	prtypes::raise_if_assumption_unsatisfied(*this->base_observer);
+	// conditionally_raise_error<UnsupportedObserverError>(!supports_elison(*this->base_observer), "does not support elision");
+	// NOTE: shown manually that base_observer supports elision?
+}
 
-// void print_guarantees(const GuaranteeSet set) {
-// 	std::cout << "{";
-// 	for (const auto& g : set) {
-// 		std::cout << g.get().name << /*"[" << &(g.get()) << "]" <<*/ ", ";
-// 	}
-// 	std::cout << "}" << std::endl;
-// }
+void prtypes::SmrObserverStore::add_impl_observer(std::unique_ptr<Observer> observer) {
+	prtypes::raise_if_assumption_unsatisfied(*observer);
+	this->impl_observer.push_back(std::move(observer));
+	this->simulation.compute_simulation(*this->impl_observer.back());
+	conditionally_raise_error<UnsupportedObserverError>(!supports_elison(*this->impl_observer.back()), "does not support elision");
+}
 
-// std::optional<std::reference_wrapper<const Function>> find_function(const Program& program, std::string name) {
-// 	for (const auto& function : program.functions) {
-// 		if (function->name == name) {
-// 			return *function;
-// 		}
-// 	}
-// 	return std::nullopt;
-// }
+bool prtypes::SmrObserverStore::supports_elison(const Observer& observer) const {
+	// requires simulation to be computed
 
-void prtypes::test() {
-	// // throw std::logic_error("not implemented");
-	
-	// std::cout << std::endl << std::endl << "Testing..." << std::endl;
-	// // const Type& ptrtype = Observer::free_function().args.at(0)->type;
+	prtypes::raise_if_assumption_unsatisfied(observer);
+	// assumption ==> free(<unobserved>) has not effect
+	// assumption ==> swapping <unobserved> addresses has no effect
+	// remains to check: <any state> in simulation relation with <initial state>
 
-	// std::string filename = "/Users/wolff/Tools/PointerRaceTypes/test.cola";
-	// auto program_ptr = cola::parse(filename);
-	// Program& program = *program_ptr;
-	// // program.name = "TestProgram";
-	
-	// std::cout << "Parsed program: " << std::endl;
-	// cola::print(program, std::cout);
-	
-	// prtypes::preprocess(program);
-	// program.name += " (preprocessed)";
-	// std::cout << "Preprocessed program: " << std::endl;
-	// cola::print(program, std::cout);
-
-	// // query retire
-	// auto search_retire = find_function(program, "retire");
-	// auto search_protect1 = find_function(program, "protect1");
-	// auto search_protect2 = find_function(program, "protect2");
-	// assert(search_protect1.has_value());
-	// assert(search_protect2.has_value());
-	// const Function& retire = *search_retire;
-	// const Function& protect1 = *search_protect1;
-	// const Function& protect2 = *search_protect2;
-
-	// // create stuff
-	// std::cout << std::endl << "Computing simulation... " << std::flush;
-	// SmrObserverStore store(program, retire);
-	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect1));
-	// store.add_impl_observer(make_hp_no_transfer_observer(retire, protect2));
-	// GuaranteeTable table(store);
-	// std::cout << "done" << std::endl;
-
-	// // adding guarantees
-	// auto add_guarantees = [&](const Function& func) {
-	// 	std::cout << std::endl << "Adding guarantees for " << func.name << "... " << std::flush;
-	// 	auto hp_guarantee_observers = prtypes::make_hp_no_transfer_guarantee_observers(retire, func, func.name);
-	// 	auto& guarantee_e1 = table.add_guarantee(std::move(hp_guarantee_observers.at(0)), "E1-" + func.name);
-	// 	auto& guarantee_e2 = table.add_guarantee(std::move(hp_guarantee_observers.at(1)), "E2-" + func.name);
-	// 	auto& guarantee_p = table.add_guarantee(std::move(hp_guarantee_observers.at(2)), "P-" + func.name);
-	// 	std::cout << "done" << std::endl;
-	// 	std::cout << "  - " << guarantee_e1.name << ": (transient, valid) = (" << guarantee_e1.is_transient << ", " << guarantee_e1.entails_validity << ")" << std::endl;
-	// 	std::cout << "  - " << guarantee_e2.name << ": (transient, valid) = (" << guarantee_e2.is_transient << ", " << guarantee_e2.entails_validity << ")" << std::endl;
-	// 	std::cout << "  -  " << guarantee_p.name << ": (transient, valid) = (" << guarantee_p.is_transient << ", " << guarantee_p.entails_validity << ")" << std::endl;
-	// };
-	// add_guarantees(protect1);
-	// add_guarantees(protect2);
-
-	// // assertion check (initial ones given by programmer)
-	// std::cout << std::endl << "Not checking initial assertions!" << std::endl;
-	// // std::cout << std::endl << "Checking initial assertions..." << std::endl;
-	// // bool initial_assertions_safe = discharge_assertions(program, table);
-	// // std::cout << "Assertion check: " << (initial_assertions_safe ? "successful" : "failed") << std::endl;
-
-	// // type check
-	// bool type_safe = false;
-	// while (!type_safe) {
-	// 	std::cout << std::endl << "Checking typing..." << std::endl;
-	// 	auto fix = [&](PointerRaceError& err) {
-	// 		std::cout << err.what() << std::endl;
-	// 		std::cout << "Trying to fix pointer race..." << std::endl;
-	// 		switch (err.kind()) {
-	// 			case PointerRaceError::CALL: try_fix_pointer_race(program, table, static_cast<UnsafeCallError&>(err)); break;
-	// 			case PointerRaceError::DEREF: try_fix_pointer_race(program, table, static_cast<UnsafeDereferenceError&>(err)); break;
-	// 			case PointerRaceError::ASSUME: try_fix_pointer_race(program, table, static_cast<UnsafeAssumeError&>(err)); break;
-	// 		}
-	// 	};
-	// 	try {
-	// 		type_safe = type_check(program, table);
-
-	// 	} catch (UnsafeCallError err) {
-	// 		fix(err);
-	// 	} catch (UnsafeDereferenceError err) {
-	// 		fix(err);
-	// 	} catch (UnsafeAssumeError err) {
-	// 		fix(err);
-	// 	}
-	// }
-	// std::cout << "Type check: " << (type_safe ? "successful" : "failed") << std::endl;
-
-	// // print program after modifications
-	// program.name += " (transformed)";
-	// cola::print(program, std::cout);
-
-	// // assertion check
-	// std::cout << std::endl << "Checking assertions..." << std::endl;
-	// bool assertions_safe = discharge_assertions(program, table);
-	// std::cout << "Assertion check: " << (assertions_safe ? "successful" : "failed") << std::endl;
-
-	// std::cout << "Checking linearizability under GC..." << std::endl;
-	// bool linearizable = prtypes::check_linearizability(program);
-	// std::cout << "Linearizability check: " << (linearizable ? "successful" : "failed") << std::endl;
-
-	// // // safe predicate
-	// // bool safe_valid, safe_invalid;
-	// // std::cout << std::endl << "Checking safe predicate. " << std::endl;
-	// // Enter enter_retire(retire);
-	// // VariableDeclaration ptr("ptr", ptrtype, false);
-	// // enter_retire.args.push_back(std::make_unique<VariableExpression>(ptr));
-	// // safe_valid = store.simulation.is_safe(enter_retire, { ptr }, {  });
-	// // std::cout << "  - enter retire(<valid>):   " << (safe_valid ? "safe" : "not safe") << std::endl;
-	// // safe_invalid = store.simulation.is_safe(enter_retire, { ptr }, { ptr });
-	// // std::cout << "  - enter retire(<invalid>): " << (safe_invalid ? "safe" : "not safe") << std::endl;
-
-	// // Enter enter_protect(protect1);
-	// // enter_protect.args.push_back(std::make_unique<VariableExpression>(ptr));
-	// // safe_valid = store.simulation.is_safe(enter_protect, { ptr }, {  });
-	// // std::cout << "  - enter protect(<valid>):   " << (safe_valid ? "safe" : "not safe") << std::endl;
-	// // safe_invalid = store.simulation.is_safe(enter_protect, { ptr }, { ptr });
-	// // std::cout << "  - enter protect(<invalid>): " << (safe_invalid ? "safe" : "not safe") << std::endl;
+	for (const auto& state : observer.states) {
+		if (state->initial) {
+			for (const auto& other : observer.states) {
+				if (!simulation.is_in_simulation_relation(*other, *state)) {
+					return false;
+				}
+			}	
+		}
+	}
+	return true;
+}
 
 
+//
+// type check
+//
 
-
-	// // std::cout << std::endl << std::endl << "Testing..." << std::endl;
-	// // const Type& ptrtype = Observer::free_function().args.at(0)->type;
-
-	// // Program program;
-	// // program.name = "TestProgram";
-	// // program.functions.push_back(std::make_unique<Function>("retire", Type::void_type(), Function::SMR));
-	// // Function& retire = *program.functions.at(0);
-	// // retire.args.push_back(std::make_unique<VariableDeclaration>("ptr", ptrtype, false));
-
-	// // // active observer (simplified)
-	// // auto obs_active_ptr = std::make_unique<Observer>();
-	// // auto& obs_active = *obs_active_ptr;
-	// // obs_active.negative_specification = false;
-	// // obs_active.variables.push_back(std::make_unique<ThreadObserverVariable>("T"));
-	// // obs_active.variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("P", ptrtype, false)));
-
-	// // obs_active.states.push_back(std::make_unique<State>("A.active", true, true));
-	// // obs_active.states.push_back(std::make_unique<State>("A.retired", false, false));
-	// // obs_active.states.push_back(std::make_unique<State>("A.dfreed", false, false));
-
-	// // obs_active.transitions.push_back(mk_transition(*obs_active.states.at(0), *obs_active.states.at(1), retire, *obs_active.variables.at(1)));
-	// // obs_active.transitions.push_back(mk_transition(*obs_active.states.at(1), *obs_active.states.at(0), Observer::free_function(), *obs_active.variables.at(1)));
-	// // obs_active.transitions.push_back(mk_transition(*obs_active.states.at(0), *obs_active.states.at(2), Observer::free_function(), *obs_active.variables.at(1)));
-
-	// // // safe observer (simplified)
-	// // auto obs_safe_ptr = std::make_unique<Observer>();
-	// // auto& obs_safe = *obs_safe_ptr;
-	// // obs_safe.negative_specification = false;
-	// // obs_safe.variables.push_back(std::make_unique<ThreadObserverVariable>("T"));
-	// // obs_safe.variables.push_back(std::make_unique<ProgramObserverVariable>(std::make_unique<VariableDeclaration>("P", ptrtype, false)));
-
-	// // obs_safe.states.push_back(std::make_unique<State>("S.init", true, true));
-	// // obs_safe.states.push_back(std::make_unique<State>("S.retired", true, true));
-	// // obs_safe.states.push_back(std::make_unique<State>("S.freed", false, false));
-
-	// // obs_safe.transitions.push_back(mk_transition(*obs_safe.states.at(0), *obs_safe.states.at(1), retire, *obs_safe.variables.at(1)));
-	// // obs_safe.transitions.push_back(mk_transition(*obs_safe.states.at(1), *obs_safe.states.at(2), Observer::free_function(), *obs_safe.variables.at(1)));
-
-
-	// // // guarantees
-	// // Guarantee gactive("active", std::move(obs_active_ptr));
-	// // Guarantee gsafe("safe", std::move(obs_safe_ptr));
-
-	// // GuaranteeSet gall = { gactive, gsafe };
-	// // std::cout << "guarantees: ";
-	// // print_guarantees(gall);
-
-	// // // inference
-	// // InferenceEngine ie(program, gall);
-
-	// // // -> epsilon
-	// // std::cout << "infer epsilon: ";
-	// // auto inferEpsilon = ie.infer(gall);
-	// // print_guarantees(inferEpsilon);
-	// // assert(inferEpsilon.count(gactive) && inferEpsilon.count(gsafe));
-
-	// // // -> enter
-	// // Enter enter(retire);
-	// // VariableDeclaration ptr("ptr", ptrtype, false);
-	// // enter.args.push_back(std::make_unique<VariableExpression>(ptr));
-	// // std::cout << "infer enter:retire(ptr): " << std::flush;
-	// // auto inferEnter = ie.infer_enter(gall, enter, ptr);
-	// // print_guarantees(inferEnter);
-	// // assert(inferEnter.count(gactive) && inferEnter.count(gsafe));
+bool prtypes::type_check(const cola::Program& program, const SmrObserverStore& observer_store) {
+	TypeContext context(observer_store);
+	TypeChecker checker(program, context);
+	return checker.is_well_typed();
 }

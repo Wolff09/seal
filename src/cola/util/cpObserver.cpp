@@ -8,7 +8,7 @@ struct CopyObserverVisitor final : public ObserverVisitor {
 	std::unique_ptr<GuardVariable> current_guard_variable;
 	std::unique_ptr<Guard> current_guard;
 	std::map<const ObserverVariable*, const ObserverVariable*> obsvar2copy;
-	std::map<const State*, const State*> state2copy;
+	std::map<const State*, State*> state2copy;
 
 	void visit(const ThreadObserverVariable& var) {
 		result->variables.push_back(std::make_unique<ThreadObserverVariable>(var.name));
@@ -55,11 +55,15 @@ struct CopyObserverVisitor final : public ObserverVisitor {
 	void visit(const State& state) {
 		result->states.push_back(std::make_unique<State>(state.name, state.initial, state.final));
 		state2copy[&state] = result->states.back().get();
+		for (const auto& transition : state.transitions) {
+			transition->accept(*this);
+		}
 	}
 
 	void visit(const Transition& transition) {
 		transition.guard->accept(*this);
-		result->transitions.push_back(std::make_unique<Transition>(*state2copy.at(&transition.src), *state2copy.at(&transition.dst), transition.label, transition.kind, std::move(current_guard)));
+		State& src_copy = *state2copy.at(&transition.src);
+		src_copy.transitions.push_back(std::make_unique<Transition>(src_copy, *state2copy.at(&transition.dst), transition.label, transition.kind, std::move(current_guard)));
 	}
 
 	void visit(const Observer& observer) {
@@ -70,9 +74,6 @@ struct CopyObserverVisitor final : public ObserverVisitor {
 		}
 		for (const auto& state : observer.states) {
 			state->accept(*this);
-		}
-		for (const auto& transition : observer.transitions) {
-			transition->accept(*this);
 		}
 	}
 };

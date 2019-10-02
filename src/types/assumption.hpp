@@ -95,10 +95,12 @@ namespace prtypes {
 				malformed = true;
 				return;
 			}
-			for (const auto& transition : observer.transitions) {
-				transition->accept(*this);
-				if (malformed) {
-					return;
+			for (const auto& state : observer.states) {
+				for (const auto& transition : state->transitions) {
+					transition->accept(*this);
+					if (malformed) {
+						return;
+					}
 				}
 			}
 		}

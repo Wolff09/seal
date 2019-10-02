@@ -170,8 +170,8 @@ std::vector<const State*> abstract_post(const Observer& observer, const State& t
 
 	std::vector<const State*> result;
 	bool definitely_has_post = false;
-	for (const auto& transition : observer.transitions) {
-		if (&transition->src == &to_post && &transition->label == &match.label && transition->kind == match.kind) {
+	for (const auto& transition : to_post.transitions) {
+		if (&transition->label == &match.label && transition->kind == match.kind) {
 			z3::expr trans_enc = make_formula(*transition->guard, PREFIX_TRANS, translation);
 
 			translation.solver.push();
@@ -225,14 +225,16 @@ bool SimulationEngine::is_safe(const Enter& enter, const std::vector<std::refere
 
 	// chech safe
 	for (const auto& observer : observers) {
-		for (const auto& transition : observer->transitions) {
-			if (&transition->label == &enter.decl && transition->kind == Transition::INVOCATION /* TODO: && enabled(transition->guard, params) */) {
-				const State& pre_state = transition->src;
-				const State& post_state = transition->dst;
-				std::vector<const State*> post_pre = abstract_post<EqualFreeable>(*observer, pre_state, *transition, invalid_translated);
-				for (const State* to_simulate : post_pre) {
-					if (!is_in_simulation_relation(*to_simulate, post_state)) {
-						return false;
+		for (const auto& state : observer->states) {
+			for (const auto& transition : state->transitions) {
+				if (&transition->label == &enter.decl && transition->kind == Transition::INVOCATION /* TODO: && enabled(transition->guard, params) */) {
+					const State& pre_state = transition->src;
+					const State& post_state = transition->dst;
+					std::vector<const State*> post_pre = abstract_post<EqualFreeable>(*observer, pre_state, *transition, invalid_translated);
+					for (const State* to_simulate : post_pre) {
+						if (!is_in_simulation_relation(*to_simulate, post_state)) {
+							return false;
+						}
 					}
 				}
 			}
@@ -248,31 +250,27 @@ bool simulation_holds(const Observer& observer, const SimulationEngine::Simulati
 		return current.count(required) != 0;
 	}
 	// handle outgoing transitions of to_simulate
-	for (const auto& transition : observer.transitions) {
-		if (&transition->src == &to_simulate) {
-			auto next_to_simulate = &transition->dst;
-			auto simulator_post = abstract_post(observer, simulator, *transition);
-			for (const auto& next_simulator : simulator_post) {
-				auto required = std::make_pair(next_to_simulate, next_simulator);
-				if (current.count(required) == 0) {
-					return false;
-				}
+	for (const auto& transition : to_simulate.transitions) {
+		auto next_to_simulate = &transition->dst;
+		auto simulator_post = abstract_post(observer, simulator, *transition);
+		for (const auto& next_simulator : simulator_post) {
+			auto required = std::make_pair(next_to_simulate, next_simulator);
+			if (current.count(required) == 0) {
+				return false;
 			}
 		}
 	}
-	// handle outgoing transitions of simulator
-	for (const auto& transition : observer.transitions) {
-		if (&transition->src == &simulator) {
-			auto next_simulator = &transition->dst;
-			auto to_simulate_post = abstract_post(observer, to_simulate, *transition);
-			for (const auto& next_to_simulate : to_simulate_post) {
-				auto required = std::make_pair(next_to_simulate, next_simulator);
-				if (!current.count(required)) {
-					return false;
-				}
-			}
-		}
-	}
+	// // handle outgoing transitions of simulator (this makes it a bisimulation!)
+	// for (const auto& transition : simulator.transitions) {
+	// 	auto next_simulator = &transition->dst;
+	// 	auto to_simulate_post = abstract_post(observer, to_simulate, *transition);
+	// 	for (const auto& next_to_simulate : to_simulate_post) {
+	// 		auto required = std::make_pair(next_to_simulate, next_simulator);
+	// 		if (!current.count(required)) {
+	// 			return false;
+	// 		}
+	// 	}
+	// }
 	return true;
 }
 
@@ -296,20 +294,20 @@ void SimulationEngine::compute_simulation(const Observer& observer) {
 		}
 	}
 
-	// // remove non-simulation pairs until fixed point
-	// bool removed;
-	// do {
-	// 	removed = false;
-	// 	auto it = result.begin();
-	// 	while (it != result.end()) {
-	// 		if (!simulation_holds(observer, result, *it->first, *it->second)) {
-	// 			removed = true;
-	// 			it = result.erase(it); // progresses it
-	// 		} else {
-	// 			it++;
-	// 		}
-	// 	}
-	// } while (removed);
+	// remove non-simulation pairs until fixed point
+	bool removed;
+	do {
+		removed = false;
+		auto it = result.begin();
+		while (it != result.end()) {
+			if (!simulation_holds(observer, result, *it->first, *it->second)) {
+				removed = true;
+				it = result.erase(it); // progresses it
+			} else {
+				it++;
+			}
+		}
+	} while (removed);
 
 	// store information
 	this->observers.insert(&observer);

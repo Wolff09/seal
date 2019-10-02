@@ -4,8 +4,7 @@
 
 #include <optional>
 #include "cola/ast.hpp"
-#include "types/guarantees.hpp"
-#include "types/inference.hpp"
+#include "types/types.hpp"
 #include "types/simulation.hpp"
 
 
@@ -14,11 +13,10 @@ namespace prtypes {
 	class TypeChecker final : public cola::Visitor {
 		private:
 			const cola::Program& program;
-			const GuaranteeTable& guarantee_table;
-			InferenceEngine inference;
+			const TypeContext& type_context;
 
 		public:
-			TypeChecker(const cola::Program& prog, const GuaranteeTable& table) : program(prog), guarantee_table(table), inference(program, guarantee_table) {}
+			TypeChecker(const cola::Program& prog, const TypeContext& context) : program(prog), type_context(context) {}
 
 			bool is_well_typed(const cola::AstNode& node) {
 				// TODO: proper exception handling
