@@ -348,7 +348,7 @@ struct CrossProductMaker {
 	}
 
 	std::vector<std::set<const HalfWaySymbolicTransition*>> get_transitions_per_state(const SymbolicState& symbolic_state, const Function* label, Transition::Kind kind) {
-		assert(!state.origin.empty());
+		assert(!symbolic_state.origin.empty());
 		std::vector<std::set<const HalfWaySymbolicTransition*>> result;
 		for (const State* state : symbolic_state.origin) {
 			std::set<const HalfWaySymbolicTransition*> transitions;
