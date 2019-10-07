@@ -138,7 +138,7 @@ antlrcpp::Any AstBuilder::visitProgram(cola::CoLaParser::ProgramContext* context
 		kvpair.second->is_shared = true;
 	}
 
-	// functions/summaries
+	// functions
 	_program->functions.reserve(context->function().size());
 	for (auto functionContext : context->function()) {
 		functionContext->accept(this);
@@ -199,8 +199,10 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 	pushScope();
 	auto arglist = context->args->accept(this).as<ArgDeclList*>();
 	function->args.reserve(arglist->size());
+	std::vector<std::string> argnames_list;
 	for (auto& pair : *arglist) {
 		std::string argname = pair.first;
+		argnames_list.push_back(argname);
 		const Type& argtype = _types.at(pair.second);
 		auto decl = std::make_unique<VariableDeclaration>(argname, argtype, false);
 		addVariable(std::move(decl));
@@ -222,8 +224,26 @@ antlrcpp::Any AstBuilder::visitFunction(cola::CoLaParser::FunctionContext* conte
 		assert(kind == Function::SMR);
 	}
 
-	// get variable decls
-	function->args = popScope();
+	// get variable decls; enforce right order
+	std::vector<std::unique_ptr<VariableDeclaration>> scope = popScope();
+	assert(scope.size() == argnames_list.size());
+	for (const auto& name : argnames_list) {
+		bool found = false;
+		for (auto& decl : scope) {
+			if (!decl) {
+				continue;
+			}
+			if (decl->name == name) {
+				function->args.push_back(std::move(decl));
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			throw std::logic_error("Parsing went terribly wrong... I lost some variables.");
+		}
+	}
+	scope.clear();
 
 	// transfer ownershp
 	if (name == INIT_NAME) {
