@@ -87,6 +87,18 @@
 		</div>
 	</header>
 
+	<!-- TODOs begin -->
+	<div class="container clearfix">
+		<div class="alert alert-danger container">
+			<strong>TODOs</strong>
+			<p class="mt-2">
+				PDFs für Observer; Link to VM; Linearizability Check Nachkommastellen; README/LICENSE in branch old-types; VM old-types benchmark.py testen; Synthese Laufzeit und Typenanzahl
+			</p>
+		</div>
+		<br>
+	</div>
+	<!-- TODOs end -->
+
 	<div class="container clearfix">
 		<!-- ********************************************************************************** -->
 		<!-- ************************************** PAPER ************************************* -->
@@ -106,10 +118,9 @@
 			</h2>
 			<h3>
 				<small>
-					Submitted to <a target="new" href="https://popl20.sigplan.org">POPL'20</a>.
+					Accepted for <a target="new" href="https://popl20.sigplan.org">POPL'20</a>.
 				</small>
 			</h3>
-			<!-- <p class="lead">Accepted for <a href="https://popl19.sigplan.org/home">POPL'19</a>.</p> -->
 			<p class="lead text-justify mb-2">
 				<strong>Abstract.</strong>
 				We consider the verification of lock-free data structures that manually manage their memory with the help of a safe memory reclamation (SMR) algorithm. Our first contribution is a type system that checks whether a program properly manages its memory. If the type check succeeds, and additionally the program's invariant annotations hold, it is safe to ignore the SMR algorithm and consider the program under garbage collection. Intuitively, our types track the protection of pointers as guaranteed by the SMR algorithm. There are two design decisions. The type system does not track any shape information, which makes it extremely lightweight. Instead, we rely on invariant annotations that postulate a protection by the SMR. To this end, we introduce angels, ghost variables with an angelic semantics. Moreover, the SMR algorithm is not hardcoded but a parameter of the type system definition. We rely on a recent specification language for SMR algorithms. Our second contribution is to automate the type and the invariant check. For the type check, we show a quadratic-time algorithm. For the invariant check, we give a source-to-source translation that links our programs to off-the-shelf verification tools. It compiles away the angelic semantics and allows us to infer appropriate annotations automatically in a guess&check manner. To demonstrate the effectiveness of our type-based verification approach, we check linearizability for various list and set implementations from the literature with both hazard pointers and epoch-based memory reclamation. For many of the examples, this is the first time they are verified automatically. For the ones where there is a competitor, we obtain a speed-up of an order of magnitude.
@@ -140,10 +151,10 @@
 					<i class="fas fa-code"></i>
 					Source Code
 				</a>
-				<!-- <a href="https://www.tcs.cs.tu-bs.de/documents/???.ova" class="btn btn-primary text-right">
+				<a target="new"  href="https://www.tcs.cs.tu-bs.de/documents/???.ova" class="btn btn-primary text-right">
 					<i class="fas fa-hdd"></i>
 					Virtual Machine
-				</a> -->
+				</a>
 			</div>
 
 			<!-- <hr class="my-4">
@@ -169,27 +180,27 @@
 
 		<!-- Quick Start -->
 		<div class="alert alert-info container">
-				<strong><i class="fas fa-shipping-fast"></i> Quick Start <i class="fas fa-shipping-fast"></i></strong>
-				<ol class="mt-2 mb-2">
-					<li class="mt-1">
-						Download the Virtual Machine Snapshot (created with <a target="new" href="https://www.virtualbox.org">Virtual Box</a>, credentials in <code>~/Desktop/pw.txt</code>).
-						The artifact is located at <code>~/popl20artifact/</code>.
-						The folder <code>~/popl20artifact/seal/</code> contains an installation of our tool <kbd>seal</kbd>, the back-end verifier, and all examples.
-						<br>
-						<i class="fas fa-link text-secondary"></i> <a href="#installation" class="text-secondary">See Compilation and Installation</a>
-					</li>
-					<li class="mt-1">
-						Fire up the Virtual Machine.
-					</li>
-					<li class="mt-1">
-						Open a Shell and simply execute <code>cd ~/popl20artifact/seal/ && python3 benchmark.py</code> to run all benchmarks.
-						<br>
-						<i class="fas fa-link text-secondary"></i> <a href="#benchmarks" class="text-secondary">See Benchmarking</a>
-					</li>
-					<li class="mt-1">
-						Presto!
-					</li>
-				</ol>
+			<strong><i class="fas fa-shipping-fast"></i> Quick Start <i class="fas fa-shipping-fast"></i></strong>
+			<ol class="mt-2 mb-2">
+				<li class="mt-1">
+					Download the Virtual Machine Snapshot (created with <a target="new" href="https://www.virtualbox.org">Virtual Box</a>, credentials in <code>~/Desktop/pw.txt</code>).
+					The artifact is located at <code>~/popl20artifact/</code>.
+					The folder <code>~/popl20artifact/seal/</code> contains an installation of our tool <kbd>seal</kbd>, the back-end verifier, and all examples.
+					<br>
+					<i class="fas fa-link text-secondary"></i> <a href="#installation" class="text-secondary">See Compilation and Installation</a>
+				</li>
+				<li class="mt-1">
+					Fire up the Virtual Machine.
+				</li>
+				<li class="mt-1">
+					Open a Shell and simply execute <code>cd ~/popl20artifact/seal/ && python3 benchmark.py</code> to run all benchmarks.
+					<br>
+					<i class="fas fa-link text-secondary"></i> <a href="#benchmarks" class="text-secondary">See Benchmarking</a>
+				</li>
+				<li class="mt-1">
+					Presto!
+				</li>
+			</ol>
 		</div>
 		<br>
 
@@ -369,7 +380,7 @@
 			
 			<h4>Running Benchmarks</h4>
 			<p>
-				To run the benchmarks got to the installation folder and execute the benchmark script like so:
+				To run the benchmarks go to the installation folder and execute the benchmark script like so:
 			</p>
 			<pre class="bg-light"><code class="bash">
       cd path/to/installation
@@ -398,15 +409,16 @@
 
 			<div class="alert alert-warning container">
 				<strong><i class="fas fa-exclamation-circle"></i> Discrepancy <i class="fas fa-exclamation-circle"></i></strong>
-				<p class="mt-3">
+				<p class="mt-2">
 					Note that the evaluation of the type check differs from the one presented in the paper.
 					Since submitting the paper, we rewrote the type implementation of the tool.
 					Our new implementation now computes the most precise type on-the-fly, rather computing (or asking for) types upfront.
 					This gives some runtime penalty for the EBR benchmarks, however, vastly improves the performance across the HP benchmarks.
-				</p>
-				<p>
 					The annotation and linearizability checks are not affected by our changes.
 					Their runtimes are as reported in the paper.
+				</p>
+				<p>
+					If you want to reproduce the old results presented in the paper, refer to <a href="old_types.html">this page</a>.
 				</p>
 			</div>
 			
