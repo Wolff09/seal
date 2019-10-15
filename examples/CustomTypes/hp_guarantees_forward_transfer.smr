@@ -185,3 +185,360 @@ observer HP2_Protection [positive] {
         s7 -- enter protect2(T, !P) >> s2;
         s7 -- free(*, P) >> s5;
 }
+
+
+/*********************************************************/
+/********************** HP transfer **********************/
+/*********************************************************/
+
+observer HPt_Entered [positive] { // needed?
+
+    variables:
+        thread T;
+        pointer P;
+
+    states:
+        s0(Final)[final];
+        s1(Base0-HPt_init)[initial];
+        s2(Base1-HPt_init);
+        s3(Base0-HPt_invoked)[final];
+        s4(Base1-HPt_invoked)[final];
+        s5(Base0-HPt_protected)[final];
+        s6(Base1-HPt_protected)[final];
+        s7(Base1-HPt_retired)[final];
+        s8(Base0-HPt_protected_invoked)[final];
+        s9(Base1-HPt_protected_invoked)[final];
+        s10(Base1-HPt_retired_invoked)[final];
+        s11(Base0-HPt_protected_transfer)[final];
+        s12(Base1-HPt_protected_transfer)[final];
+        s13(Base1-HPt_retired_transfer)[final];
+
+    transitions:
+        s1 -- enter retire(*, P) >> s2;
+        s1 -- enter protect1(T, P) >> s3;
+        s1 -- free(*, P) >> s0;
+        s2 -- enter protect1(T, P) >> s4;
+        s2 -- free(*, P) >> s1;
+        s3 -- enter retire(*, P) >> s4;
+        s3 -- enter protect1(T, !P) >> s1;
+        s3 -- exit protect1(T) >> s5;
+        s3 -- free(*, P) >> s0;
+        s4 -- enter protect1(T, !P) >> s2;
+        s4 -- exit protect1(T) >> s6;
+        s4 -- free(*, P) >> s3;
+        s5 -- enter retire(*, P) >> s7;
+        s5 -- enter protect1(T, !P) >> s1;
+        s5 -- enter protect2(T, P) >> s8;
+        s5 -- free(*, P) >> s0;
+        s6 -- enter retire(*, P) >> s7;
+        s6 -- enter protect1(T, !P) >> s2;
+        s6 -- enter protect2(T, P) >> s9;
+        s6 -- free(*, P) >> s5;
+        s7 -- enter protect1(T, !P) >> s2;
+        s7 -- enter protect2(T, P) >> s10;
+        s7 -- free(*, P) >> s0;
+        s8 -- enter retire(*, P) >> s10;
+        s8 -- enter protect1(T, !P) >> s1;
+        s8 -- enter protect2(T, !P) >> s1;
+        s8 -- exit protect2(T) >> s11;
+        s8 -- free(*, P) >> s0;
+        s9 -- enter retire(*, P) >> s10;
+        s9 -- enter protect1(T, !P) >> s2;
+        s9 -- enter protect2(T, !P) >> s2;
+        s9 -- exit protect2(T) >> s12;
+        s9 -- free(*, P) >> s8;
+        s10 -- enter protect1(T, !P) >> s2;
+        s10 -- enter protect2(T, !P) >> s2;
+        s10 -- exit protect2(T) >> s13;
+        s10 -- free(*, P) >> s0;
+        s11 -- enter retire(*, P) >> s13;
+        s11 -- enter protect2(T, !P) >> s1;
+        s11 -- free(*, P) >> s0;
+        s12 -- enter retire(*, P) >> s13;
+        s12 -- enter protect2(T, !P) >> s2;
+        s12 -- free(*, P) >> s11;
+        s13 -- enter protect2(T, !P) >> s2;
+        s13 -- free(*, P) >> s0;
+}
+
+observer HPt_Exited [positive] { // needed?
+
+    variables:
+        thread T;
+        pointer P;
+
+    states:
+        s0(Final)[final];
+        s1(Base0-HPt_init)[initial];
+        s2(Base1-HPt_init);
+        s3(Base0-HPt_invoked);
+        s4(Base1-HPt_invoked);
+        s5(Base0-HPt_protected)[final];
+        s6(Base1-HPt_protected)[final];
+        s7(Base1-HPt_retired)[final];
+        s8(Base0-HPt_protected_invoked)[final];
+        s9(Base1-HPt_protected_invoked)[final];
+        s10(Base1-HPt_retired_invoked)[final];
+        s11(Base0-HPt_protected_transfer)[final];
+        s12(Base1-HPt_protected_transfer)[final];
+        s13(Base1-HPt_retired_transfer)[final];
+
+    transitions:
+        s1 -- enter retire(*, P) >> s2;
+        s1 -- enter protect1(T, P) >> s3;
+        s1 -- free(*, P) >> s0;
+        s2 -- enter protect1(T, P) >> s4;
+        s2 -- free(*, P) >> s1;
+        s3 -- enter retire(*, P) >> s4;
+        s3 -- enter protect1(T, !P) >> s1;
+        s3 -- exit protect1(T) >> s5;
+        s3 -- free(*, P) >> s0;
+        s4 -- enter protect1(T, !P) >> s2;
+        s4 -- exit protect1(T) >> s6;
+        s4 -- free(*, P) >> s3;
+        s5 -- enter retire(*, P) >> s7;
+        s5 -- enter protect1(T, !P) >> s1;
+        s5 -- enter protect2(T, P) >> s8;
+        s5 -- free(*, P) >> s0;
+        s6 -- enter retire(*, P) >> s7;
+        s6 -- enter protect1(T, !P) >> s2;
+        s6 -- enter protect2(T, P) >> s9;
+        s6 -- free(*, P) >> s5;
+        s7 -- enter protect1(T, !P) >> s2;
+        s7 -- enter protect2(T, P) >> s10;
+        s7 -- free(*, P) >> s0;
+        s8 -- enter retire(*, P) >> s10;
+        s8 -- enter protect1(T, !P) >> s1;
+        s8 -- enter protect2(T, !P) >> s1;
+        s8 -- exit protect2(T) >> s11;
+        s8 -- free(*, P) >> s0;
+        s9 -- enter retire(*, P) >> s10;
+        s9 -- enter protect1(T, !P) >> s2;
+        s9 -- enter protect2(T, !P) >> s2;
+        s9 -- exit protect2(T) >> s12;
+        s9 -- free(*, P) >> s8;
+        s10 -- enter protect1(T, !P) >> s2;
+        s10 -- enter protect2(T, !P) >> s2;
+        s10 -- exit protect2(T) >> s13;
+        s10 -- free(*, P) >> s0;
+        s11 -- enter retire(*, P) >> s13;
+        s11 -- enter protect2(T, !P) >> s1;
+        s11 -- free(*, P) >> s0;
+        s12 -- enter retire(*, P) >> s13;
+        s12 -- enter protect2(T, !P) >> s2;
+        s12 -- free(*, P) >> s11;
+        s13 -- enter protect2(T, !P) >> s2;
+        s13 -- free(*, P) >> s0;
+}
+
+
+
+observer HPt_Transfer1 [positive] {
+
+    variables:
+        thread T;
+        pointer P;
+
+    states:
+        s0(Final)[final];
+        s1(Base0-HPt_init)[initial];
+        s2(Base1-HPt_init);
+        s3(Base0-HPt_invoked);
+        s4(Base1-HPt_invoked);
+        s5(Base0-HPt_protected)[final];
+        s6(Base1-HPt_protected);
+        s7(Base1-HPt_retired)[final];
+        s8(Base0-HPt_protected_invoked)[final];
+        s9(Base1-HPt_protected_invoked);
+        s10(Base1-HPt_retired_invoked)[final];
+        s11(Base0-HPt_protected_transfer)[final];
+        s12(Base1-HPt_protected_transfer);
+        s13(Base1-HPt_retired_transfer)[final];
+
+    transitions:
+        s1 -- enter retire(*, P) >> s2;
+        s1 -- enter protect1(T, P) >> s3;
+        s1 -- free(*, P) >> s0;
+        s2 -- enter protect1(T, P) >> s4;
+        s2 -- free(*, P) >> s1;
+        s3 -- enter retire(*, P) >> s4;
+        s3 -- enter protect1(T, !P) >> s1;
+        s3 -- exit protect1(T) >> s5;
+        s3 -- free(*, P) >> s0;
+        s4 -- enter protect1(T, !P) >> s2;
+        s4 -- exit protect1(T) >> s6;
+        s4 -- free(*, P) >> s3;
+        s5 -- enter retire(*, P) >> s7;
+        s5 -- enter protect1(T, !P) >> s1;
+        s5 -- enter protect2(T, P) >> s8;
+        s5 -- free(*, P) >> s0;
+        s6 -- enter retire(*, P) >> s7;
+        s6 -- enter protect1(T, !P) >> s2;
+        s6 -- enter protect2(T, P) >> s9;
+        s6 -- free(*, P) >> s5;
+        s7 -- enter protect1(T, !P) >> s2;
+        s7 -- enter protect2(T, P) >> s10;
+        s7 -- free(*, P) >> s0;
+        s8 -- enter retire(*, P) >> s10;
+        s8 -- enter protect1(T, !P) >> s1;
+        s8 -- enter protect2(T, !P) >> s1;
+        s8 -- exit protect2(T) >> s11;
+        s8 -- free(*, P) >> s0;
+        s9 -- enter retire(*, P) >> s10;
+        s9 -- enter protect1(T, !P) >> s2;
+        s9 -- enter protect2(T, !P) >> s2;
+        s9 -- exit protect2(T) >> s12;
+        s9 -- free(*, P) >> s8;
+        s10 -- enter protect1(T, !P) >> s2;
+        s10 -- enter protect2(T, !P) >> s2;
+        s10 -- exit protect2(T) >> s13;
+        s10 -- free(*, P) >> s0;
+        s11 -- enter retire(*, P) >> s13;
+        s11 -- enter protect2(T, !P) >> s1;
+        s11 -- free(*, P) >> s0;
+        s12 -- enter retire(*, P) >> s13;
+        s12 -- enter protect2(T, !P) >> s2;
+        s12 -- free(*, P) >> s11;
+        s13 -- enter protect2(T, !P) >> s2;
+        s13 -- free(*, P) >> s0;
+}
+
+observer HPt_Transfer2 [positive] {
+
+    variables:
+        thread T;
+        pointer P;
+
+    states:
+        s0(Final)[final];
+        s1(Base0-HP1_init)[initial];
+        s2(Base1-HP1_init);
+        s3(Base0-HP1_invoked);
+        s4(Base1-HP1_invoked);
+        s5(Base0-HP1_protected);
+        s6(Base1-HP1_protected);
+        s7(Base1-HP1_retired);
+        s8(Base0-HP1_protected_invoked)[final];
+        s9(Base1-HP1_protected_invoked);
+        s10(Base1-HP1_retired_invoked)[final];
+        s11(Base0-HP1_protected_transfer)[final];
+        s12(Base1-HP1_protected_transfer);
+        s13(Base1-HP1_retired_transfer)[final];
+
+    transitions:
+        s1 -- enter retire(*, P) >> s2;
+        s1 -- enter protect1(T, P) >> s3;
+        s1 -- free(*, P) >> s0;
+        s2 -- enter protect1(T, P) >> s4;
+        s2 -- free(*, P) >> s1;
+        s3 -- enter retire(*, P) >> s4;
+        s3 -- enter protect1(T, !P) >> s1;
+        s3 -- exit protect1(T) >> s5;
+        s3 -- free(*, P) >> s0;
+        s4 -- enter protect1(T, !P) >> s2;
+        s4 -- exit protect1(T) >> s6;
+        s4 -- free(*, P) >> s3;
+        s5 -- enter retire(*, P) >> s7;
+        s5 -- enter protect1(T, !P) >> s1;
+        s5 -- enter protect2(T, P) >> s8;
+        s5 -- free(*, P) >> s0;
+        s6 -- enter retire(*, P) >> s7;
+        s6 -- enter protect1(T, !P) >> s2;
+        s6 -- enter protect2(T, P) >> s9;
+        s6 -- free(*, P) >> s5;
+        s7 -- enter protect1(T, !P) >> s2;
+        s7 -- enter protect2(T, P) >> s10;
+        s7 -- free(*, P) >> s0;
+        s8 -- enter retire(*, P) >> s10;
+        s8 -- enter protect1(T, !P) >> s1;
+        s8 -- enter protect2(T, !P) >> s1;
+        s8 -- exit protect2(T) >> s11;
+        s8 -- free(*, P) >> s0;
+        s9 -- enter retire(*, P) >> s10;
+        s9 -- enter protect1(T, !P) >> s2;
+        s9 -- enter protect2(T, !P) >> s2;
+        s9 -- exit protect2(T) >> s12;
+        s9 -- free(*, P) >> s8;
+        s10 -- enter protect1(T, !P) >> s2;
+        s10 -- enter protect2(T, !P) >> s2;
+        s10 -- exit protect2(T) >> s13;
+        s10 -- free(*, P) >> s0;
+        s11 -- enter retire(*, P) >> s13;
+        s11 -- enter protect2(T, !P) >> s1;
+        s11 -- free(*, P) >> s0;
+        s12 -- enter retire(*, P) >> s13;
+        s12 -- enter protect2(T, !P) >> s2;
+        s12 -- free(*, P) >> s11;
+        s13 -- enter protect2(T, !P) >> s2;
+        s13 -- free(*, P) >> s0;
+}
+
+observer HPt_Transfer3 [positive] {
+
+    variables:
+        thread T;
+        pointer P;
+
+    states:
+        s0(Final)[final];
+        s1(Base0-HP1_init)[initial];
+        s2(Base1-HP1_init);
+        s3(Base0-HP1_invoked);
+        s4(Base1-HP1_invoked);
+        s5(Base0-HP1_protected);
+        s6(Base1-HP1_protected);
+        s7(Base1-HP1_retired);
+        s8(Base0-HP1_protected_invoked);
+        s9(Base1-HP1_protected_invoked);
+        s10(Base1-HP1_retired_invoked);
+        s11(Base0-HP1_protected_transfer)[final];
+        s12(Base1-HP1_protected_transfer);
+        s13(Base1-HP1_retired_transfer)[final];
+
+    transitions:
+        s1 -- enter retire(*, P) >> s2;
+        s1 -- enter protect1(T, P) >> s3;
+        s1 -- free(*, P) >> s0;
+        s2 -- enter protect1(T, P) >> s4;
+        s2 -- free(*, P) >> s1;
+        s3 -- enter retire(*, P) >> s4;
+        s3 -- enter protect1(T, !P) >> s1;
+        s3 -- exit protect1(T) >> s5;
+        s3 -- free(*, P) >> s0;
+        s4 -- enter protect1(T, !P) >> s2;
+        s4 -- exit protect1(T) >> s6;
+        s4 -- free(*, P) >> s3;
+        s5 -- enter retire(*, P) >> s7;
+        s5 -- enter protect1(T, !P) >> s1;
+        s5 -- enter protect2(T, P) >> s8;
+        s5 -- free(*, P) >> s0;
+        s6 -- enter retire(*, P) >> s7;
+        s6 -- enter protect1(T, !P) >> s2;
+        s6 -- enter protect2(T, P) >> s9;
+        s6 -- free(*, P) >> s5;
+        s7 -- enter protect1(T, !P) >> s2;
+        s7 -- enter protect2(T, P) >> s10;
+        s7 -- free(*, P) >> s0;
+        s8 -- enter retire(*, P) >> s10;
+        s8 -- enter protect1(T, !P) >> s1;
+        s8 -- enter protect2(T, !P) >> s1;
+        s8 -- exit protect2(T) >> s11;
+        s8 -- free(*, P) >> s0;
+        s9 -- enter retire(*, P) >> s10;
+        s9 -- enter protect1(T, !P) >> s2;
+        s9 -- enter protect2(T, !P) >> s2;
+        s9 -- exit protect2(T) >> s12;
+        s9 -- free(*, P) >> s8;
+        s10 -- enter protect1(T, !P) >> s2;
+        s10 -- enter protect2(T, !P) >> s2;
+        s10 -- exit protect2(T) >> s13;
+        s10 -- free(*, P) >> s0;
+        s11 -- enter retire(*, P) >> s13;
+        s11 -- enter protect2(T, !P) >> s1;
+        s11 -- free(*, P) >> s0;
+        s12 -- enter retire(*, P) >> s13;
+        s12 -- enter protect2(T, !P) >> s2;
+        s12 -- free(*, P) >> s11;
+        s13 -- enter protect2(T, !P) >> s2;
+        s13 -- free(*, P) >> s0;
+}
