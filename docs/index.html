@@ -92,7 +92,7 @@
 		<div class="alert alert-danger container">
 			<strong>TODOs</strong>
 			<p class="mt-2">
-				Link to VM; Linearizability Check Nachkommastellen; README/LICENSE in branch old-types; VM old-types benchmark.py testen; Synthese Laufzeit und Typenanzahl
+				Link to VM; README/LICENSE in all branches; VM old-types benchmark.py testen; Synthese Laufzeit und Typenanzahl
 			</p>
 		</div>
 		<br>
@@ -232,17 +232,17 @@
 			</p>
 			<ul>
 				<li>a type check to decide whether or not the data structure properly manages its memory (a successful type check implies memory safety),</li>
-				<li>a check to prove the invariant annotations in the input program (which may be needed for a successful type check) correct, and</li>
+				<li>a check to prove correct the invariant annotations in the input program (which may be needed for a successful type check), and</li>
 				<li>a linearizability check of the data structure.</li>
 			</ul>
 			<p>
 				The novelty of our approach lies in the ability to perform the last two tasks under garbage collection, using an off-the-shelf verifier.
-				For our tool we use Vafeiadis' <a target="new" href="https://people.mpi-sws.org/~viktor/cave/">CAVE</a> <span class="ref-year">Vafeiadis09, Vafeiadis10a, Vafeiadis10b</span> as a back-end.
+				For our tool we use Vafeiadis' <a target="new" href="https://people.mpi-sws.org/~viktor/cave/">CAVE</a> <span class="ref-year">Vafeiadis09, Vafeiadis10a, Vafeiadis10b</span> as a back-end solver.
 				To help the type check go through, our tool comes with an experimental rewrite engine to automatically add invariant annotations and apply Lipton's <span class="ref-year">Lipton75</span> mover types.
 			</p>
-			<p>
+			<!-- <p>
 				We submitted our tool to the <a target="new" href="https://popl20.sigplan.org/track/POPL-2020-Artifact-Evaluation">POPL'20 artifact evaluation</a> where it received the <i>Artifact Evaluated &mdash; Reusable</i> badge.
-			</p>
+			</p> -->
 			<p>
 				In the this page we discuss how to reproduce our experiments.
 				Therefore, we walk through the installation, compilation, and benchmarking.
@@ -279,12 +279,12 @@
 			<p>
 				To build the project, do the following:</p>
 			<pre class="bg-light"><code class="bash">
-      cd path/to/Seal-POPL20
-      mkdir build
-      cd build
-      cmake .. -DCMAKE_INSTALLATION_PREFIX=/path/to/installation -DCMAKE_CXX_COMPILER=/path/to/CXX-compiler
-      make
-      make install
+        cd path/to/Seal-POPL20
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_INSTALLATION_PREFIX=/path/to/installation -DCMAKE_CXX_COMPILER=/path/to/CXX-compiler
+        make
+        make install
 			</code></pre>
 			<p>
 				This creates a folder <code>/path/to/installation/seal</code> at the specified location.
@@ -383,8 +383,8 @@
 				To run the benchmarks go to the installation folder and execute the benchmark script like so:
 			</p>
 			<pre class="bg-light"><code class="bash">
-      cd path/to/installation
-      python3 benchmark.py
+        cd path/to/installation
+        python3 benchmark.py
 			</code></pre>
 			<p>
 				Make sure to use <code>python3</code>.
@@ -395,7 +395,7 @@
 				You can modify the timeout in seconds by passing an optional argument to <code>benchmark.py</code>:
 			</p>
 			<pre class="bg-light"><code class="bash">
-      python3 benchmark.py &lt;timeout_in_seconds&gt;
+        python3 benchmark.py &lt;timeout_in_seconds&gt;
 			</code></pre>
 			<p>
 				The benchmark script will output a table with the following columns:
@@ -564,7 +564,7 @@
 				You invoke <kbd>seal</kbd> like so:
 			</p>
 			<pre class="bg-light"><code class="">
-         ./seal  [-t] [-l] [-a] [-s] [-e]  &lt;path_to_program&gt; &lt;path_to_smr&gt;
+        ./seal  [-t] [-l] [-a] [-s] [-e]  &lt;path_to_program&gt; &lt;path_to_smr&gt;
 			</code></pre>
 			<p>
 				The flags and their arguments are listed in the following table (excerpt).
