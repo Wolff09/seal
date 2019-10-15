@@ -181,7 +181,6 @@ static void create_smr_observer(const Program& program, const Function& retire) 
 
 static void add_custom_guarantees(const Program& program, const Function& /*retire*/) {
 	std::cout << std::endl << "Loading custom types... " << std::flush;
-	INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID = false;
 	auto guarantees = cola::parse_observer(config.customtypes_path, program);
 	for (auto& guarantee : guarantees) {
 		input.table->add_guarantee(std::move(guarantee));
