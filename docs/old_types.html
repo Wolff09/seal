@@ -53,9 +53,6 @@
 			/*max-width: 400px;*/
 			max-width: 25rem;
 		}
-		/*.tooltip-inner i {
-			font-weight: 600;
-		}*/
 		span.ref-full::before, span.ref-year::before, .ref-item-id::before {
 			content: "[";
 		}
@@ -92,7 +89,6 @@
 		<!-- ************************************** PAPER ************************************* -->
 		<!-- ********************************************************************************** -->
 		<div class="jumbotron">
-			<!-- <img src="artifacts_evaluated_reusable.png" class="ml-4 mr-3" style="max-height: 9rem; float: right;"> -->
 			<h1 style="font-size: 2.75rem;">
 				Pointer Life Cycle Types for Lock-Free Data Structures with Memory Reclamation
 			</h1>
@@ -109,10 +105,6 @@
 					Accepted for <a target="new" href="https://popl20.sigplan.org">POPL'20</a>.
 				</small>
 			</h3>
-			<!-- <p class="lead text-justify mb-2">
-				<strong>Abstract.</strong>
-				We consider the verification of lock-free data structures that manually manage their memory with the help of a safe memory reclamation (SMR) algorithm. Our first contribution is a type system that checks whether a program properly manages its memory. If the type check succeeds, and additionally the program's invariant annotations hold, it is safe to ignore the SMR algorithm and consider the program under garbage collection. Intuitively, our types track the protection of pointers as guaranteed by the SMR algorithm. There are two design decisions. The type system does not track any shape information, which makes it extremely lightweight. Instead, we rely on invariant annotations that postulate a protection by the SMR. To this end, we introduce angels, ghost variables with an angelic semantics. Moreover, the SMR algorithm is not hardcoded but a parameter of the type system definition. We rely on a recent specification language for SMR algorithms. Our second contribution is to automate the type and the invariant check. For the type check, we show a quadratic-time algorithm. For the invariant check, we give a source-to-source translation that links our programs to off-the-shelf verification tools. It compiles away the angelic semantics and allows us to infer appropriate annotations automatically in a guess&check manner. To demonstrate the effectiveness of our type-based verification approach, we check linearizability for various list and set implementations from the literature with both hazard pointers and epoch-based memory reclamation. For many of the examples, this is the first time they are verified automatically. For the ones where there is a competitor, we obtain a speed-up of an order of magnitude.
-			</p> -->
 			
 			<br>
 			<div class="text-right mt-3">
@@ -167,7 +159,7 @@
 				<p class="mt-2">
 					Note: if you already followed the quick start guide from the <a href="index.html">main page</a>, go directly to step 3 (do not pass "GO", do not collect $200).
 				</p>
-				<ol class="mt-2 mb-2">
+				<ol class="mb-2">
 					<li class="mt-1">
 						Download the Virtual Machine Snapshot (created with <a target="new" href="https://www.virtualbox.org">Virtual Box</a>, credentials in <code>~/Desktop/pw.txt</code>).
 						The artifact is located at <code>~/popl20artifact/previous_version/</code>.
@@ -217,7 +209,7 @@
 				Our test script uses the timeout feature of the <code>subprocess</code> library which is available only in version 3.5 and newer.
 			</p>
 			<p>
-				The <code>benchmark.py</code> script runs every task (type check, annotation check, linearizability check) for every example program with a default timeout of 12 hours.
+				The <code>benchmark.py</code> script runs every task (type check, annotation check, linearizability check) for every example program with a default timeout of one hour.
 				You can modify the timeout in seconds by passing an optional argument to <code>benchmark.py</code>:
 			</p>
 			<pre class="bg-light"><code class="bash">
@@ -225,14 +217,15 @@
 			</code></pre>
 			<p>
 				The benchmark script will output a table with the following columns:
-				<ol>
-					<li><i>Program: </i>the name of the example program,</li>
-					<li><i>Synthesis:</i> time in seconds to automatically synthesis the required types upfront,</li>
-					<li><i>Synthesized Types:</i> time in seconds to perform a type check with the automatically synthesized types,</li>
-					<li><i>Manual Types:</i> time in seconds to perform a type check with manually specified types,</li>
-					<li><i>Annotations:</i> time in seconds to perform an annotation check with our back-end solver CAVE, and</li>
-					<li><i>Linearizability:</i> time in seconds to perform a linearizability check with our back-end solver CAVE.</li>
-				</ol> 
+			</p>
+			<ol>
+				<li><i>Program: </i>the name of the example program,</li>
+				<li><i>Synthesized Types:</i> time in seconds to perform a type check with the automatically synthesized types, and</li>
+				<li><i>Manual Types:</i> time in seconds to perform a type check with manually specified types.</li>
+			</ol>
+			<p>
+				Here, the benchmark script reproduces only the running times for computing a typing.
+				For the run times of the annotation and linearizability checks, refer to the <a href="index.html">main page</a>, they are not affected by our rewriting of the type implementation.
 			</p>
 			
 			<h4>Expected Benchmarks Results</h4>
@@ -242,13 +235,7 @@
 				The timeout was set to 12h.
 				We mark successful tasks with <i class="experiments fas fa-check"></i>, failed tasks with <i class="experiments fas fa-times"></i>, and timed out tasks with <i class="experiments far fa-clock"></i>.
 			</p>
-			<p>
-				TODO: synthesis info; is the HP-DGLM synth time correct?<br>
-				The synthesis for HP/EBR is identical across all benchmarks.
-				For HP, it took XXXs on average and produced XXX types.
-				For EBR, it took XXXs on average and produced XXX types.
-				Compared to that, we manually specified XXX types for HP and XXX for EBR.
-			</p>
+			<p>For completeness sake, we include the running times for the annotation and linearizability checks.</p>
 			<table class="table experiments">
 				<thead>
 					<tr>
@@ -256,8 +243,8 @@
 						<th scope="col">SMR</th>
 						<th class="text-right" scope="col">Synth. Types</th>
 						<th class="text-right" scope="col">Man. Types</th>
-						<th class="text-right" scope="col">Annotations</th>
-						<th class="text-right" scope="col">Linearizability</th>
+						<th class="text-right text-muted" scope="col">Annotations</th>
+						<th class="text-right text-muted" scope="col">Linearizability</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -266,117 +253,117 @@
 						<td>EBR</td>
 						<td class="text-right">0.16<i class="fas fa-check"></i></td>
 						<td class="text-right">0.12s<i class="fas fa-check"></i></td>
-						<td class="text-right">10s <i class="fas fa-check"></i></td>
-						<td class="text-right">1s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">10s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">1s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">26s<i class="fas fa-check"></i></td>
 						<td class="text-right">1.2s<i class="fas fa-check"></i></td>
-						<td class="text-right">12s <i class="fas fa-check"></i></td>
-						<td class="text-right">1s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">12s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">1s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row">Opt. Treiber's Stack</th>
 						<td>HP</td>
 						<td class="text-right">19s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.8s<i class="fas fa-check"></i></td>
-						<td class="text-right">11s <i class="fas fa-check"></i></td>
-						<td class="text-right">1s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">11s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">1s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row" rowspan="2">Michael&amp;Scott's Queue</th>
 						<td>EBR</td>
 						<td class="text-right">0.18s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.18s<i class="fas fa-check"></i></td>
-						<td class="text-right">16s <i class="fas fa-check"></i></td>
-						<td class="text-right">5s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">16s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">5s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">63s<i class="fas fa-check"></i></td>
 						<td class="text-right">2.3s<i class="fas fa-check"></i></td>
-						<td class="text-right">12s <i class="fas fa-check"></i></td>
-						<td class="text-right">4s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">12s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">4s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row" rowspan="2">DGLM Queue</th>
 						<td>EBR</td>
 						<td class="text-right">0.19s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.17s<i class="fas fa-check"></i></td>
-						<td class="text-right">1s<sup>*</sup> <i class="fas fa-times"></i></td>
-						<td class="text-right">6s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">1s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right text-muted">6s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">23s<i class="fas fa-check"></i></td>
 						<td class="text-right">42.3s<i class="fas fa-check"></i></td>
-						<td class="text-right">1s<sup>*</sup> <i class="fas fa-times"></i></td>
-						<td class="text-right">5s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">1s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right text-muted">5s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row" rowspan="2">Vechev&Yahav's DCAS Set</th>
 						<td>EBR</td>
 						<td class="text-right">0.25s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.23s<i class="fas fa-check"></i></td>
-						<td class="text-right">38s <i class="fas fa-check"></i></td>
-						<td class="text-right">200s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">38s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">200s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">230s<i class="fas fa-check"></i></td>
 						<td class="text-right">11s<i class="fas fa-check"></i></td>
-						<td class="text-right">13s <i class="fas fa-check"></i></td>
-						<td class="text-right">98s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">13s <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">98s <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row" rowspan="2">Vechev&Yahav's CAS Set</th>
 						<td>EBR</td>
 						<td class="text-right">0.23s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.21s<i class="fas fa-check"></i></td>
-						<td class="text-right">7h <i class="fas fa-check"></i></td>
-						<td class="text-right">42m <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">7h <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">42m <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">205s<i class="fas fa-check"></i></td>
 						<td class="text-right">11s<i class="fas fa-check"></i></td>
-						<td class="text-right">3.5h <i class="fas fa-check"></i></td>
-						<td class="text-right">42m <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">3.5h <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">42m <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row" rowspan="2">ORVYY Set</th>
 						<td>EBR</td>
 						<td class="text-right">0.23s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.21s<i class="fas fa-check"></i></td>
-						<td class="text-right">7h <i class="fas fa-check"></i></td>
-						<td class="text-right">47m <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">7h <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">47m <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">205s<i class="fas fa-check"></i></td>
 						<td class="text-right">11s<i class="fas fa-check"></i></td>
-						<td class="text-right">3.2h <i class="fas fa-check"></i></td>
-						<td class="text-right">47m <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">3.2h <i class="fas fa-check"></i></td>
+						<td class="text-right text-muted">47m <i class="fas fa-check"></i></td>
 					</tr>
 					<tr>
 						<th scope="row" rowspan="2">Michael's Set</th>
 						<td>EBR</td>
 						<td class="text-right">0.51s<i class="fas fa-check"></i></td>
 						<td class="text-right">0.48s<i class="fas fa-check"></i></td>
-						<td class="text-right">22s<sup>*</sup> <i class="fas fa-times"></i></td>
-						<td class="text-right">t/o <i class="far fa-clock"></i></td>
+						<td class="text-right text-muted">22s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right text-muted">t/o <i class="far fa-clock"></i></td>
 					</tr>
 					<tr>
 						<td>HP</td>
 						<td class="text-right">479s<i class="fas fa-check"></i></td>
 						<td class="text-right">23s<i class="fas fa-check"></i></td>
-						<td class="text-right">90s<sup>*</sup> <i class="fas fa-times"></i></td>
-						<td class="text-right">t/o <i class="far fa-clock"></i></td>
+						<td class="text-right text-muted">90s<sup>*</sup> <i class="fas fa-times"></i></td>
+						<td class="text-right text-muted">t/o <i class="far fa-clock"></i></td>
 					</tr>
 				</tbody>
 			</table>
-			<p>
+			<p class="text-muted">
 				<sup>*</sup> False-positive due to imprecision in the back-end verifier.
 			</p>
 			<br>
