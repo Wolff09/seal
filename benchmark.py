@@ -1,11 +1,11 @@
 # -*- coding: utf8 -*-
 
-#################################################
-######## Needs to be run from /build/bin ########
-#################################################
-
 import sys
-from subprocess import STDOUT, check_output, TimeoutExpired
+import os
+import signal
+from subprocess import Popen, PIPE, TimeoutExpired
+from time import monotonic as timer
+
 
 TIMEOUT = 60*60*1 # in seconds
 TIMEOUT_GIST = "#gist=?;to:t/o;to:t/o;to:t/o;to:t/o"
@@ -13,14 +13,13 @@ EXAMPLES_DIR = "examples/"
 
 HP = 1
 EBR = 2
-HP_MONOLITH = 3
 
 SMR_NAME = {
 	HP: "Hazard Pointers (HP)",
 	EBR: "Epoch-Based Reclamation (EBR)",
 }
 SMR_FILE = {
-	HP: "hp_forward_transfer.smr",
+	HP: "hp.smr",
 	EBR: "ebr.smr",
 }
 SMR_PROGRAM_FOLDER = {
@@ -28,8 +27,8 @@ SMR_PROGRAM_FOLDER = {
 	EBR: "EBR",
 }
 TYPE_FILE = {
-	HP: "CustomTypes/hp_guarantees_forward_transfer.smr",
-	EBR: "CustomTypes/ebr_guarantees.smr",
+	HP: "CustomTypes/hp_types.smr",
+	EBR: "CustomTypes/ebr_types.smr",
 }
 
 
@@ -61,11 +60,15 @@ def run_with_timeout(name, smr, args):
 	path_smr = EXAMPLES_DIR + SMR_FILE[smr]
 	all_args = ['./seal'] + args + [path_program, path_smr]
 
-	try:
-		out  = check_output(all_args, stderr=STDOUT, timeout=TIMEOUT, text=True)
-		gist = out.splitlines()[-1]
-	except TimeoutExpired:
-		gist = TIMEOUT_GIST
+	# make sure to properly kill subprocesses after timeout
+	# see: https://stackoverflow.com/questions/36952245/subprocess-timeout-failure
+	start = timer()
+	with Popen(all_args, stderr=PIPE, stdout=PIPE, preexec_fn=os.setsid, universal_newlines=True) as process:
+		try:
+			gist = process.communicate(timeout=TIMEOUT)[0]
+		except TimeoutExpired:
+			os.killpg(process.pid, signal.SIGINT) # send signal to the process group
+			gist = TIMEOUT_GIST
 	return gist
 
 def run_test(name, smr):
@@ -100,7 +103,6 @@ def main():
 	# EBR
 	print_head(SMR_NAME[EBR])
 	run_test("TreiberStack", EBR)
-	# run_test("TreiberOptimizedStack", EBR)
 	run_test("MichaelScottQueue", EBR)
 	run_test("DGLM", EBR)
 	run_test("VechevDCasSet", EBR)
