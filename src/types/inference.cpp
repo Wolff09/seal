@@ -654,11 +654,11 @@ GuaranteeSet infer_guarantees(const GuaranteeTable& guarantee_table, Translator&
 		// 	continue;
 		// }
 
-		#if INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID
+		if(INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID) {
 			if (!guarantee.entails_validity && prtypes::entails_valid(result)) {
 				continue;
 			}
-		#endif
+		}
 
 		// inference by nfa language inclusion
 //		std::cout << "  checkinf inference for: " << guarantee.name << std::endl;

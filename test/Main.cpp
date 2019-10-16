@@ -269,9 +269,15 @@ static void do_type_check() {
 	};
 
 	bool type_safe;
+	bool first = true;
 	do {
 		std::cout << std::endl << "Checking typing..." << std::endl;
 		auto begin = get_time();
+		if (!first && INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID) {
+			// if the first type check fails, turn off optimization
+			INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID = false;
+		}
+
 		try {
 			type_safe = prtypes::type_check(*input.program, *input.table);
 			output.time_types_total += get_elapsed(begin);
@@ -280,21 +286,27 @@ static void do_type_check() {
 		} catch (UnsafeCallError err) {
 			output.time_types_total += get_elapsed(begin);
 			output.time_types_last = get_elapsed(begin);
-			try_fix(err);
+			if (!first) try_fix(err);
 
 		} catch (UnsafeDereferenceError err) {
 			output.time_types_total += get_elapsed(begin);
 			output.time_types_last = get_elapsed(begin);
-			try_fix(err);
+			if (!first) try_fix(err);
 
 		} catch (UnsafeAssumeError err) {
 			output.time_types_total += get_elapsed(begin);
 			output.time_types_last = get_elapsed(begin);
 			bool reoffending = is_reoffending(err);
-			try_fix(err, reoffending);
+			if (!first) try_fix(err, reoffending);
 		}
 
-	} while (!type_safe && config.rewrite_and_retry);
+		first = false;
+		if (!type_safe && INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID) {
+			std::cout << std::endl << "-*- turning off optimization and retrying -*-" << std::endl;
+			// done in next iteration
+		}
+
+	} while (!type_safe && (config.rewrite_and_retry || INFERENCE_SKIP_GUARANTEES_IF_ALREADY_VALID));
 
 	// print program after modifications
 	if (config.rewrite_and_retry) {
