@@ -1,16 +1,11 @@
 # -*- coding: utf8 -*-
 
-####################################################
-######## Needs to be run from /path/to/seal ########
-####################################################
-
 import sys
-
-# from subprocess import STDOUT, check_output, TimeoutExpired
 import os
 import signal
 from subprocess import Popen, PIPE, TimeoutExpired
 from time import monotonic as timer
+
 
 TIMEOUT = 60*60*12 # in seconds
 TIMEOUT_GIST = "#gist=to:t/o;to:t/o;to:t/o"
@@ -43,9 +38,6 @@ def get_cell(gist, i):
 
 def get_verdict(verdict):
 	result = "-"
-	# if verdict == "0": result = "❌"
-	# if verdict == "1": result = "✅"
-	# if verdict == "to": result = "⌛"
 	if verdict == "0": result = "✗"
 	if verdict == "1": result = "✓"
 	if verdict == "to": result = "✗"
@@ -74,14 +66,7 @@ def run_with_timeout(name, smr, args):
 	path_smr = EXAMPLES_DIR + SMR_FILE[smr]
 	all_args = ['./seal'] + args + ADDITIONAL_ARGS[smr] + [path_program, path_smr]
 
-	# the following may not properly kill subprocesses after the specified timeout
-	# try:
-	# 	out  = check_output(all_args, stderr=STDOUT, timeout=TIMEOUT, text=True)
-	# 	gist = out.splitlines()[-1]
-	# except TimeoutExpired:
-	# 	gist = TIMEOUT_GIST
-	# return gist
-
+	# make sure to properly kill subprocesses after timeout
 	# see: https://stackoverflow.com/questions/36952245/subprocess-timeout-failure
 	start = timer()
 	with Popen(all_args, stderr=PIPE, stdout=PIPE, preexec_fn=os.setsid, universal_newlines=True) as process:
@@ -126,7 +111,6 @@ def main():
 	# EBR
 	print_head(SMR_NAME[EBR])
 	run_test("TreiberStack", EBR)
-	run_test("TreiberOptimizedStack", EBR)
 	run_test("MichaelScottQueue", EBR)
 	run_test("DGLM", EBR)
 	run_test("VechevDCasSet", EBR)
