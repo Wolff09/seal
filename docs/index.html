@@ -398,12 +398,10 @@
 			<div class="alert alert-warning container">
 				<strong><i class="fas fa-exclamation-circle"></i> Discrepancy <i class="fas fa-exclamation-circle"></i></strong>
 				<p class="mt-2">
-					Note that the evaluation of the type check differs from the one presented in the paper.
-					Since submitting the paper, we rewrote the type implementation of the tool.
+					Since submitting the paper, we optimized our tool and rewrote the type implementation.
 					Our new implementation now computes the most precise type on-the-fly, rather computing (or asking for) types upfront.
 					This gives some runtime penalty for the EBR benchmarks, however, vastly improves the performance across the HP benchmarks.
-					The annotation and linearizability checks are not affected by our changes.
-					Their runtimes are as reported in the paper.
+					The annotation and linearizability checks are not affected by our changes, their runtimes are as reported in the paper.
 				</p>
 				<p>
 					If you want to reproduce the old results presented in the paper, refer to <a href="old_types.html">this page</a>.
