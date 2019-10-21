@@ -618,6 +618,29 @@
 			<p>
 				Besides the above, <code>--version</code> prints the tool's version, <code>-h</code> and <code>--help</code> print the full usage description.
 			</p>
+
+			<h4>Experimental Rewrite Engine</h4>
+			<p>
+				Our tool comes with an experimental rewrite engine for hazard pointers that fully automatically applies moverness arguments and inserts active annotations upon a failed type check.
+				This rewrite engine is turned on by default (turned off by the <code>-e</code> eager flag).
+			</p>
+			<p>
+				For an example, one can execute <kbd>seal</kbd> on Micheal&Scott's non-preprocessed queue (<a target="new" href="https://github.com/Wolff09/seal/blob/POPL20/examples/HP/MichaelScottQueue.cola">Michael&amp;Scott's Queue</a>):
+			</p>
+			<pre class="bg-light"><code class="">
+        cd path/to/seal
+        ./seal -t examples/HP/MichaelScottQueue.cola examples/hp.smr
+			</code></pre>
+			<p>
+				Doing so, <kbd>seal</kbd> will start with the type check and soon report on a failure due using a potentially invalid pointer.
+				It will then attempt to fix the issue based on integrated heuristics and repeat the type check.
+				The output will give insights on the exact failure during the type check and the fix that is applied.
+				Note that fixing an issue may take some time as <kbd>seal</kbd> may invoke the back-end solver to test if an annotation can be added.
+			</p>
+			<p>
+				At the end, <kbd>seal</kbd> outputs the rewritten program and the number of rewrites performed.
+				For Michael&Scott's queue, 12 rewrites are necessary.
+			</p>
 		</div>
 		<br>
 
