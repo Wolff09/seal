@@ -92,7 +92,7 @@
 		<!-- ************************************** PAPER ************************************* -->
 		<!-- ********************************************************************************** -->
 		<div class="jumbotron">
-			<!-- <img src="artifacts_evaluated_reusable.png" class="ml-4 mr-3" style="max-height: 9rem; float: right;"> -->
+			<img src="artifacts_evaluated_reusable.png" class="ml-4 mr-3" style="max-height: 9rem; float: right;">
 			<h1 style="font-size: 2.75rem;">
 				Pointer Life Cycle Types for Lock-Free Data Structures with Memory Reclamation
 			</h1>
@@ -111,30 +111,44 @@
 			</h3>
 			<p class="lead text-justify mb-2">
 				<strong>Abstract.</strong>
-				We consider the verification of lock-free data structures that manually manage their memory with the help of a safe memory reclamation (SMR) algorithm. Our first contribution is a type system that checks whether a program properly manages its memory. If the type check succeeds, and additionally the program's invariant annotations hold, it is safe to ignore the SMR algorithm and consider the program under garbage collection. Intuitively, our types track the protection of pointers as guaranteed by the SMR algorithm. There are two design decisions. The type system does not track any shape information, which makes it extremely lightweight. Instead, we rely on invariant annotations that postulate a protection by the SMR. To this end, we introduce angels, ghost variables with an angelic semantics. Moreover, the SMR algorithm is not hardcoded but a parameter of the type system definition. We rely on a recent specification language for SMR algorithms. Our second contribution is to automate the type and the invariant check. For the type check, we show a quadratic-time algorithm. For the invariant check, we give a source-to-source translation that links our programs to off-the-shelf verification tools. It compiles away the angelic semantics and allows us to infer appropriate annotations automatically in a guess&check manner. To demonstrate the effectiveness of our type-based verification approach, we check linearizability for various list and set implementations from the literature with both hazard pointers and epoch-based memory reclamation. For many of the examples, this is the first time they are verified automatically. For the ones where there is a competitor, we obtain a speed-up of an order of magnitude.
+				We consider the verification of lock-free data structures that manually manage their memory with the help of a safe memory reclamation (SMR) algorithm.
+				Our first contribution is a type system that checks whether a program properly manages its memory.
+				If the type check succeeds, it is safe to ignore the SMR algorithm and consider the program under garbage collection.
+				Intuitively, our types track the protection of pointers as guaranteed by the SMR algorithm.
+				There are two design decisions.
+				The type system does not track any shape information, which makes it extremely lightweight.
+				Instead, we rely on invariant annotations that postulate a protection by the SMR.
+				To this end, we introduce angels, ghost variables with an angelic semantics.
+				Moreover, the SMR algorithm is not hard-coded but a parameter of the type system definition.
+				To achieve this, we rely on a recent specification language for SMR algorithms.
+				Our second contribution is to automate the type inference and the invariant check.
+				For the type inference, we show a quadratic-time algorithm.
+				For the invariant check, we give a source-to-source translation that links our programs to off-the-shelf verification tools.
+				It compiles away the angelic semantics.
+				This allows us to infer appropriate annotations automatically in a guess-and-check manner.
+				To demonstrate the effectiveness of our type-based verification approach, we check linearizability for various list and set implementations from the literature with both hazard pointers and epoch-based memory reclamation.
+				For many of the examples, this is the first time they are verified automatically.
+				For the ones where there is a competitor, we obtain a speed-up of up to two orders of magnitude.
 			</p>
 			
 			<div class="text-right mt-3">
-				<a target="new" href="resources/popl20-paper265-submitted.pdf" class="btn btn-primary text-right">
-					<i class="far fa-file-pdf"></i> 
-					Submitted Paper
-				</a>
-				<!-- <a target="new" href="http://www.tcs.cs.tu-bs.de/group/wolff/doc/???.pdf" class="btn btn-primary text-right">
+				<a target="new" href="resources/POPL20MeyerWolff.pdf" class="btn btn-primary text-right">
 					<i class="far fa-file-pdf"></i> 
 					Paper
 				</a>
+				<!--
 				<a target="new" href="http://www.tcs.cs.tu-bs.de/group/wolff/doc/???.pdf" class="btn btn-primary text-right">
 					<i class="far fa-file-pdf"></i> 
 					Slides
-				</a>
-				<a target="new" href="https://arxiv.org/abs/???" class="btn btn-primary text-right">
+				</a> -->
+				<a target="new" href="https://arxiv.org/abs/1910.11714" class="btn btn-primary text-right">
 					<i class="far fa-file-pdf"></i> 
 					Technical Report
 				</a>
-				<a target="new" href="https://doi.org/???" class="btn btn-primary text-right">
+				<a target="new" href="https://doi.org/10.1145/3371136" class="btn btn-primary text-right">
 					<i class="far fa-file-pdf"></i> 
 					DOI
-				</a> -->
+				</a>
 				<a target="new" href="https://github.com/Wolff09/seal/releases/tag/POPL20" class="btn btn-primary text-right">
 					<i class="fas fa-code"></i>
 					Source Code
@@ -145,19 +159,20 @@
 				</a>
 			</div>
 
-			<!-- <hr class="my-4">
+			<hr class="my-4">
 			<p>
 				CCS Concepts:
-				<strong>• Theory of computation → Data structures design and analysis; Program verification;</strong> Shared memory algorithms; Program specifications; Program analysis;
+				<strong>• Theory of computation → Program verification;</strong> Type theory; Shared memory algorithms; Concurrent algorithms; Program analysis; Invariants;
+				<strong>• Software and its engineering → Memory management; Model checking;</strong> Automated static analysis.
 			</p>
 			<p class="mb-4">
 				Additional Key Words and Phrases:
-				static analysis, lock-free data structures, verification, linearizability, safe memory reclamation, memory management
+				 lock-free data structures, safe memory reclamation, garbage collection, linearizability, verification, type systems, type inference
 			</p>
 			<p class="mb-0">
 				<b>ACM Reference Format:</b><br>
-				Roland Meyer and Sebastian Wolff. 2019. Decoupling Lock-Free Data Structures from Memory Reclamation for Static Analysis. <i>Proc. ACM Program. Lang.</i> 3, POPL, Article 58 (January 2019), 31 pages. <a href="https://doi.org/10. 1145/3290371">https://doi.org/10.1145/3290371</a>
-			</p> -->
+				Roland Meyer and Sebastian Wolff. 2020. Pointer Life Cycle Types for Lock-Free Data Structures with Memory Reclamation. <i>Proc. ACM Program. Lang.</i> 4, POPL, Article 68 (January 2020), 36 pages. <a href="https://arxiv.org/abs/1910.11714">https://arxiv.org/abs/1910.11714</a>
+			</p>
 		</div>
 
 
@@ -394,19 +409,6 @@
 					<li><i>Linearizability:</i> time in seconds to perform a linearizability check with our back-end solver CAVE.</li>
 				</ol> 
 			</p>
-
-			<div class="alert alert-warning container">
-				<strong><i class="fas fa-exclamation-circle"></i> Discrepancy <i class="fas fa-exclamation-circle"></i></strong>
-				<p class="mt-2">
-					Since submitting the paper, we optimized our tool and rewrote the type implementation.
-					Our new implementation now computes the most precise type on-the-fly, rather computing (or asking for) types upfront.
-					This gives some runtime penalty for the EBR benchmarks, however, vastly improves the performance across the HP benchmarks.
-					The annotation and linearizability checks are not affected by our changes, their runtimes are as reported in the paper.
-				</p>
-				<p>
-					If you want to reproduce the old results presented in the paper, refer to <a href="old_types.html">this page</a>.
-				</p>
-			</div>
 			
 			<h4>Expected Benchmarks Results</h4>
 			<p>
