@@ -179,7 +179,7 @@ bool remove(data_t key) {
 					assume(next == curr->next);
 					curr->marked = true;
 				}
-				atomic {
+				atomic { // should be inside another choose?
 					assume(pred->marked == false);
 					assume(curr == pred->next);
 					pred->next = next;

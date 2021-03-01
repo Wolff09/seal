@@ -1,0 +1,84 @@
+observer HazardPointer [negative] {
+
+	variables:
+		thread T;
+		pointer P;	
+
+	states:
+		s0(HP_init)[initial];
+		s1(HP1_invoked);
+		s2(HP1_protected);
+		s3(HP1_retired);
+		s4(HP1_interim);
+		s5(HP1_protected_HP2_invoked);
+		s6(HP1_retired_HP2_invoked);
+		s7(HP1_protected_HP2_protected);
+		s8(HP1_retired_HP2_protected);
+
+		s9(HP2_invoked);
+		s10(HP2_protected);
+		s11(HP2_retired);
+		s12(HP2_interim);
+		s13(HP2_protected_HP1_invoked);
+		s14(HP2_retired_HP1_invoked);
+		s15(HP2_retired_HP1_protected);
+
+		sF(fail)[final];
+
+	transitions:
+		s0 -- enter protect1(T, P) >> s1;
+		s1 -- exit protect1(T) >> s2;
+		s1 -- enter protect2(T, P) >> s4;
+		s2 -- enter protect2(T, P) >> s5;
+		s3 -- enter protect2(T, P) >> s6;
+		s4 -- exit protect2(T) >> s13;
+		s5 -- exit protect2(T) >> s7;
+		s6 -- exit protect2(T) >> s8;
+		s2 -- enter retire(*, P) >> s3;
+		s5 -- enter retire(*, P) >> s6;
+		s7 -- enter retire(*, P) >> s8;
+		
+		s1 -- enter protect1(T, !P) >> s0;
+		s2 -- enter protect1(T, !P) >> s0;
+		s3 -- enter protect1(T, !P) >> s0;
+		s4 -- exit protect1(T) >> s5;
+		s5 -- enter protect1(T, !P) >> s0;
+		s6 -- enter protect1(T, !P) >> s0;
+		s7 -- enter protect1(T, !P) >> s10;
+		s8 -- enter protect1(T, !P) >> s11;
+		s5 -- enter protect2(T, !P) >> s2;
+		s6 -- enter protect2(T, !P) >> s3;
+		s7 -- enter protect2(T, !P) >> s2;
+		s8 -- enter protect2(T, !P) >> s3;
+
+		s0 -- enter protect2(T, P) >> s9;
+		s9 -- exit protect2(T) >> s10;
+		s9 -- enter protect1(T, P) >> s12;
+		s10 -- enter protect1(T, P) >> s13;
+		s11 -- enter protect1(T, P) >> s14;
+		s12 -- exit protect1(T) >> s5;
+		s12 -- exit protect2(T) >> s13;
+		s13 -- exit protect1(T) >> s7;
+		s14 -- exit protect1(T) >> s15;
+		s10 -- enter retire(*, P) >> s11;
+		s13 -- enter retire(*, P) >> s14;
+		
+		s9 -- enter protect2(T, !P) >> s0;
+		s10 -- enter protect2(T, !P) >> s0;
+		s11 -- enter protect2(T, !P) >> s0;
+		s12 -- enter protect2(T, !P) >> s0;
+		s13 -- enter protect2(T, !P) >> s0;
+		s14 -- enter protect2(T, !P) >> s0;
+		s15 -- enter protect2(T, !P) >> s2;
+		s13 -- enter protect1(T, !P) >> s10;
+		s14 -- enter protect1(T, !P) >> s11;
+		s15 -- enter protect1(T, !P) >> s11;
+
+		s3 -- free(*, P) >> sF;
+		s6 -- free(*, P) >> sF;
+		s8 -- free(*, P) >> sF;
+		s11 -- free(*, P) >> sF;
+		s14 -- free(*, P) >> sF;
+		s15 -- free(*, P) >> sF;
+
+}

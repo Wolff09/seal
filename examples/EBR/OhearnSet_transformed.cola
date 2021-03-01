@@ -1,4 +1,4 @@
-#name "O'Hearn Set EBR"
+#name "O'Hearn Set EBR, manually transformed"
 #smr "EBR"
 #cavespec "../set_spec.cav"
 #cave 'prover_opts imp_var = "CC_.Head.next";'
@@ -45,12 +45,15 @@ inline void locate(Node* pred, Node* curr, data_t key, data_t k, data_t k3) {
 		k3 = k;
 
 		curr = pred->next;
-		angel(member(curr));
+		// angel(member(curr));
 
 		choose {
 			atomic {
 				assume(pred->marked == false);
-				assume(curr == pred->next);
+				// assume(curr == pred->next);
+				curr = pred->next; // atomicity abstraction
+				angel(member(curr)); // atomicity abstraction
+				k3 = k3;
 			}
 
 			k = curr->val;

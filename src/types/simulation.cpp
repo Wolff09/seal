@@ -249,7 +249,7 @@ bool simulation_holds(const Observer& observer, const SimulationEngine::Simulati
 		auto required = std::make_pair(&to_simulate, &simulator);
 		return current.count(required) != 0;
 	}
-	// handle outgoing transitions of to_simulate
+	// handle outgoing transitions of to_simulate // TODO: does this ignore implicit transitions?
 	for (const auto& transition : to_simulate.transitions) {
 		auto next_to_simulate = &transition->dst;
 		auto simulator_post = abstract_post(observer, simulator, *transition);

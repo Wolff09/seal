@@ -21,11 +21,7 @@ void init() {
 
 void push(data_t e) {
 	Node* top, node;
-
-	atomic {
-		angel(choose active);
-		leaveQ();
-	}
+	Node* tmp;
 
 	node = malloc;
 	node->val = e;
@@ -33,14 +29,23 @@ void push(data_t e) {
 
 	while (true) {
 		top = TOS;
-		angel(member(top));
 		node->next = top;
-		if (CAS(TOS, top, node)) {
-			break;
+		atomic {
+			assert(active(TOS));
+			choose {
+				tmp = node->next;   // ensure atomicity abstraction is correct (node->next has not changed)
+				assert(top == tmp); // ensure atomicity abstraction is correct (node->next has not changed)
+
+				// assume(TOS == top);
+				top = TOS; // atomicity abstraction
+				node->next = top; // atomicity abstraction
+				TOS = node;
+				break;
+			}{
+				assume(TOS != top);
+			}
 		}
 	}
-
-	enterQ();
 }
 
 data_t pop() {

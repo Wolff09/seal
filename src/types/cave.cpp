@@ -752,7 +752,7 @@ struct CaveOutputVisitor : public Visitor {
 				bool is_first = true;
 				for (const auto& stmt : this->derefs_in_current_atomic) {
 					if (!is_first) {
-						stream << ", ";
+						stream << "; "; // TODO: should this be ", " or "; "?
 					}
 					is_first = false;
 					handle_assign(*stmt);

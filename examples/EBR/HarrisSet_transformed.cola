@@ -1,0 +1,218 @@
+#name "Harris' Set EBR"
+#smr "EBR"
+#cavespec "../set_spec.cav"
+#cave 'prover_opts imp_var = "CC_.Head.next";'
+#cavebound "key"
+#instrumentation "container"
+
+
+struct Node {
+	data_t val;
+	bool marked;
+	Node* next;
+}
+
+Node* Head, Tail;
+
+extern void retire(Node* ptr);
+extern void enterQ();
+extern void leaveQ();
+
+
+void init() {
+	Tail = malloc;
+	Tail->next = NULL;
+	Tail->marked = false;
+	Head = malloc;
+	Head->next = Tail;
+	Head->marked = false;
+}
+
+
+inline void locate(Node* left, Node* lnext, Node* right, Node* rnext, bool rmark, data_t key, data_t k, data_t k3) {
+	// k3: CAVE hack for necessary precision
+	
+	k = MIN_VAL;
+	k3 = MIN_VAL;
+
+	while (true) {
+		right = Head;
+		atomic {
+			assert(active(Head));
+			rmark = Head->marked;
+			rnext = Head->next;
+		}
+		while (true) {
+			if (rmark == false) {
+				left = right;
+				lnext = rnext;
+			}
+			right = rnext;
+			angel(member(right));
+			if (right == Tail) break;
+			atomic {
+				rmark = right->marked;
+				rnext = right->next;
+			}
+			k = right->val;
+			k3 = right->val;
+			if (rmark == false) {
+				if (k >= key) {
+					break;
+				}
+			}
+		}
+		angel(member(left));
+		angel(member(lnext));
+		angel(member(right));
+		if (lnext == right) {
+			if (right == Tail) { break; }
+			if (right->marked == false) { break; }
+		} else {
+			choose {
+				atomic {
+					assume(left->marked == false);
+					assume(lnext == left->next);
+					left->marked = true;
+					left->next = right;
+				}
+				while (true) {
+					angel(member(lnext));
+					if (lnext == right) { break; }
+					atomic {
+						assert(active(lnext));
+						retire(lnext);
+					}
+					lnext = lnext->next;
+				}
+				if (right == Tail) { break; }
+				if (right->marked == false) { break; }
+			}{
+				skip;
+			}
+		}
+	}
+}
+
+
+bool contains(data_t key) {
+	Node* left, lnext, right, rnext;
+	data_t k, k3;
+	bool rmark, result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	locate(left, lnext, right, rnext, rmark, key, k, k3);
+
+	if (k == key) {
+		result = true;
+	} else {
+		result = false;
+	}
+
+	enterQ();
+	return result;
+}
+
+
+bool add(data_t key) {
+	Node* left, lnext, right, rnext, entry;
+	data_t k, k3;
+	bool rmark, result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	entry = malloc;
+	entry->val = key;
+	entry->marked = false;
+	angel(member(entry)); // should be done by Local Guarantee
+
+	while (true) {
+		locate(left, lnext, right, rnext, rmark, key, k, k3);
+
+		if (k == key) {
+			result = false;
+			// retire(entry); // reclaim new node that was not added to the data structure
+			break;
+
+		} else {
+			entry->next = right;
+			atomic {
+				choose {
+					assume(left->marked == false);
+					assume(right == left->next);
+
+					left->next = entry;
+					k3 = k;
+					result = true;
+					break;
+				}{
+					skip; // retry
+				}
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}
+
+bool remove(data_t key) {
+	Node* left, lnext, right, rnext;
+	data_t k, k3;
+	bool rmark, result;
+
+	atomic {
+		angel(choose active);
+		leaveQ();
+	}
+
+	while (true) {
+		locate(left, lnext, right, rnext, rmark, key, k, k3);
+
+		if (right == Tail) {
+			result = false;
+			break;
+		} else {
+			if (k > key) {
+				result = false;
+				break;
+
+			} else {
+				angel(member(right));
+				rnext = right->next;
+				angel(member(rnext));
+				choose {
+					atomic {
+						assume(right->marked == false);
+						assume(rnext == right->next);
+						right->marked = true;
+					}
+					choose {
+						angel(member(left));
+						atomic {
+							assume(left->marked == false);
+							assume(right == left->next);
+							left->next = rnext;
+							assert(active(right));
+							retire(right);
+						}
+					}{ skip; }
+					result = true;
+					break;
+				}{
+					skip; // retry
+				}
+			}
+		}
+	}
+
+	enterQ();
+	return result;
+}
