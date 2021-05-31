@@ -285,7 +285,7 @@
         cd path/to/Seal-POPL20
         mkdir build
         cd build
-        cmake .. -DCMAKE_INSTALLATION_PREFIX=/path/to/installation -DCMAKE_CXX_COMPILER=/path/to/CXX-compiler
+        cmake .. -DCMAKE_INSTALL_PREFIX=/path/to/installation -DCMAKE_CXX_COMPILER=/path/to/CXX-compiler
         make
         make install
 			</code></pre>
@@ -294,7 +294,7 @@
 				This folder contains all binaries, scripts, and examples needed to reproduce the evaluation from the paper.
 			</p>
 			<p>
-				We recommend to use the <code>-DCMAKE_INSTALLATION_PREFIX</code> to specify a location where to install the tool.
+				We recommend to use the <code>-DCMAKE_INSTALL_PREFIX</code> to specify a location where to install the tool.
 				Omitting this flag will install the tool somewhere like <code>/usr/local/</code>.
 				You can omit the <code>-DCMAKE_CXX_COMPILER</code> option to use your system's default compiler.
 			</p>
@@ -312,7 +312,7 @@
 				<dd>
 					When using <code>clang</code> to build <kbd>seal</kbd>, you might run into problems compiling and linking <code>AntLR</code>.
 					To solve this (tested with Ubuntu 18.04), install <code>libc++-dev</code> and <code>libc++abi-dev</code>.
-					Then, use the <code>clang++-libc++</code> compiler wrapper, i.e., pass <code>-DCMAKE_INSTALLATION_PREFIX=clang++-libc++</code> to <code>cmake</code>; it properly sets up <code>clang++</code> to use <code>libc++</code>.
+					Then, use the <code>clang++-libc++</code> compiler wrapper, i.e., pass <code>-DCMAKE_INSTALL_PREFIX=clang++-libc++</code> to <code>cmake</code>; it properly sets up <code>clang++</code> to use <code>libc++</code>.
 				</dd>
 			</dl>
 		</div>
