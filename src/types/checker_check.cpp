@@ -49,6 +49,13 @@ void debug_type_env(const TypeEnv& env, std::string note="") {
 	}
 }
 
+void debug_type_env(const TypeEnv& env, std::string note, const Command& cmd) {
+	std::stringstream stream;
+	stream << note << " --- ";
+	cola::print(cmd, stream);
+	debug_type_env(env, stream.str());
+}
+
 
 std::unique_ptr<Assert> make_assert_from_invariant(const Invariant* inv) {
 	if (inv) {
@@ -79,16 +86,16 @@ void TypeChecker::check_skip(const Skip& /*skip*/) {
 	// do nothing
 }
 
-void TypeChecker::check_malloc(const Malloc& /*malloc*/, const VariableDeclaration& ptr) {
+void TypeChecker::check_malloc(const Malloc& malloc, const VariableDeclaration& ptr) {
 	conditionally_raise_error<UnsupportedConstructError>(ptr.is_shared, "allocations must not target shared variables");
 	assert(prtypes::has_binding(current_type_environment, ptr));
 	current_type_environment.at(ptr) = type_context.local_type;
-	// debug_type_env(this->current_type_environment, "post malloc");
+	debug_type_env(this->current_type_environment, "post malloc", malloc);
 }
 
 void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wrapper<const VariableDeclaration>> params) {
-	// std::cout << std::endl << std::endl << ">>>>>> ENTER: "; cola::print(enter, std::cout);
-	// debug_type_env(this->current_type_environment);
+	std::cout << std::endl << std::endl << ">>>>>> ENTER: "; cola::print(enter, std::cout);
+	debug_type_env(this->current_type_environment);
 
 	// check safe
 	SimulationEngine::VariableDeclarationSet invalid;
@@ -115,20 +122,20 @@ void TypeChecker::check_enter(const Enter& enter, std::vector<std::reference_wra
 	// update types
 	this->current_type_environment = type_post(this->current_type_environment, enter);
 
-	// std::cout << "done";
-	// debug_type_env(this->current_type_environment);
-	// std::cout << "<<<<<<" << std::endl << std::endl;
+	std::cout << "done";
+	debug_type_env(this->current_type_environment);
+	std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_exit(const Exit& exit) {
-	// std::cout << std::endl << std::endl << ">>>>>> EXIT: "; cola::print(exit, std::cout);
-	// debug_type_env(this->current_type_environment);
+	std::cout << std::endl << std::endl << ">>>>>> EXIT: "; cola::print(exit, std::cout);
+	debug_type_env(this->current_type_environment);
 
 	this->current_type_environment = type_post(this->current_type_environment, exit);
 
-	// std::cout << "done";
-	// debug_type_env(this->current_type_environment);
-	// std::cout << "<<<<<<" << std::endl << std::endl;
+	std::cout << "done";
+	debug_type_env(this->current_type_environment);
+	std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaration& var) {
@@ -138,7 +145,7 @@ void TypeChecker::check_return(const Return& /*retrn*/, const VariableDeclaratio
 	}
 }
 
-void TypeChecker::check_break(const Break& /*brk*/) {
+void TypeChecker::check_break(const Break& brk) {
 	this->break_envs.push_back(this->current_type_environment);
 	
 	// result is universal typeenv to avoid restricting types unnecessarily
@@ -146,7 +153,7 @@ void TypeChecker::check_break(const Break& /*brk*/) {
 		type = type_context.empty_type;
 	}
 
-	// debug_type_env(this->current_type_environment, "post break");
+	debug_type_env(this->current_type_environment, "post break", brk);
 }
 
 
@@ -171,6 +178,8 @@ void TypeChecker::check_assume_pointer(const Assume& assume, const VariableDecla
 	} else {
 		// do nothing
 	}
+
+	debug_type_env(this->current_type_environment, "post assume", assume);
 }
 
 void TypeChecker::check_assume_pointer(const cola::Assume& assume, const cola::VariableDeclaration& lhs, cola::BinaryExpression::Operator op, const cola::Dereference& /*rhs_deref*/, const cola::VariableDeclaration& rhs_var) {
@@ -180,6 +189,8 @@ void TypeChecker::check_assume_pointer(const cola::Assume& assume, const cola::V
 
 	conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(rhs_var), assume, rhs_var);
 	// rely on preprocessing to have inserted an assertion for rhs_deref result to be active and thus valid
+
+	debug_type_env(this->current_type_environment, "post assume", assume);
 }
 
 void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableDeclaration& /*lhs*/, BinaryExpression::Operator /*op*/, const NullValue& /*rhs*/) {
@@ -189,13 +200,15 @@ void TypeChecker::check_assume_pointer(const Assume& /*assume*/, const VariableD
 void TypeChecker::check_assume_pointer(const cola::Assume& assume, const cola::Dereference& lhs_deref, const cola::VariableDeclaration& lhs_var, cola::BinaryExpression::Operator /*op*/, const cola::Expression& /*rhs*/) {
 	assert(lhs_deref.sort() != Sort::PTR);
 	conditionally_raise_error<UnsafeAssumeError>(!is_pointer_valid(lhs_var), assume, lhs_var);
+
+	debug_type_env(this->current_type_environment, "post assume", assume);
 }
 
 void TypeChecker::check_assert_nonpointer(const cola::Assert& /*assert*/, const cola::Expression& /*expr*/) {
 	// do nothing
 }
 
-void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableDeclaration& lhs, BinaryExpression::Operator op, const VariableDeclaration& rhs) {
+void TypeChecker::check_assert_pointer(const Assert& assert, const VariableDeclaration& lhs, BinaryExpression::Operator op, const VariableDeclaration& rhs) {
 	if (op == BinaryExpression::Operator::EQ) {
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		assert(prtypes::has_binding(current_type_environment, rhs));
@@ -208,9 +221,11 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 	} else {
 		raise_error<UnsupportedConstructError>("unsupported comparison operator in assertions; must be '=='");
 	}
+
+	debug_type_env(this->current_type_environment, "post assert", assert);
 }
 
-void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
+void TypeChecker::check_assert_pointer(const Assert& assert, const VariableDeclaration& lhs, BinaryExpression::Operator op, const NullValue& /*rhs*/) {
 	if (op == BinaryExpression::Operator::EQ) {
 		assert(prtypes::has_binding(current_type_environment, lhs));
 		current_type_environment.at(lhs) = prtypes::type_remove_local(current_type_environment.at(lhs));
@@ -218,17 +233,19 @@ void TypeChecker::check_assert_pointer(const Assert& /*assert*/, const VariableD
 	} else {
 		raise_error<UnsupportedConstructError>("unsupported comparison operator in assertions; must be '=='");
 	}
+
+	debug_type_env(this->current_type_environment, "post assert", assert);
 }
 
-void TypeChecker::check_assert_active(const Assert& /*assertion*/, const VariableDeclaration& ptr) {
-	// std::cout << std::endl << std::endl << ">>>>>> ASSERT ACTIVE: "; cola::print(assertion, std::cout);
-	// debug_type_env(this->current_type_environment);
+void TypeChecker::check_assert_active(const Assert& assertion, const VariableDeclaration& ptr) {
+	std::cout << std::endl << std::endl << ">>>>>> ASSERT ACTIVE: "; cola::print(assertion, std::cout);
+	debug_type_env(this->current_type_environment);
 
 	current_type_environment.at(ptr) = prtypes::type_add_active(current_type_environment.at(ptr));
 
-	// std::cout << "done";
-	// debug_type_env(this->current_type_environment);
-	// std::cout << "<<<<<<" << std::endl << std::endl;
+	std::cout << "done";
+	debug_type_env(this->current_type_environment);
+	std::cout << "<<<<<<" << std::endl << std::endl;
 }
 
 void TypeChecker::check_assert_active(const Assert& /*assert*/, const Dereference& /*deref*/, const VariableDeclaration& /*ptr*/) {
@@ -236,9 +253,9 @@ void TypeChecker::check_assert_active(const Assert& /*assert*/, const Dereferenc
 }
 
 
-void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const VariableDeclaration& rhs) {
-//	std::cout << "ASSIGN ptr = ptr: "; cola::print(node, std::cout);
-//	debug_type_env(this->current_type_environment);
+void TypeChecker::check_assign_pointer(const Assignment& node, const VariableDeclaration& lhs, const VariableDeclaration& rhs) {
+	std::cout << "ASSIGN ptr = ptr: "; cola::print(node, std::cout);
+	debug_type_env(this->current_type_environment);
 
 	assert(prtypes::has_binding(current_type_environment, lhs));
 	assert(prtypes::has_binding(current_type_environment, rhs));
@@ -248,8 +265,8 @@ void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const Variabl
 	current_type_environment.at(lhs) = result;
 	current_type_environment.at(rhs) = result;
 	
-//	std::cout << "done ASSIGN";
-//	debug_type_env(this->current_type_environment);
+	std::cout << "done ASSIGN";
+	debug_type_env(this->current_type_environment);
 }
 
 void TypeChecker::check_assign_pointer(const Assignment& /*node*/, const VariableDeclaration& lhs, const NullValue& /*rhs*/) {
@@ -301,20 +318,20 @@ void TypeChecker::check_angel_choose(bool active) {
 	Type type = active ? type_context.active_type : type_context.default_type;
 	current_type_environment.insert({ *current_angel, type });
 
-	// debug_type_env(current_type_environment, "@angle(choose) post");
+	debug_type_env(current_type_environment, "@angle(choose) post");
 }
 
 void TypeChecker::check_angel_active() {
 	conditionally_raise_error<TypeCheckError>(!current_angel, "Angel used but not allocated.");
 	assert(prtypes::has_binding(current_type_environment, *current_angel));
 
-	// debug_type_env(current_type_environment, "@angle(active) pre");
+	debug_type_env(current_type_environment, "@angle(active) pre");
 
 	Type type = current_type_environment.at(*current_angel);
 	type = prtypes::type_add_active(type);
 	current_type_environment.at(*current_angel) = type;
 
-	// debug_type_env(current_type_environment, "@angle(active) post");
+	debug_type_env(current_type_environment, "@angle(active) post");
 }
 
 void TypeChecker::check_angel_contains(const VariableDeclaration& ptr) {
@@ -322,12 +339,12 @@ void TypeChecker::check_angel_contains(const VariableDeclaration& ptr) {
 	assert(prtypes::has_binding(current_type_environment, *current_angel));
 	assert(prtypes::has_binding(current_type_environment, ptr));
 
-	// debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) pre");
+	debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) pre");
 
 	Type sum = prtypes::type_union(current_type_environment.at(*current_angel), current_type_environment.at(ptr));
 	current_type_environment.at(ptr) = sum;
 
-	// debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) post");
+	debug_type_env(current_type_environment, "@angle(contains(" + ptr.name + ")) post");
 }
 
 
@@ -434,15 +451,15 @@ void TypeChecker::check_ite(const IfThenElse& ite) {
 }
 
 void TypeChecker::check_loop(const Loop& loop) {
-	// std::cout << "ENTERING WHILE" << std::endl;
-//	debug_type_env(this->current_type_environment);
+	std::cout << "ENTERING WHILE" << std::endl;
+	debug_type_env(this->current_type_environment);
 	assert(loop.body);
 	TypeEnv pre_types;
 
 	conditionally_raise_error<TypeCheckError>(!this->break_envs.empty(), "'break' must not jump over loops");
 	do {
-//		std::cout << "========DOING WHILE" << std::endl;
-//		debug_type_env(this->current_type_environment);
+		std::cout << "========DOING WHILE" << std::endl;
+		debug_type_env(this->current_type_environment);
 		assert(this->break_envs.empty());
 		pre_types = this->current_type_environment;
 		loop.body->accept(*this);
@@ -455,13 +472,13 @@ void TypeChecker::check_loop(const Loop& loop) {
 		}
 
 	} while (!prtypes::equals(pre_types, this->current_type_environment));
-//	std::cout << "EXITING WHILE" << std::endl;
-//	debug_type_env(this->current_type_environment);
+	std::cout << "EXITING WHILE" << std::endl;
+	debug_type_env(this->current_type_environment);
 }
 
 void TypeChecker::check_while(const While& whl) {
-	// std::cout << "ENTERING WHILE " << whl.id << std::endl;
-	// debug_type_env(this->current_type_environment);
+	std::cout << "ENTERING WHILE " << whl.id << std::endl;
+	debug_type_env(this->current_type_environment);
 	assert(whl.expr);
 	assert(whl.body);
 
@@ -474,8 +491,8 @@ void TypeChecker::check_while(const While& whl) {
 	// apply loop rule, but peel breaking iterations
 	TypeEnv pre_types;
 	do {
-		// std::cout << "========DOING WHILE " << whl.id << std::endl;
-		// debug_type_env(this->current_type_environment);
+		std::cout << "========DOING WHILE " << whl.id << std::endl;
+		debug_type_env(this->current_type_environment);
 		pre_types = this->current_type_environment;
 		whl.body->accept(*this);
 		this->current_type_environment = prtypes::type_intersection(pre_types, this->current_type_environment);
@@ -495,8 +512,8 @@ void TypeChecker::check_while(const While& whl) {
 
 	assert(this->break_envs.empty());
 	this->current_type_environment = std::move(*result);
-	// std::cout << "EXITING WHILE" << std::endl;
-	// debug_type_env(this->current_type_environment);
+	std::cout << "EXITING WHILE" << std::endl;
+	debug_type_env(this->current_type_environment);
 
 	// // on-the-fly handle 'while (<cond>) { <body> }' as 'loop { assume(<cond>); <body> }; assume(!<cond>);'
 	// auto assume_positive = std::make_unique<Assume>(cola::copy(*whl.expr));

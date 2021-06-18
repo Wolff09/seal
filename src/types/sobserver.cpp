@@ -450,31 +450,31 @@ struct CrossProductMaker {
 
 		post_process();
 
-		// // debug output
-		// std::cout << "#states = " << states.size() << std::endl;
-		// auto print_sstate = [](const SymbolicState& symbolic_state) {
-		// 	std::cout << "{ ";
-		// 	bool first = true;
-		// 	for (const auto& state : symbolic_state.origin) {
-		// 		if (!first) std::cout << ", ";
-		// 		first = false;
-		// 		std::cout << state->name;
-		// 	}
-		// 	std::cout << " }";
-		// };
-		// for (const auto& state : states) {
-		// 	std::cout << "++ ";
-		// 	if (state->is_final) std::cout << "final ";
-		// 	if (state->is_active) std::cout << "active ";
-		// 	std::cout << "state: ";
-		// 	print_sstate(*state);
-		// 	std::cout << std::endl;
-		// 	for (const auto& transition : state->transitions) {
-		// 		std::cout << "    --[ " << (transition->kind == Transition::INVOCATION ? "enter " : "exit ") << transition->label.name << " ]--> ";
-		// 		print_sstate(transition->dst);
-		// 		std::cout << "    // " << transition->guard << std::endl;
-		// 	}
-		// }
+		// debug output
+		std::cout << "#states = " << states.size() << std::endl;
+		auto print_sstate = [](const SymbolicState& symbolic_state) {
+			std::cout << "{ ";
+			bool first = true;
+			for (const auto& state : symbolic_state.origin) {
+				if (!first) std::cout << ", ";
+				first = false;
+				std::cout << state->name;
+			}
+			std::cout << " }";
+		};
+		for (const auto& state : states) {
+			std::cout << "++ ";
+			if (state->is_final) std::cout << "final ";
+			if (state->is_active) std::cout << "active ";
+			std::cout << "state: ";
+			print_sstate(*state);
+			std::cout << std::endl;
+			for (const auto& transition : state->transitions) {
+				std::cout << "    --[ " << (transition->kind == Transition::INVOCATION ? "enter " : "exit ") << transition->label.name << " ]--> ";
+				print_sstate(transition->dst);
+				std::cout << "    // " << transition->guard << std::endl;
+			}
+		}
 	}
 };
 
